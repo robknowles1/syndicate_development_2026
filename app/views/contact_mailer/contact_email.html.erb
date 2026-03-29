@@ -1,0 +1,11 @@
+<html>
+  <body>
+    <h2>New Contact Form Submission</h2>
+    <p><strong>Name:</strong> <%= @name %></p>
+    <p><strong>Email:</strong> <%= @email %></p>
+    <p><strong>Subject:</strong> <%= @subject %></p>
+    <hr>
+    <p><strong>Message:</strong></p>
+    <p><%= simple_format(@message) %></p>
+  </body>
+</html>

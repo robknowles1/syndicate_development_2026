@@ -1,0 +1,15 @@
+<section class="mt-[70px] px-4 py-8">
+  <h1 class="text-3xl md:text-4xl font-black uppercase tracking-wide text-center mb-8" style="color: #242121;">
+    PROJECT GALLERY
+  </h1>
+
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+    <% @images.each do |image_path| %>
+      <a href="<%= asset_path(image_path) %>" class="block overflow-hidden">
+        <%= image_tag image_path,
+              alt: "Syndicate Development project photo",
+              class: "object-cover aspect-square w-full h-full hover:opacity-90 transition-opacity" %>
+      </a>
+    <% end %>
+  </div>
+</section>
