@@ -1,7 +1,7 @@
 # Spec: Admin Backend — Authentication and Services Page Management
 
 **ID:** SPEC-004
-**Status:** in-progress
+**Status:** done
 **Priority:** high
 **Created:** 2026-05-19
 **Author:** pm-agent

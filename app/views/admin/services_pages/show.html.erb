@@ -3,7 +3,7 @@
 <%# ---- Published toggle ---- %>
 <section class="bg-white rounded-lg shadow p-6 mb-8">
   <h2 class="text-lg font-semibold mb-4">Visibility</h2>
-  <%= form_with url: admin_services_page_path, method: :patch do |f| %>
+  <%= form_with url: admin_services_page_path, method: :patch, html: { id: "toggle-form" } do |f| %>
     <%# Hidden field ensures "false" is sent when checkbox is unchecked %>
     <input type="hidden" name="published" value="false">
     <label class="flex items-center gap-3 cursor-pointer">
@@ -20,7 +20,7 @@
 
 <%# ---- Content editor ---- %>
 <section class="bg-white rounded-lg shadow p-6" data-controller="bullet-editor">
-  <%= form_with url: admin_services_page_path, method: :patch do |f| %>
+  <%= form_with url: admin_services_page_path, method: :patch, html: { id: "content-form" } do |f| %>
     <% @sections.each do |section| %>
       <div class="mb-8 border-b pb-6 last:border-b-0 last:pb-0">
         <h2 class="text-lg font-bold mb-4"><%= section.heading %></h2>

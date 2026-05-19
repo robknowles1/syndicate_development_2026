@@ -83,6 +83,8 @@ en:
     gallery:
       heading: "PROJECT GALLERY"
       photo_alt: "Syndicate Development project photo"
+    services:
+      heading: "Services"
 
   contact:
     form:
@@ -113,10 +115,6 @@ en:
       title: "Admin — Syndicate Development"
       header: "Syndicate Development Admin"
       logout: "Log Out"
-
-  pages:
-    services:
-      heading: "Services"
 
   mailer:
     contact_email:
