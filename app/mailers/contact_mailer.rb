@@ -8,7 +8,7 @@ class ContactMailer < ApplicationMailer
     mail(
       to: "robknowles105@gmail.com",
       reply_to: email,
-      subject: "[Syndicate Development] #{subject}"
+      subject: "#{I18n.t('mailer.contact_email.subject_prefix')} #{subject}"
     )
   end
 end

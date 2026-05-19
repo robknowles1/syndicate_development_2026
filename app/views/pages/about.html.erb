@@ -33,83 +33,77 @@
 
 <%# Slideshow Section %>
 <section class="slideshow mt-[70px]">
-  <%= image_tag "gallery/m45a2920.jpg", alt: "Syndicate Development motorcycle 1" %>
-  <%= image_tag "gallery/m45a2927.jpg", alt: "Syndicate Development motorcycle 2" %>
-  <%= image_tag "gallery/m45a2928.jpg", alt: "Syndicate Development motorcycle 3" %>
+  <%= image_tag "gallery/m45a2920.jpg", alt: t("pages.about.slideshow_alt", n: 1) %>
+  <%= image_tag "gallery/m45a2927.jpg", alt: t("pages.about.slideshow_alt", n: 2) %>
+  <%= image_tag "gallery/m45a2928.jpg", alt: t("pages.about.slideshow_alt", n: 3) %>
 </section>
 
 <%# Shop Info Section %>
 <section class="py-16 px-6 max-w-4xl mx-auto">
   <h2 class="text-3xl md:text-4xl font-black uppercase tracking-wide mb-6" style="color: #242121;">
-    SYNDICATE DEVELOPMENT
+    <%= t("pages.about.shop_heading") %>
   </h2>
 
   <div class="mb-6 text-gray-700 text-lg">
     <p class="mb-2">
-      <strong>Shop Phone:</strong>
+      <strong><%= t("pages.about.shop_phone_label") %></strong>
       <a href="tel:2082519536" class="hover:text-red-600 transition-colors">208-251-9536</a>
     </p>
     <p>
-      <strong>Shop Address:</strong>
+      <strong><%= t("pages.about.shop_address_label") %></strong>
       <a href="https://goo.gl/maps/k6PjesVBsAqDArb27"
          target="_blank"
          rel="noopener noreferrer"
          class="hover:text-red-600 transition-colors">
-        1801 N. Arthur Ave., Pocatello, ID, 83204
+        <%= t("pages.about.shop_address") %>
       </a>
     </p>
   </div>
 
-  <h3 class="text-2xl font-bold uppercase mb-4" style="color: #242121;">About Doug Haskett</h3>
+  <h3 class="text-2xl font-bold uppercase mb-4" style="color: #242121;"><%= t("pages.about.bio_heading") %></h3>
   <p class="text-gray-700 text-base md:text-lg leading-relaxed mb-12">
-    Doug Haskett has been involved with motorcycles and racing for most of his life. Since 1998 he has been perfecting
-    his skills in the mechanics of the machine, learning the fine craft of engine, suspension and ECU tuning, and overall
-    bike fixes, upgrades and performance. He has worked at the highest levels of dirt bike racing, having experience with
-    professional Supercross and Motocross teams such as Rocky Mountain ATV MC and High Desert Racing as a mechanic. He has
-    also worked with many pro riders in testing and has the experience to do some testing himself. He continues to ride and
-    race, and his lifelong passion for bikes combined with his knowledge and state of the art performance equipment and dyno
-    room make him a highly sought-after mechanic today. Have a question? Send a message!
+    <%= t("pages.about.bio_body") %>
   </p>
 
   <%# Contact Form %>
   <div class="bg-gray-50 rounded-lg p-8 border border-gray-200">
-    <h3 class="text-2xl font-bold uppercase mb-6" style="color: #242121;">CONTACT THE SHOP</h3>
+    <h3 class="text-2xl font-bold uppercase mb-6" style="color: #242121;"><%= t("pages.about.contact_heading") %></h3>
 
     <%= form_with url: contact_path, method: :post, class: "space-y-4" do |f| %>
       <div>
-        <%= f.label :name, "Name *", class: "block font-bold text-gray-700 mb-1" %>
+        <%= f.label :name, t("pages.about.form.name_label"), class: "block font-bold text-gray-700 mb-1" %>
         <%= f.text_field :name,
-              placeholder: "Your name",
+              placeholder: t("pages.about.form.name_placeholder"),
               class: "w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:border-red-600",
               required: true %>
       </div>
 
       <div>
-        <%= f.label :email, "Email *", class: "block font-bold text-gray-700 mb-1" %>
+        <%= f.label :email, t("pages.about.form.email_label"), class: "block font-bold text-gray-700 mb-1" %>
         <%= f.email_field :email,
-              placeholder: "your@email.com",
+              placeholder: t("pages.about.form.email_placeholder"),
               class: "w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:border-red-600",
               required: true %>
       </div>
 
       <div>
-        <%= f.label :subject, "Subject", class: "block font-bold text-gray-700 mb-1" %>
+        <%= f.label :subject, t("pages.about.form.subject_label"), class: "block font-bold text-gray-700 mb-1" %>
         <%= f.text_field :subject,
-              placeholder: "What is this about?",
+              placeholder: t("pages.about.form.subject_placeholder"),
               class: "w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:border-red-600" %>
       </div>
 
       <div>
-        <%= f.label :message, "Message *", class: "block font-bold text-gray-700 mb-1" %>
+        <%= f.label :message, t("pages.about.form.message_label"), class: "block font-bold text-gray-700 mb-1" %>
         <%= f.text_area :message,
-              placeholder: "Tell us what you need...",
+              placeholder: t("pages.about.form.message_placeholder"),
               rows: 6,
               class: "w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:border-red-600",
               required: true %>
       </div>
 
       <div>
-        <%= f.submit "Send Message",
+        <%= f.submit t("pages.about.form.submit"),
               class: "bg-red-600 text-white font-bold uppercase tracking-widest px-8 py-3 hover:bg-red-700 transition-colors cursor-pointer rounded" %>
       </div>
     <% end %>

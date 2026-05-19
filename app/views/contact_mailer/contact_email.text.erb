@@ -1,9 +1,9 @@
-New Contact Form Submission
+<%= t("mailer.contact_email.heading") %>
 ===========================
 
-Name:    <%= @name %>
-Email:   <%= @email %>
-Subject: <%= @subject %>
+<%= t("mailer.contact_email.name_label") %>    <%= @name %>
+<%= t("mailer.contact_email.email_label") %>   <%= @email %>
+<%= t("mailer.contact_email.subject_label") %> <%= @subject %>
 
-Message:
+<%= t("mailer.contact_email.message_label") %>
 <%= @message %>

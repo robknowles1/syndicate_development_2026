@@ -6,15 +6,15 @@ class ContactsController < ApplicationController
     message = params[:message].to_s.strip
 
     if name.blank? || email.blank? || message.blank?
-      redirect_to about_path, alert: "Please fill in all required fields (name, email, and message)."
+      redirect_to about_path, alert: I18n.t("contact.errors.missing_required_fields")
     else
       ContactMailer.contact_email(
         name: name,
         email: email,
-        subject: subject.presence || "(No subject)",
+        subject: subject.presence || I18n.t("contact.form.no_subject"),
         message: message
       ).deliver_now
-      redirect_to about_path, notice: "Message sent! We'll be in touch soon."
+      redirect_to about_path, notice: I18n.t("contact.notices.message_sent")
     end
   end
 end

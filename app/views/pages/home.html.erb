@@ -3,9 +3,9 @@
          style="background-image: url('<%= asset_path('gallery/m45a2849.jpg') %>');"
          >
   <div class="text-white">
-    <h1 class="text-4xl md:text-7xl font-black tracking-widest uppercase break-words">SYNDICATE DEVELOPMENT</h1>
-    <p class="text-xl md:text-2xl font-bold tracking-wide mt-2">Performance, Passion, Precision.</p>
-    <%= link_to "PROJECT GALLERY", gallery_path,
+    <h1 class="text-4xl md:text-7xl font-black tracking-widest uppercase break-words"><%= t("pages.home.hero_heading") %></h1>
+    <p class="text-xl md:text-2xl font-bold tracking-wide mt-2"><%= t("pages.home.hero_tagline") %></p>
+    <%= link_to t("pages.home.cta_gallery"), gallery_path,
           class: "inline-block mt-6 px-8 py-3 border-2 border-white text-white font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors" %>
   </div>
 </section>
@@ -13,16 +13,13 @@
 <%# Mission Section %>
 <section class="py-20 px-6 text-center bg-white">
   <h2 class="text-3xl md:text-4xl font-black uppercase tracking-wide mb-4" style="color: #db0505;">
-    DREAM IT. BUILD IT. RIDE IT. LOVE IT.
+    <%= t("pages.home.mission_heading") %>
   </h2>
   <h4 class="text-lg md:text-xl font-bold uppercase tracking-wide text-gray-800 mb-8">
-    SPECIALIZING IN CUSTOM PERFORMANCE MOTOCROSS AND SUPERCROSS MOTORCYCLES
+    <%= t("pages.home.mission_subheading") %>
   </h4>
   <p class="max-w-3xl mx-auto text-gray-700 text-base md:text-lg leading-relaxed">
-    From simple upgrades to full race ready bikes, Syndicate Development is here to cater to all of your motorcycle needs.
-    With state of the art equipment and a performance dyno room, we are here to get your machine performing better than you even thought possible.
-    We specialize in custom suspension, engine performance, and ECU tuning, but we also offer things from regular services to full race prep.
-    Give us a call or send us a message and let us know what we can do for you!
+    <%= t("pages.home.mission_body") %>
   </p>
 </section>
 
@@ -30,8 +27,8 @@
 <section class="w-full h-screen bg-cover bg-center flex flex-col items-center justify-center text-center px-6"
          style="background-image: url('<%= asset_path('gallery/m45a2996.jpg') %>');">
   <div class="text-white">
-    <h1 class="text-4xl md:text-6xl font-black uppercase tracking-widest mb-8">READY TO START BUILDING?</h1>
-    <%= link_to "CONTACT THE SHOP", about_path,
+    <h1 class="text-4xl md:text-6xl font-black uppercase tracking-widest mb-8"><%= t("pages.home.cta_heading") %></h1>
+    <%= link_to t("pages.home.cta_contact"), about_path,
           class: "inline-block px-10 py-4 border-2 border-red-600 text-white font-bold uppercase tracking-widest text-lg hover:bg-red-600 transition-colors" %>
   </div>
 </section>

@@ -1,11 +1,11 @@
 <html>
   <body>
-    <h2>New Contact Form Submission</h2>
-    <p><strong>Name:</strong> <%= @name %></p>
-    <p><strong>Email:</strong> <%= @email %></p>
-    <p><strong>Subject:</strong> <%= @subject %></p>
+    <h2><%= t("mailer.contact_email.heading") %></h2>
+    <p><strong><%= t("mailer.contact_email.name_label") %></strong> <%= @name %></p>
+    <p><strong><%= t("mailer.contact_email.email_label") %></strong> <%= @email %></p>
+    <p><strong><%= t("mailer.contact_email.subject_label") %></strong> <%= @subject %></p>
     <hr>
-    <p><strong>Message:</strong></p>
+    <p><strong><%= t("mailer.contact_email.message_label") %></strong></p>
     <p><%= simple_format(@message) %></p>
   </body>
 </html>

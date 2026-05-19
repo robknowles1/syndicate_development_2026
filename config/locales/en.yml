@@ -28,4 +28,74 @@
 #       enabled: "ON"
 
 en:
-  hello: "Hello world"
+  application:
+    title: "Syndicate Development"
+    name: "Syndicate Development"
+
+  nav:
+    logo_alt: "Syndicate Development"
+    home: "Home"
+    about: "About"
+    gallery: "Gallery"
+    toggle_aria_label: "Toggle navigation menu"
+
+  pages:
+    home:
+      hero_heading: "SYNDICATE DEVELOPMENT"
+      hero_tagline: "Performance, Passion, Precision."
+      cta_gallery: "PROJECT GALLERY"
+      mission_heading: "DREAM IT. BUILD IT. RIDE IT. LOVE IT."
+      mission_subheading: "SPECIALIZING IN CUSTOM PERFORMANCE MOTOCROSS AND SUPERCROSS MOTORCYCLES"
+      mission_body: |
+        From simple upgrades to full race ready bikes, Syndicate Development is here to cater to all of your motorcycle needs.
+        With state of the art equipment and a performance dyno room, we are here to get your machine performing better than you even thought possible.
+        We specialize in custom suspension, engine performance, and ECU tuning, but we also offer things from regular services to full race prep.
+        Give us a call or send us a message and let us know what we can do for you!
+      cta_heading: "READY TO START BUILDING?"
+      cta_contact: "CONTACT THE SHOP"
+    about:
+      shop_heading: "SYNDICATE DEVELOPMENT"
+      shop_phone_label: "Shop Phone:"
+      shop_address_label: "Shop Address:"
+      shop_address: "1801 N. Arthur Ave., Pocatello, ID, 83204"
+      bio_heading: "About Doug Haskett"
+      bio_body: |
+        Doug Haskett has been involved with motorcycles and racing for most of his life. Since 1998 he has been perfecting
+        his skills in the mechanics of the machine, learning the fine craft of engine, suspension and ECU tuning, and overall
+        bike fixes, upgrades and performance. He has worked at the highest levels of dirt bike racing, having experience with
+        professional Supercross and Motocross teams such as Rocky Mountain ATV MC and High Desert Racing as a mechanic. He has
+        also worked with many pro riders in testing and has the experience to do some testing himself. He continues to ride and
+        race, and his lifelong passion for bikes combined with his knowledge and state of the art performance equipment and dyno
+        room make him a highly sought-after mechanic today. Have a question? Send a message!
+      contact_heading: "CONTACT THE SHOP"
+      slideshow_alt: "Syndicate Development motorcycle %{n}"
+      form:
+        name_label: "Name *"
+        name_placeholder: "Your name"
+        email_label: "Email *"
+        email_placeholder: "your@email.com"
+        subject_label: "Subject"
+        subject_placeholder: "What is this about?"
+        message_label: "Message *"
+        message_placeholder: "Tell us what you need..."
+        submit: "Send Message"
+    gallery:
+      heading: "PROJECT GALLERY"
+      photo_alt: "Syndicate Development project photo"
+
+  contact:
+    form:
+      no_subject: "(No subject)"
+    errors:
+      missing_required_fields: "Please fill in all required fields (name, email, and message)."
+    notices:
+      message_sent: "Message sent! We'll be in touch soon."
+
+  mailer:
+    contact_email:
+      subject_prefix: "[Syndicate Development]"
+      heading: "New Contact Form Submission"
+      name_label: "Name:"
+      email_label: "Email:"
+      subject_label: "Subject:"
+      message_label: "Message:"

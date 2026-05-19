@@ -18,10 +18,10 @@ RSpec.describe "Contacts", type: :request do
         expect(response).to redirect_to(about_path)
       end
 
-      it "sets a flash notice" do
+      it "sets a flash notice matching the locale value" do
         ActionMailer::Base.delivery_method = :test
         post contact_path, params: valid_params
-        expect(flash[:notice]).to eq("Message sent! We'll be in touch soon.")
+        expect(flash[:notice]).to eq(I18n.t("contact.notices.message_sent"))
       end
 
       it "delivers an email" do
@@ -45,6 +45,11 @@ RSpec.describe "Contacts", type: :request do
         post contact_path, params: valid_params.merge(name: "")
         expect(response).to redirect_to(about_path)
         expect(flash[:alert]).to be_present
+      end
+
+      it "sets a flash alert matching the locale value" do
+        post contact_path, params: valid_params.merge(name: "")
+        expect(flash[:alert]).to eq(I18n.t("contact.errors.missing_required_fields"))
       end
 
       it "does not send an email" do

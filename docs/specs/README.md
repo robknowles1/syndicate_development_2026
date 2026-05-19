@@ -8,6 +8,7 @@ This directory contains feature specs produced by the PM agent following the spe
 |----------|---------|--------|----------|------|
 | SPEC-001 | Frontend Rebuild — Marketing/Portfolio Site | ready | high | [frontend-rebuild.md](frontend-rebuild.md) |
 | SPEC-002 | Services Page | draft | medium | [services-page.md](services-page.md) |
+| SPEC-003 | i18n String Extraction | ready | medium | [i18n-string-extraction.md](i18n-string-extraction.md) |
 
 *(Update this table as specs are added.)*
 
