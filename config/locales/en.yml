@@ -111,10 +111,26 @@ en:
       toggle_notice: "Services page visibility updated."
       content_notice: "Service section content saved."
       validation_error: "Each service section must have at least one bullet item."
+      visibility_heading: "Visibility"
+      current_status_label: "Current status:"
+      status_published: "Published"
+      status_unpublished: "Unpublished"
+      section_heading_label: "Heading"
+      bullet_items_label: "Bullet Items"
+      bullet_remove_label: "Remove"
+      add_bullet_button: "+ Add bullet"
     layout:
       title: "Admin — Syndicate Development"
       header: "Syndicate Development Admin"
       logout: "Log Out"
+
+  activerecord:
+    errors:
+      models:
+        service_section:
+          attributes:
+            base:
+              at_least_one_bullet: "Each service section must have at least one bullet item."
 
   mailer:
     contact_email:

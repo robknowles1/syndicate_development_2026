@@ -31,7 +31,7 @@ RSpec.describe "Admin::Sessions", type: :request do
     end
 
     context "with incorrect password" do
-      it "re-renders the login form with HTTP 200 (unprocessable entity)" do
+      it "re-renders the login form with HTTP 422 Unprocessable Entity" do
         post admin_login_path, params: { email: admin.email, password: "wrongpassword" }
         expect(response).to have_http_status(:unprocessable_entity)
       end

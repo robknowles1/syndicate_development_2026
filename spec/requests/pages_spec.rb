@@ -4,7 +4,7 @@ RSpec.describe "Pages", type: :request do
   describe "GET /services" do
     before do
       # Seed the three sections so the page can render
-      %w[precision_engines custom_suspension ecu_tuning].each_with_index do |slug, i|
+      %w[precision_engines custom_suspension_setup ecu_tuning].each_with_index do |slug, i|
         section = ServiceSection.find_or_create_by!(slug: slug) { |s| s.heading = slug.upcase }
         ServiceBullet.find_or_create_by!(service_section: section, position: 0) { |b| b.body = "Bullet #{i}" }
       end
