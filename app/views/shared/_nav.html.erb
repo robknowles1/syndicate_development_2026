@@ -10,6 +10,10 @@
       <%= link_to t("nav.home"), root_path, class: "text-white font-bold tracking-wide hover:text-red-600 transition-colors" %>
       <%= link_to t("nav.about"), about_path, class: "text-white font-bold tracking-wide hover:text-red-600 transition-colors" %>
       <%= link_to t("nav.gallery"), gallery_path, class: "text-white font-bold tracking-wide hover:text-red-600 transition-colors" %>
+      <% if SiteSetting.enabled?("services_page_published") %>
+        <%= link_to t("nav.services"), services_path,
+              class: "font-bold tracking-wide transition-colors #{current_page?(services_path) ? 'text-red-600' : 'text-white hover:text-red-600'}" %>
+      <% end %>
     </div>
 
     <%# Mobile hamburger button — visible on mobile, hidden on md+ %>
@@ -35,6 +39,11 @@
       <%= link_to t("nav.gallery"), gallery_path,
             class: "text-white font-bold px-6 py-3 hover:text-red-600 transition-colors",
             data: { action: "click->nav#toggle" } %>
+      <% if SiteSetting.enabled?("services_page_published") %>
+        <%= link_to t("nav.services"), services_path,
+              class: "font-bold px-6 py-3 transition-colors #{current_page?(services_path) ? 'text-red-600' : 'text-white hover:text-red-600'}",
+              data: { action: "click->nav#toggle" } %>
+      <% end %>
     </div>
   </div>
 </div>

@@ -1,0 +1,25 @@
+<div class="mt-[70px]">
+  <div class="bg-[#242121] text-white py-16 px-6 text-center">
+    <h1 class="text-4xl font-black tracking-widest"><%= t("pages.services.heading") %></h1>
+  </div>
+
+  <div class="max-w-5xl mx-auto px-6 py-16">
+    <div class="grid gap-12 md:grid-cols-3">
+      <% @sections.each do |section| %>
+        <div>
+          <h2 class="text-xl font-black tracking-wide text-[#242121] mb-4 border-b-2 border-red-600 pb-2">
+            <%= section.heading %>
+          </h2>
+          <ul class="space-y-2">
+            <% section.service_bullets.each do |bullet| %>
+              <li class="flex items-start gap-2 text-gray-700">
+                <span class="text-red-600 font-bold mt-0.5">&bull;</span>
+                <span><%= bullet.body %></span>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
