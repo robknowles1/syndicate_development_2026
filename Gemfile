@@ -77,4 +77,7 @@ group :test do
 
   # Matchers for common Rails validations and associations
   gem "shoulda-matchers"
+
+  # Database cleanup strategy for system tests (truncation instead of transactions)
+  gem "database_cleaner-active_record"
 end
