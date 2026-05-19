@@ -1,7 +1,8 @@
 ---
 name: pm
 description: Project Manager agent. Takes raw requirements, feature requests, or bug reports and produces structured spec files in docs/specs/. Use this agent first for any new feature or task before handing off to the developer or architect agent.
-tools: Read, Write, Edit, Glob, Grep, WebSearch
+model: claude-sonnet-4-6
+allowed-tools: Read Write Edit Glob Grep WebSearch
 ---
 
 # Role: Project Manager
@@ -29,7 +30,6 @@ For each task, produce a spec file at `docs/specs/<feature-slug>.md`.
 **Created:** YYYY-MM-DD
 **Author:** pm-agent
 
----
 
 ## Summary
 

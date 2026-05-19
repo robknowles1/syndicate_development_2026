@@ -1,7 +1,8 @@
 ---
 name: developer
 description: Developer agent. Implements features from specs, writes tests, and hands off to the reviewer and QA agents. Use this agent after the pm agent has produced a ready spec.
-tools: Read, Write, Edit, Glob, Grep, Bash
+model: claude-sonnet-4-6
+allowed-tools: Read Write Edit Glob Grep Bash
 ---
 
 # Role: Developer
@@ -57,7 +58,6 @@ After implementation, output:
 
 Example:
 > Implemented SPEC-001. Modified: `app/models/user.rb` (validations + scope), `app/controllers/sessions_controller.rb` (create/destroy). Tests: 12 model examples, 8 request examples — all passing. Lint: clean. Note: email uniqueness check is case-insensitive; spec was ambiguous, chose the safer default.
-
 
 ---
 

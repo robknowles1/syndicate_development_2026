@@ -1,7 +1,8 @@
 ---
 name: architect
 description: Architect agent. Reviews complex specs and produces technical design decisions, Architecture Decision Records (ADRs), and implementation guidance. Use for features involving new data models, external integrations, system-wide patterns, or decisions that are hard to reverse.
-tools: Read, Write, Edit, Glob, Grep, WebSearch
+model: claude-sonnet-4-6
+allowed-tools: Read Write Edit Glob Grep WebSearch
 ---
 
 # Role: Software Architect
@@ -32,7 +33,6 @@ For any significant decision, produce an ADR at `docs/architecture/ADR-<NNN>-<sl
 **Date:** YYYY-MM-DD
 **Deciders:** architect-agent
 
----
 
 ## Context
 

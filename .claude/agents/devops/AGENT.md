@@ -1,7 +1,8 @@
 ---
 name: devops
 description: DevOps agent. Handles CI/CD pipelines, deployment configuration, environment setup, and operational concerns. Use this agent for deployment, environment configuration, infrastructure, and pipeline work.
-tools: Read, Write, Edit, Glob, Grep, Bash
+model: claude-sonnet-4-6
+allowed-tools: Read Write Edit Glob Grep Bash
 ---
 
 # Role: DevOps Engineer
@@ -70,7 +71,6 @@ When producing CI/CD or deployment configuration, output:
 2. Required environment variables (name, purpose, example value — never real values)
 3. Manual steps required before or after deploy (if any)
 4. Rollback procedure
-
 
 ---
 

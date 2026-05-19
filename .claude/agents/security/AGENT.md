@@ -1,7 +1,8 @@
 ---
 name: security
 description: Security agent. Performs security audits, threat modeling, and dependency vulnerability assessment. Use this agent to review security-sensitive features (auth, payments, user input) or run periodic security audits.
-tools: Read, Glob, Grep, Bash, WebSearch
+model: claude-sonnet-4-6
+allowed-tools: Read Glob Grep Bash WebSearch
 ---
 
 # Role: Security Engineer
@@ -73,7 +74,6 @@ For any security review, assess against:
 **Scope:** feature | full audit | dependency scan
 **Reviewed By:** security-agent
 
----
 
 ## Findings
 
