@@ -37,6 +37,7 @@ en:
     home: "Home"
     about: "About"
     gallery: "Gallery"
+    services: "Services"
     toggle_aria_label: "Toggle navigation menu"
 
   pages:
@@ -90,6 +91,32 @@ en:
       missing_required_fields: "Please fill in all required fields (name, email, and message)."
     notices:
       message_sent: "Message sent! We'll be in touch soon."
+
+  admin:
+    login:
+      heading: "Admin Login"
+      email_label: "Email"
+      password_label: "Password"
+      submit: "Log In"
+      invalid_credentials: "Invalid email or password."
+    dashboard:
+      heading: "Admin Dashboard"
+      services_link: "Manage Services Page"
+    services_page:
+      heading: "Services Page Settings"
+      published_label: "Services page is published (visible to the public)"
+      save: "Save Changes"
+      toggle_notice: "Services page visibility updated."
+      content_notice: "Service section content saved."
+      validation_error: "Each service section must have at least one bullet item."
+    layout:
+      title: "Admin — Syndicate Development"
+      header: "Syndicate Development Admin"
+      logout: "Log Out"
+
+  pages:
+    services:
+      heading: "Services"
 
   mailer:
     contact_email:
