@@ -26,7 +26,7 @@ sections_data = [
     ]
   },
   {
-    slug: "custom_suspension",
+    slug: "custom_suspension_setup",
     heading: "CUSTOM SUSPENSION SETUP",
     bullets: [
       "Revalving and re-springing for rider weight and style",

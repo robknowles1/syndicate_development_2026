@@ -2,7 +2,7 @@
 
 <%# ---- Published toggle ---- %>
 <section class="bg-white rounded-lg shadow p-6 mb-8">
-  <h2 class="text-lg font-semibold mb-4">Visibility</h2>
+  <h2 class="text-lg font-semibold mb-4"><%= t("admin.services_page.visibility_heading") %></h2>
   <%= form_with url: admin_services_page_path, method: :patch, html: { id: "toggle-form" } do |f| %>
     <%# Hidden field ensures "false" is sent when checkbox is unchecked %>
     <input type="hidden" name="published" value="false">
@@ -12,7 +12,7 @@
       <span class="font-semibold"><%= t("admin.services_page.published_label") %></span>
     </label>
     <p class="text-sm text-gray-500 mt-2">
-      Current status: <strong><%= @published ? "Published" : "Unpublished" %></strong>
+      <%= t("admin.services_page.current_status_label") %> <strong><%= @published ? t("admin.services_page.status_published") : t("admin.services_page.status_unpublished") %></strong>
     </p>
     <%= submit_tag t("admin.services_page.save"), class: "mt-4 bg-red-600 text-white font-bold py-2 px-5 rounded hover:bg-red-700 cursor-pointer" %>
   <% end %>
@@ -26,13 +26,13 @@
         <h2 class="text-lg font-bold mb-4"><%= section.heading %></h2>
 
         <div class="mb-4">
-          <%= label_tag "service_sections[#{section.slug}][heading]", "Heading", class: "block text-sm font-semibold mb-1" %>
+          <%= label_tag "service_sections[#{section.slug}][heading]", t("admin.services_page.section_heading_label"), class: "block text-sm font-semibold mb-1" %>
           <%= text_field_tag "service_sections[#{section.slug}][heading]", section.heading,
                 class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
         </div>
 
         <div class="mb-3">
-          <span class="block text-sm font-semibold mb-2">Bullet Items</span>
+          <span class="block text-sm font-semibold mb-2"><%= t("admin.services_page.bullet_items_label") %></span>
           <div id="bullets-<%= section.slug %>" class="space-y-2">
             <% section.service_bullets.each_with_index do |bullet, idx| %>
               <div class="flex items-center gap-2 bullet-row">
@@ -43,7 +43,7 @@
                 <label class="flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap">
                   <%= check_box_tag "service_sections[#{section.slug}][service_bullets_attributes][#{idx}][_destroy]",
                         "1", false, class: "accent-red-600" %>
-                  Remove
+                  <%= t("admin.services_page.bullet_remove_label") %>
                 </label>
               </div>
             <% end %>
@@ -58,7 +58,7 @@
               <label class="flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap">
                 <input type="checkbox" name="service_sections[SLUG][service_bullets_attributes][NEW_INDEX][_destroy]"
                        value="1" class="accent-red-600">
-                Remove
+                <%= t("admin.services_page.bullet_remove_label") %>
               </label>
             </div>
           </template>
@@ -67,7 +67,7 @@
                   class="mt-2 text-sm text-red-600 hover:text-red-800 font-semibold"
                   data-action="click->bullet-editor#addBullet"
                   data-bullet-editor-section-slug-param="<%= section.slug %>">
-            + Add bullet
+            <%= t("admin.services_page.add_bullet_button") %>
           </button>
         </div>
       </div>

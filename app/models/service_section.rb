@@ -10,13 +10,11 @@ class ServiceSection < ApplicationRecord
   private
 
   def at_least_one_bullet
-    # Only enforce minimum-bullet constraint when the association has been loaded
-    # (i.e., nested attributes were submitted). Skips validation during initial seed creation.
-    return unless service_bullets.loaded?
-
-    surviving_bullets = service_bullets.reject { |b| b.marked_for_destruction? }
-    if surviving_bullets.empty?
-      errors.add(:base, I18n.t("admin.services_page.validation_error"))
+    if service_bullets.loaded?
+      surviving = service_bullets.reject(&:marked_for_destruction?)
+      errors.add(:base, :at_least_one_bullet) if surviving.empty?
+    elsif persisted?
+      errors.add(:base, :at_least_one_bullet) if service_bullets.count < 1
     end
   end
 end

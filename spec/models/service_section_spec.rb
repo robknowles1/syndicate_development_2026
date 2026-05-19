@@ -16,7 +16,7 @@ RSpec.describe ServiceSection, type: :model do
       # Load association and mark all bullets for destruction
       section.service_bullets.each(&:mark_for_destruction)
       expect(section).not_to be_valid
-      expect(section.errors[:base]).to include(I18n.t("admin.services_page.validation_error"))
+      expect(section.errors[:base]).to include(I18n.t("activerecord.errors.models.service_section.attributes.base.at_least_one_bullet"))
     end
 
     it "is valid when at least one bullet survives destruction marking" do
