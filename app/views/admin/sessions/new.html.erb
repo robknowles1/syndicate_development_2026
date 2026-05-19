@@ -1,0 +1,20 @@
+<div class="max-w-md mx-auto mt-16 bg-white rounded-lg shadow p-8">
+  <h1 class="text-2xl font-bold mb-6 text-center"><%= t("admin.login.heading") %></h1>
+
+  <%= form_with url: admin_login_path, method: :post, class: "space-y-5" do |f| %>
+    <div>
+      <%= label_tag :email, t("admin.login.email_label"), class: "block text-sm font-semibold mb-1" %>
+      <%= text_field_tag :email, params[:email], type: "email", required: true, autofocus: true,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <div>
+      <%= label_tag :password, t("admin.login.password_label"), class: "block text-sm font-semibold mb-1" %>
+      <%= password_field_tag :password, nil, required: true,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <%= submit_tag t("admin.login.submit"),
+          class: "w-full bg-red-600 text-white font-bold py-2 px-4 rounded hover:bg-red-700 cursor-pointer" %>
+  <% end %>
+</div>

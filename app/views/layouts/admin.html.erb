@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= t("admin.layout.title") %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="bg-gray-100 text-gray-900" style="font-family: 'Montserrat', sans-serif;">
+    <header class="bg-[#242121] text-white px-6 py-4 flex items-center justify-between">
+      <span class="font-bold tracking-wide text-lg"><%= t("admin.layout.header") %></span>
+      <% if current_admin %>
+        <%= button_to t("admin.layout.logout"), admin_logout_path, method: :delete,
+              class: "text-sm text-red-400 hover:text-red-300 bg-transparent border-0 cursor-pointer font-bold" %>
+      <% end %>
+    </header>
+
+    <% if notice %>
+      <div class="bg-green-600 text-white text-center py-3 px-4" role="alert">
+        <%= notice %>
+      </div>
+    <% end %>
+    <% if alert %>
+      <div class="bg-red-600 text-white text-center py-3 px-4" role="alert">
+        <%= alert %>
+      </div>
+    <% end %>
+
+    <main class="max-w-4xl mx-auto px-6 py-8">
+      <%= yield %>
+    </main>
+  </body>
+</html>
