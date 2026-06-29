@@ -1,0 +1,101 @@
+<%# Shared form for new and edit service sections %>
+<%= form_with model: [:admin, section], html: { class: "space-y-6" } do |f| %>
+  <% if section.errors.any? %>
+    <div class="bg-red-50 border border-red-300 rounded p-4">
+      <ul class="list-disc list-inside text-red-700 text-sm space-y-1">
+        <% section.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <%# Heading %>
+  <div>
+    <%= f.label :heading, t("admin.service_sections.heading"), class: "block text-sm font-semibold mb-1" %>
+    <%= f.text_field :heading,
+          class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600",
+          placeholder: t("admin.service_sections.heading") %>
+  </div>
+
+  <%# Icon key select with live preview %>
+  <div data-controller="icon-preview">
+    <%= f.label :icon_key, t("admin.service_sections.icon_key_label"), class: "block text-sm font-semibold mb-1" %>
+    <div class="flex items-center gap-4">
+      <%= f.select :icon_key, ServiceSection::ICON_KEYS,
+            { include_blank: false },
+            class: "border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600",
+            data: { "icon-preview-target" => "select", action: "change->icon-preview#change" } %>
+
+      <%# Pre-rendered icon spans — each hidden; Stimulus shows the selected one %>
+      <div class="flex items-center gap-2">
+        <% ServiceSection::ICON_KEYS.each do |key| %>
+          <span class="<%= key == section.icon_key ? '' : 'hidden' %> text-gray-700"
+                data-icon-preview-target="preview"
+                data-icon-preview-key-value="<%= key %>">
+            <%= heroicon key, variant: :outline, options: { class: "w-8 h-8" } %>
+          </span>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Bullet list editor %>
+  <div data-controller="section-bullet-editor">
+    <span class="block text-sm font-semibold mb-2"><%= t("admin.service_sections.bullets_label") %></span>
+
+    <div data-section-bullet-editor-target="container" class="space-y-2" id="bullets-container">
+      <% section.service_bullets.each_with_index do |bullet, idx| %>
+        <div class="flex items-center gap-2 bullet-row">
+          <%= f.fields_for :service_bullets_attributes, bullet, index: idx do |bf| %>
+            <%= bf.hidden_field :id %>
+            <%= bf.hidden_field :position, value: bullet.position %>
+            <%= bf.text_field :body,
+                  class: "flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600",
+                  data: { "destroy-target" => "text" } %>
+            <label class="flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap">
+              <%= bf.check_box :_destroy, { class: "accent-red-600",
+                    data: { action: "change->section-bullet-editor#toggleDestroy" } }, "1", "0" %>
+              <%= t("admin.service_sections.delete") %>
+            </label>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%# New bullet rows appended by Stimulus go here — template below %>
+    </div>
+
+    <%# Template for new bullet rows — hidden, cloned by Stimulus %>
+    <template data-section-bullet-editor-target="template">
+      <div class="flex items-center gap-2 bullet-row">
+        <input type="hidden"
+               name="service_section[service_bullets_attributes][NEW_INDEX][position]"
+               value="NEW_POS">
+        <input type="text"
+               name="service_section[service_bullets_attributes][NEW_INDEX][body]"
+               value=""
+               class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600">
+        <label class="flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap">
+          <input type="checkbox"
+                 name="service_section[service_bullets_attributes][NEW_INDEX][_destroy]"
+                 value="1"
+                 class="accent-red-600"
+                 data-action="change->section-bullet-editor#toggleDestroy">
+          <%= t("admin.service_sections.delete") %>
+        </label>
+      </div>
+    </template>
+
+    <button type="button"
+            class="mt-2 text-sm text-red-600 hover:text-red-800 font-semibold"
+            data-action="click->section-bullet-editor#addBullet">
+      <%= t("admin.service_sections.add_bullet") %>
+    </button>
+
+    <p class="mt-2 text-xs text-gray-500"><%= t("admin.service_sections.bullet_minimum_hint") %></p>
+  </div>
+
+  <%# Submit %>
+  <%= f.submit t("admin.service_sections.save"),
+        class: "bg-red-600 text-white font-bold py-2 px-6 rounded hover:bg-red-700 cursor-pointer" %>
+<% end %>

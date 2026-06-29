@@ -15,8 +15,9 @@ SiteSetting.find_or_create_by(key: "services_page_published") { |s| s.value = "f
 # --- Service Sections with Bullets ---
 sections_data = [
   {
-    slug: "precision_engines",
     heading: "PRECISION ENGINES",
+    icon_key: "cog-6-tooth",
+    position: 0,
     bullets: [
       "Full engine builds and rebuilds",
       "Top-end and bottom-end service",
@@ -26,8 +27,9 @@ sections_data = [
     ]
   },
   {
-    slug: "custom_suspension_setup",
     heading: "CUSTOM SUSPENSION SETUP",
+    icon_key: "adjustments-horizontal",
+    position: 1,
     bullets: [
       "Revalving and re-springing for rider weight and style",
       "Fork and shock servicing",
@@ -37,8 +39,9 @@ sections_data = [
     ]
   },
   {
-    slug: "ecu_tuning",
     heading: "ECU TUNING",
+    icon_key: "cpu-chip",
+    position: 2,
     bullets: [
       "Fuel injection mapping and fuel curve optimization",
       "Ignition timing adjustment",
@@ -50,11 +53,27 @@ sections_data = [
 ]
 
 sections_data.each do |data|
-  existing = ServiceSection.find_by(slug: data[:slug])
-  next if existing
+  derived_slug = data[:heading].parameterize(separator: "_")
+  section = ServiceSection.find_by(heading: data[:heading]) ||
+            ServiceSection.find_by(slug: derived_slug)
 
-  section = ServiceSection.create!(slug: data[:slug], heading: data[:heading])
+  if section
+    section.update_columns(icon_key: data[:icon_key], position: data[:position])
+  else
+    section = ServiceSection.new(
+      heading: data[:heading],
+      icon_key: data[:icon_key],
+      position: data[:position]
+    )
+    # Build at least one bullet so the at_least_one_bullet validation passes on create
+    data[:bullets].each_with_index do |body, index|
+      section.service_bullets.build(body: body, position: index)
+    end
+    section.save!
+    next
+  end
+
   data[:bullets].each_with_index do |body, index|
-    section.service_bullets.create!(body: body, position: index)
+    ServiceBullet.find_or_create_by!(service_section: section, position: index) { |b| b.body = body }
   end
 end

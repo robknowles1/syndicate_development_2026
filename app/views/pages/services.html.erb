@@ -4,22 +4,29 @@
   </div>
 
   <div class="max-w-5xl mx-auto px-6 py-16">
-    <div class="grid gap-12 md:grid-cols-3">
-      <% @sections.each do |section| %>
-        <div>
-          <h2 class="text-xl font-black tracking-wide text-[#242121] mb-4 border-b-2 border-red-600 pb-2">
-            <%= section.heading %>
-          </h2>
-          <ul class="space-y-2">
-            <% section.service_bullets.each do |bullet| %>
-              <li class="flex items-start gap-2 text-gray-700">
-                <span class="text-red-600 font-bold mt-0.5">&bull;</span>
-                <span><%= bullet.body %></span>
-              </li>
-            <% end %>
-          </ul>
-        </div>
-      <% end %>
-    </div>
+    <% if @sections.empty? %>
+      <p class="text-center text-gray-500"><%= t("pages.services.empty_message") %></p>
+    <% else %>
+      <div class="grid gap-12 md:grid-cols-2 lg:grid-cols-3">
+        <% @sections.each do |section| %>
+          <div>
+            <div class="mb-3 text-red-600">
+              <%= heroicon section.icon_key, variant: :outline, options: { class: "w-10 h-10" } %>
+            </div>
+            <h2 class="text-xl font-black tracking-wide text-[#242121] mb-4 border-b-2 border-red-600 pb-2">
+              <%= section.heading %>
+            </h2>
+            <ul class="space-y-2">
+              <% section.service_bullets.each do |bullet| %>
+                <li class="flex items-start gap-2 text-gray-700">
+                  <span class="text-red-600 font-bold mt-0.5">&bull;</span>
+                  <span><%= bullet.body %></span>
+                </li>
+              <% end %>
+            </ul>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
   </div>
 </div>

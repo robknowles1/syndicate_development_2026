@@ -130,8 +130,9 @@ Both `test` and `system-test` require a `postgres:16` service container and `DAT
 
 ```
 SPEC-001 (Frontend Rebuild: Home, About, Gallery, Contact)   ✅ done
-SPEC-002 (Services Page)                                      📝 draft — needs AC
+SPEC-002 (Services Page)                                      ✅ done
 SPEC-003 (i18n String Extraction)                             ✅ done
+SPEC-004 (Admin Backend)                                      ✅ done
 ```
 
 Spec files live in `docs/specs/`.

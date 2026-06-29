@@ -21,6 +21,12 @@ Rails.application.routes.draw do
     post   "login",  to: "sessions#create"
     delete "logout", to: "sessions#destroy", as: :logout
     root to: "dashboard#index"
-    resource :services_page, only: [ :show, :update ]
+    resource  :services_page,    only: [ :show, :update ]
+    resources :service_sections, only: [ :new, :create, :edit, :update, :destroy ] do
+      member do
+        patch :move_up
+        patch :move_down
+      end
+    end
   end
 end

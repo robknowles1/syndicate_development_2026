@@ -14,7 +14,7 @@ class PagesController < ApplicationController
   end
 
   def services
-    @sections = ServiceSection.includes(:service_bullets).all.order(:slug)
+    @sections = ServiceSection.includes(:service_bullets).all.order(:position)
   end
 
   private

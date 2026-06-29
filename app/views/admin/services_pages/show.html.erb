@@ -18,62 +18,66 @@
   <% end %>
 </section>
 
-<%# ---- Content editor ---- %>
-<section class="bg-white rounded-lg shadow p-6" data-controller="bullet-editor">
-  <%= form_with url: admin_services_page_path, method: :patch, html: { id: "content-form" } do |f| %>
-    <% @sections.each do |section| %>
-      <div class="mb-8 border-b pb-6 last:border-b-0 last:pb-0">
-        <h2 class="text-lg font-bold mb-4"><%= section.heading %></h2>
+<%# ---- Section list ---- %>
+<section class="bg-white rounded-lg shadow p-6">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-lg font-semibold"><%= t("admin.services_page.sections_heading") %></h2>
+    <%= link_to t("admin.service_sections.add_first"), new_admin_service_section_path,
+          class: "bg-red-600 text-white font-bold py-2 px-4 rounded hover:bg-red-700 text-sm" %>
+  </div>
 
-        <div class="mb-4">
-          <%= label_tag "service_sections[#{section.slug}][heading]", t("admin.services_page.section_heading_label"), class: "block text-sm font-semibold mb-1" %>
-          <%= text_field_tag "service_sections[#{section.slug}][heading]", section.heading,
-                class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
-        </div>
+  <% if @sections.empty? %>
+    <p class="text-gray-500 italic"><%= t("admin.service_sections.empty_state") %></p>
+    <p class="mt-2">
+      <%= link_to t("admin.service_sections.add_first"), new_admin_service_section_path,
+            class: "text-red-600 font-bold hover:text-red-800" %>
+    </p>
+  <% else %>
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b text-left text-gray-500">
+          <th class="pb-2 pr-4"><%= t("admin.services_page.col_icon") %></th>
+          <th class="pb-2 pr-4"><%= t("admin.services_page.col_heading") %></th>
+          <th class="pb-2 pr-4"><%= t("admin.services_page.col_bullets") %></th>
+          <th class="pb-2"><%= t("admin.services_page.col_actions") %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @sections.each do |section| %>
+          <tr class="border-b last:border-b-0">
+            <td class="py-3 pr-4 w-10 text-gray-600">
+              <%= heroicon section.icon_key, variant: :outline, options: { class: "w-6 h-6" } %>
+            </td>
+            <td class="py-3 pr-4 font-semibold"><%= section.heading %></td>
+            <td class="py-3 pr-4 text-gray-500"><%= section.service_bullets.size %></td>
+            <td class="py-3">
+              <div class="flex items-center gap-2 flex-wrap">
+                <%# Move controls %>
+                <%= button_to t("admin.service_sections.move_up"),
+                      move_up_admin_service_section_path(section),
+                      method: :patch,
+                      class: "text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded font-semibold" %>
+                <%= button_to t("admin.service_sections.move_down"),
+                      move_down_admin_service_section_path(section),
+                      method: :patch,
+                      class: "text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded font-semibold" %>
 
-        <div class="mb-3">
-          <span class="block text-sm font-semibold mb-2"><%= t("admin.services_page.bullet_items_label") %></span>
-          <div id="bullets-<%= section.slug %>" class="space-y-2">
-            <% section.service_bullets.each_with_index do |bullet, idx| %>
-              <div class="flex items-center gap-2 bullet-row">
-                <%= hidden_field_tag "service_sections[#{section.slug}][service_bullets_attributes][#{idx}][id]", bullet.id %>
-                <%= hidden_field_tag "service_sections[#{section.slug}][service_bullets_attributes][#{idx}][position]", bullet.position %>
-                <%= text_field_tag "service_sections[#{section.slug}][service_bullets_attributes][#{idx}][body]", bullet.body,
-                      class: "flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
-                <label class="flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap">
-                  <%= check_box_tag "service_sections[#{section.slug}][service_bullets_attributes][#{idx}][_destroy]",
-                        "1", false, class: "accent-red-600" %>
-                  <%= t("admin.services_page.bullet_remove_label") %>
-                </label>
+                <%# Edit control %>
+                <%= link_to t("admin.service_sections.edit"),
+                      edit_admin_service_section_path(section),
+                      class: "text-xs bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded font-semibold ml-4" %>
+
+                <%# Delete control — visually separated and red %>
+                <%= button_to t("admin.service_sections.delete"),
+                      admin_service_section_path(section),
+                      method: :delete,
+                      form: { data: { turbo_confirm: t("admin.service_sections.confirm_delete") } },
+                      class: "text-xs font-semibold px-2 py-1 rounded ml-4 text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100" %>
               </div>
-            <% end %>
-          </div>
-
-          <%# New bullet template — hidden, cloned by Stimulus %>
-          <template id="new-bullet-template-<%= section.slug %>">
-            <div class="flex items-center gap-2 bullet-row">
-              <input type="hidden" name="service_sections[SLUG][service_bullets_attributes][NEW_INDEX][position]" value="NEW_POS">
-              <input type="text" name="service_sections[SLUG][service_bullets_attributes][NEW_INDEX][body]" value=""
-                     class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600">
-              <label class="flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap">
-                <input type="checkbox" name="service_sections[SLUG][service_bullets_attributes][NEW_INDEX][_destroy]"
-                       value="1" class="accent-red-600">
-                <%= t("admin.services_page.bullet_remove_label") %>
-              </label>
-            </div>
-          </template>
-
-          <button type="button"
-                  class="mt-2 text-sm text-red-600 hover:text-red-800 font-semibold"
-                  data-action="click->bullet-editor#addBullet"
-                  data-bullet-editor-section-slug-param="<%= section.slug %>">
-            <%= t("admin.services_page.add_bullet_button") %>
-          </button>
-        </div>
-      </div>
-    <% end %>
-
-    <%= submit_tag t("admin.services_page.save"),
-          class: "mt-4 bg-red-600 text-white font-bold py-2 px-5 rounded hover:bg-red-700 cursor-pointer" %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
   <% end %>
 </section>

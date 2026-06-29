@@ -2,29 +2,55 @@ require "rails_helper"
 
 RSpec.describe "Pages", type: :request do
   describe "GET /services" do
-    before do
-      # Seed the three sections so the page can render
-      %w[precision_engines custom_suspension_setup ecu_tuning].each_with_index do |slug, i|
-        section = ServiceSection.find_or_create_by!(slug: slug) { |s| s.heading = slug.upcase }
-        ServiceBullet.find_or_create_by!(service_section: section, position: 0) { |b| b.body = "Bullet #{i}" }
+    context "when services_page_published is true (AT1)" do
+      before do
+        SiteSetting.set("services_page_published", "true")
+        create(:service_section, heading: "SECTION ALPHA",  position: 0, icon_key: "wrench")
+        create(:service_section, heading: "SECTION BRAVO",  position: 1, icon_key: "bolt")
+        create(:service_section, heading: "SECTION CHARLIE", position: 2, icon_key: "fire")
       end
-    end
 
-    context "when services_page_published is true" do
-      before { SiteSetting.set("services_page_published", "true") }
-
-      it "returns HTTP 200" do
+      it "returns HTTP 200 and renders sections in position order (AT1)" do
         get services_path
         expect(response).to have_http_status(:ok)
+        body = response.body
+        expect(body).to include("SECTION ALPHA")
+        expect(body).to include("SECTION BRAVO")
+        expect(body).to include("SECTION CHARLIE")
+        expect(body.index("SECTION ALPHA")).to be < body.index("SECTION BRAVO")
+        expect(body.index("SECTION BRAVO")).to be < body.index("SECTION CHARLIE")
       end
     end
 
-    context "when services_page_published is false" do
+    context "when services_page_published is false (AT2)" do
       before { SiteSetting.set("services_page_published", "false") }
 
-      it "redirects to root" do
+      it "redirects to root (AT2)" do
         get services_path
         expect(response).to redirect_to(root_path)
+      end
+    end
+
+    context "icon rendering (AT3)" do
+      before do
+        SiteSetting.set("services_page_published", "true")
+        create(:service_section, heading: "Bolt Section", icon_key: "bolt", position: 0)
+      end
+
+      it "renders an inline SVG for the section icon (AT3)" do
+        get services_path
+        expect(response.body).to include("<svg")
+      end
+    end
+
+    context "empty sections (AT4)" do
+      before { SiteSetting.set("services_page_published", "true") }
+
+      it "returns HTTP 200 with page heading and empty message (AT4)" do
+        get services_path
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(I18n.t("pages.services.heading"))
+        expect(response.body).to include(I18n.t("pages.services.empty_message"))
       end
     end
   end
@@ -35,7 +61,6 @@ RSpec.describe "Pages", type: :request do
 
       it "does not include the Services nav link" do
         get root_path
-        # Extract only the nav section to check
         expect(response.body).not_to include('href="/services"')
       end
     end
@@ -43,10 +68,7 @@ RSpec.describe "Pages", type: :request do
     context "when services_page_published is true" do
       before do
         SiteSetting.set("services_page_published", "true")
-        %w[precision_engines].each do |slug|
-          section = ServiceSection.find_or_create_by!(slug: slug) { |s| s.heading = "Test" }
-          ServiceBullet.find_or_create_by!(service_section: section, position: 0) { |b| b.body = "Bullet" }
-        end
+        create(:service_section, heading: "Test", position: 0)
       end
 
       it "includes the Services nav link" do
