@@ -4,7 +4,8 @@ FactoryBot.define do
   # separately after the section is persisted.
   factory :service_section_without_bullet, class: "ServiceSection" do
     sequence(:heading) { |n| "Test Section Heading #{n}" }
-    icon_key { "wrench" }
+    sequence(:slug)    { |n| "test_section_heading_#{n}" }
+    icon_key  { "wrench" }
     sequence(:position) { |n| n }
     to_create { |instance| instance.save!(validate: false) }
   end

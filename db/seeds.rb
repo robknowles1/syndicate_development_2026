@@ -55,7 +55,8 @@ sections_data = [
 sections_data.each do |data|
   derived_slug = data[:heading].parameterize(separator: "_")
   section = ServiceSection.find_by(heading: data[:heading]) ||
-            ServiceSection.find_by(slug: derived_slug)
+            ServiceSection.find_by(slug: derived_slug) ||
+            ServiceSection.find_by(slug: "custom_suspension")
 
   if section
     section.update_columns(icon_key: data[:icon_key], position: data[:position])

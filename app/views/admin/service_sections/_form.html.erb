@@ -32,7 +32,7 @@
         <% ServiceSection::ICON_KEYS.each do |key| %>
           <span class="<%= key == section.icon_key ? '' : 'hidden' %> text-gray-700"
                 data-icon-preview-target="preview"
-                data-icon-preview-key-value="<%= key %>">
+                data-icon-preview-icon-key="<%= key %>">
             <%= heroicon key, variant: :outline, options: { class: "w-8 h-8" } %>
           </span>
         <% end %>

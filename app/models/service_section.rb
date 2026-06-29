@@ -36,6 +36,9 @@ class ServiceSection < ApplicationRecord
     self.slug = candidate
   end
 
+  # NOTE: relies on service_bullets being preloaded. Callers that query ServiceSection
+  # for validation purposes must use `.includes(:service_bullets)` to avoid N+1 and
+  # to ensure `reject(&:marked_for_destruction?)` operates on the full in-memory collection.
   def at_least_one_bullet
     surviving = service_bullets.reject(&:marked_for_destruction?)
     errors.add(:base, :at_least_one_bullet) if surviving.empty?

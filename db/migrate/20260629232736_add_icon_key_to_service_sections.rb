@@ -1,6 +1,8 @@
 class AddIconKeyToServiceSections < ActiveRecord::Migration[8.1]
   def change
     reversible do |dir|
+      dir.down { remove_column :service_sections, :icon_key }
+
       dir.up do
         # Step 1: add the column as nullable so PostgreSQL accepts it on existing rows
         add_column :service_sections, :icon_key, :string
