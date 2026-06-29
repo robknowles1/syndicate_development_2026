@@ -13,5 +13,14 @@ Rails.application.routes.draw do
   root "pages#home"
   get "/about", to: "pages#about"
   get "/gallery", to: "pages#gallery"
+  get "/services", to: "pages#services"
   post "/contact", to: "contacts#create", as: :contact
+
+  namespace :admin do
+    get    "login",  to: "sessions#new",     as: :login
+    post   "login",  to: "sessions#create"
+    delete "logout", to: "sessions#destroy", as: :logout
+    root to: "dashboard#index"
+    resource :services_page, only: [ :show, :update ]
+  end
 end
