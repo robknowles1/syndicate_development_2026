@@ -7,7 +7,7 @@ This directory contains feature specs produced by the PM agent following the spe
 | ID       | Feature | Status | Priority | File |
 |----------|---------|--------|----------|------|
 | SPEC-001 | Frontend Rebuild — Marketing/Portfolio Site | done | high | [frontend-rebuild.md](frontend-rebuild.md) |
-| SPEC-002 | Services Page | on-hold | medium | [services-page.md](services-page.md) |
+| SPEC-002 | Services Page — Dynamic Content with Admin CRUD | ready | medium | [services-page.md](services-page.md) |
 | SPEC-003 | i18n String Extraction | ready | medium | [i18n-string-extraction.md](i18n-string-extraction.md) |
 | SPEC-004 | Admin Backend — Authentication and Services Page Management | done | high | [admin-backend.md](admin-backend.md) |
 
