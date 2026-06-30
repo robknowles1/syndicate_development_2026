@@ -21,10 +21,10 @@
   <%# Icon key select with live preview %>
   <div data-controller="icon-preview">
     <%= f.label :icon_key, t("admin.service_sections.icon_key_label"), class: "block text-sm font-semibold mb-1" %>
-    <div class="flex items-center gap-4">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
       <%= f.select :icon_key, ServiceSection::ICON_KEYS,
             { include_blank: false },
-            class: "border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600",
+            class: "w-full sm:w-auto border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600",
             data: { "icon-preview-target" => "select", action: "change->icon-preview#change" } %>
 
       <%# Pre-rendered icon spans — each hidden; Stimulus shows the selected one %>
@@ -97,5 +97,5 @@
 
   <%# Submit %>
   <%= f.submit t("admin.service_sections.save"),
-        class: "bg-red-600 text-white font-bold py-2 px-6 rounded hover:bg-red-700 cursor-pointer" %>
+        class: "w-full md:w-auto bg-red-600 text-white font-bold py-3 px-6 rounded hover:bg-red-700 cursor-pointer" %>
 <% end %>
