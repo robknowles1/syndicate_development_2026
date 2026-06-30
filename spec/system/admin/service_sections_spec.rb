@@ -84,7 +84,7 @@ RSpec.describe "Admin service section CRUD", type: :system do
       expect(page).to have_text("TO DELETE")
 
       accept_confirm do
-        click_button I18n.t("admin.service_sections.delete"), match: :first
+        click_link I18n.t("admin.service_sections.delete"), match: :first
       end
 
       expect(page).to have_current_path(admin_services_page_path)
