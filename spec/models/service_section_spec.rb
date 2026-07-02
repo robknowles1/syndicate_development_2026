@@ -94,8 +94,8 @@ RSpec.describe ServiceSection, type: :model do
   end
 
   describe "ICON_KEYS constant" do
-    it "contains exactly 12 values" do
-      expect(ServiceSection::ICON_KEYS.length).to eq(12)
+    it "contains exactly 14 values" do
+      expect(ServiceSection::ICON_KEYS.length).to eq(14)
     end
   end
 end
