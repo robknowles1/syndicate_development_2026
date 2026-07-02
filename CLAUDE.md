@@ -92,6 +92,21 @@ pm → architect (if complex) → developer → reviewer → qa
 
 ---
 
+## Mobile-First Design
+
+**All views — public and admin — must be designed mobile-first.**
+
+The primary admin user (Doug) manages the site from his phone. Every layout decision must work on a small screen first, then scale up.
+
+- Use Tailwind's unprefixed utilities for mobile, then `md:` / `lg:` for larger breakpoints
+- Touch targets must be large enough to tap (minimum `py-3 px-4` on interactive elements)
+- Avoid horizontal scrolling on any screen width
+- Tables in admin views should either reflow to a stacked card layout on small screens or use `overflow-x-auto` as a fallback
+- Buttons and links in table rows must stack or wrap cleanly on narrow viewports (`flex-wrap`)
+- Form inputs should be full-width (`w-full`) on mobile
+
+---
+
 ## Code Conventions
 
 ### Internationalisation (i18n)
