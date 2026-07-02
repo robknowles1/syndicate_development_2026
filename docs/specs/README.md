@@ -10,6 +10,7 @@ This directory contains feature specs produced by the PM agent following the spe
 | SPEC-002 | Services Page — Dynamic Content with Admin CRUD | ready | medium | [services-page.md](services-page.md) |
 | SPEC-003 | i18n String Extraction | ready | medium | [i18n-string-extraction.md](i18n-string-extraction.md) |
 | SPEC-004 | Admin Backend — Authentication and Services Page Management | done | high | [admin-backend.md](admin-backend.md) |
+| SPEC-005 | Icon Library Migration — Heroicon to Tabler Icons | ready | medium | [SPEC-005-icon-library-migration.md](SPEC-005-icon-library-migration.md) |
 
 *(Update this table as specs are added.)*
 
