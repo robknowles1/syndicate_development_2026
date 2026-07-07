@@ -11,6 +11,7 @@ This directory contains feature specs produced by the PM agent following the spe
 | SPEC-003 | i18n String Extraction | ready | medium | [i18n-string-extraction.md](i18n-string-extraction.md) |
 | SPEC-004 | Admin Backend — Authentication and Services Page Management | done | high | [admin-backend.md](admin-backend.md) |
 | SPEC-005 | Icon Library Migration — Heroicon to Tabler Icons | ready | medium | [SPEC-005-icon-library-migration.md](SPEC-005-icon-library-migration.md) |
+| SPEC-006 | Home Page Content Editing — Admin-Managed Hero and Mission Copy | draft | medium | [SPEC-006-home-page-content-editing.md](SPEC-006-home-page-content-editing.md) |
 
 *(Update this table as specs are added.)*
 
