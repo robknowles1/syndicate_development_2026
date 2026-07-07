@@ -5,9 +5,9 @@ RSpec.describe "Pages", type: :request do
     context "when services_page_published is true (AT1)" do
       before do
         SiteSetting.set("services_page_published", "true")
-        create(:service_section, heading: "SECTION ALPHA",  position: 0, icon_key: "wrench")
+        create(:service_section, heading: "SECTION ALPHA",  position: 0, icon_key: "tool")
         create(:service_section, heading: "SECTION BRAVO",  position: 1, icon_key: "bolt")
-        create(:service_section, heading: "SECTION CHARLIE", position: 2, icon_key: "fire")
+        create(:service_section, heading: "SECTION CHARLIE", position: 2, icon_key: "flame")
       end
 
       it "returns HTTP 200 and renders sections in position order (AT1)" do
@@ -39,6 +39,19 @@ RSpec.describe "Pages", type: :request do
 
       it "renders an inline SVG for the section icon (AT3)" do
         get services_path
+        expect(response.body).to include("<svg")
+      end
+    end
+
+    context "vendored icon fallback — car-suspension (AC-19/AT15)" do
+      before do
+        SiteSetting.set("services_page_published", "true")
+        create(:service_section, heading: "Suspension Section", icon_key: "car-suspension", position: 0)
+      end
+
+      it "returns HTTP 200 and renders an inline SVG via the vendored fallback (AT15)" do
+        get services_path
+        expect(response).to have_http_status(:ok)
         expect(response.body).to include("<svg")
       end
     end

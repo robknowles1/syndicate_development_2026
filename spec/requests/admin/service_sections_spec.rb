@@ -20,6 +20,12 @@ RSpec.describe "Admin::ServiceSections", type: :request do
         get new_admin_service_section_path
         expect(response.body).to include(I18n.t("admin.service_sections.save"))
       end
+
+      it "renders exactly 18 icon options and 18 preview spans (AT7/AC-9)" do
+        get new_admin_service_section_path
+        expect(response.body.scan("<option").count).to eq(18)
+        expect(response.body.scan("data-icon-preview-icon-key").count).to eq(18)
+      end
     end
 
     context "when unauthenticated" do
@@ -41,7 +47,7 @@ RSpec.describe "Admin::ServiceSections", type: :request do
         post admin_service_sections_path, params: {
           service_section: {
             heading: "Frame Fab",
-            icon_key: "wrench",
+            icon_key: "tool",
             service_bullets_attributes: {
               "0" => { body: "Custom chromoly frames", position: "0" }
             }
@@ -62,7 +68,7 @@ RSpec.describe "Admin::ServiceSections", type: :request do
         post admin_service_sections_path, params: {
           service_section: {
             heading: "Empty Section",
-            icon_key: "wrench",
+            icon_key: "tool",
             service_bullets_attributes: {}
           }
         }

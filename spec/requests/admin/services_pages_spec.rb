@@ -36,6 +36,14 @@ RSpec.describe "Admin::ServicesPages", type: :request do
         get admin_services_page_path
         expect(response.body).to include(I18n.t("admin.service_sections.add_first"))
       end
+
+      it "renders an inline SVG via the vendored fallback for car-suspension sections (AC-19/AT15)" do
+        ServiceSection.destroy_all
+        create(:service_section, heading: "Suspension Section", icon_key: "car-suspension", position: 0)
+        get admin_services_page_path
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("<svg")
+      end
     end
 
     context "when unauthenticated" do

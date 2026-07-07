@@ -5,7 +5,7 @@ FactoryBot.define do
   factory :service_section_without_bullet, class: "ServiceSection" do
     sequence(:heading) { |n| "Test Section Heading #{n}" }
     sequence(:slug)    { |n| "test_section_heading_#{n}" }
-    icon_key  { "wrench" }
+    icon_key  { "tool" }
     sequence(:position) { |n| n }
     to_create { |instance| instance.save!(validate: false) }
   end
@@ -13,7 +13,7 @@ FactoryBot.define do
   # Default factory: builds one bullet inline so at_least_one_bullet validation passes on create.
   factory :service_section do
     sequence(:heading) { |n| "Test Section Heading #{n}" }
-    icon_key { "wrench" }
+    icon_key { "tool" }
     sequence(:position) { |n| n }
 
     after(:build) do |section|

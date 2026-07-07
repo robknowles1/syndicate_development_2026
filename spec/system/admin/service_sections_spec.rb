@@ -24,7 +24,7 @@ RSpec.describe "Admin service section CRUD", type: :system do
       visit new_admin_service_section_path
 
       fill_in I18n.t("admin.service_sections.heading"), with: "Frame Fabrication"
-      select "wrench", from: I18n.t("admin.service_sections.icon_key_label")
+      select "tool", from: I18n.t("admin.service_sections.icon_key_label")
 
       # The form renders with one bullet row initially; fill it in
       first_body = find("input[name*='service_bullets_attributes'][name*='[body]']")
@@ -46,7 +46,7 @@ RSpec.describe "Admin service section CRUD", type: :system do
 
   describe "editing a service section" do
     let!(:section) do
-      s = ServiceSection.new(heading: "OLD HEADING", icon_key: "wrench", position: 0)
+      s = ServiceSection.new(heading: "OLD HEADING", icon_key: "tool", position: 0)
       s.service_bullets.build(body: "Original bullet", position: 0)
       s.save!
       s
@@ -86,7 +86,7 @@ RSpec.describe "Admin service section CRUD", type: :system do
 
   describe "deleting a service section" do
     let!(:section) do
-      s = ServiceSection.new(heading: "TO DELETE", icon_key: "wrench", position: 0)
+      s = ServiceSection.new(heading: "TO DELETE", icon_key: "tool", position: 0)
       s.service_bullets.build(body: "Bullet", position: 0)
       s.save!
       s

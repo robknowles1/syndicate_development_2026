@@ -6,7 +6,7 @@ RSpec.describe "Admin services page toggle", type: :system do
   let!(:admin) { create(:admin_user, email: "admin@syndicate.com", password: "password123", password_confirmation: "password123") }
 
   let!(:section) do
-    sec = ServiceSection.new(heading: "PRECISION ENGINES", icon_key: "cog-6-tooth", position: 0)
+    sec = ServiceSection.new(heading: "PRECISION ENGINES", icon_key: "settings", position: 0)
     sec.service_bullets.build(body: "Full engine builds", position: 0)
     sec.save!
     sec
