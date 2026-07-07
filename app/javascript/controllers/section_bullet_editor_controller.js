@@ -6,7 +6,10 @@ export default class extends Controller {
   static targets = ["container", "template"]
 
   addBullet() {
-    const newIndex = `new_${Date.now()}`
+    // Rails' strong parameters only recognizes nested-attribute hash keys that are
+    // purely numeric (matches /\A-?\d+\z/) — a "new_" prefix causes the entry to be
+    // silently dropped by permit(), so the index must be digits only.
+    const newIndex = String(Date.now())
     const existingRows = this.containerTarget.querySelectorAll(".bullet-row").length
 
     const clone = this.templateTarget.content.cloneNode(true)

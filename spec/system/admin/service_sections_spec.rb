@@ -67,6 +67,21 @@ RSpec.describe "Admin service section CRUD", type: :system do
       expect(page).to have_text(I18n.t("admin.service_sections.flash.updated"))
       expect(section.reload.heading).to eq("NEW HEADING")
     end
+
+    it "persists a newly added bullet row after clicking Add Bullet and saving" do
+      visit edit_admin_service_section_path(section)
+
+      click_button I18n.t("admin.service_sections.add_bullet")
+
+      new_body_field = all("input[name*='service_bullets_attributes'][name*='[body]']").last
+      new_body_field.set("Freshly added bullet")
+
+      click_button I18n.t("admin.service_sections.save")
+
+      expect(page).to have_current_path(admin_services_page_path)
+      expect(section.reload.service_bullets.pluck(:body)).to include("Freshly added bullet")
+      expect(section.service_bullets.count).to eq(2)
+    end
   end
 
   describe "deleting a service section" do
