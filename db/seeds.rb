@@ -16,7 +16,7 @@ SiteSetting.find_or_create_by(key: "services_page_published") { |s| s.value = "f
 sections_data = [
   {
     heading: "PRECISION ENGINES",
-    icon_key: "cog-6-tooth",
+    icon_key: "settings",
     position: 0,
     bullets: [
       "Full engine builds and rebuilds",
@@ -40,7 +40,7 @@ sections_data = [
   },
   {
     heading: "ECU TUNING",
-    icon_key: "cpu-chip",
+    icon_key: "cpu",
     position: 2,
     bullets: [
       "Fuel injection mapping and fuel curve optimization",

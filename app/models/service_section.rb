@@ -1,8 +1,9 @@
 class ServiceSection < ApplicationRecord
   ICON_KEYS = %w[
-    wrench wrench-screwdriver bolt fire beaker
-    adjustments-horizontal adjustments-vertical cpu-chip chart-bar
-    cog-6-tooth cog-8-tooth cube sparkles trophy
+    tool tools bolt flame flask
+    adjustments-horizontal adjustments cpu chart-bar
+    settings settings-2 cube sparkles trophy
+    engine car-suspension motorbike helmet
   ].freeze
 
   has_many :service_bullets, -> { order(:position) }, dependent: :destroy

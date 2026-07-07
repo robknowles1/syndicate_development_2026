@@ -11,7 +11,7 @@
         <% @sections.each do |section| %>
           <div>
             <div class="mb-3 text-red-600">
-              <%= heroicon section.icon_key, variant: :outline, options: { class: "w-10 h-10" } %>
+              <%= service_icon section.icon_key, css_class: "w-10 h-10" %>
             </div>
             <h2 class="text-xl font-black tracking-wide text-[#242121] mb-4 border-b-2 border-red-600 pb-2">
               <%= section.heading %>

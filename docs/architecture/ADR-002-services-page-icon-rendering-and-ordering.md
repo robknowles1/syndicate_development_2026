@@ -1,5 +1,7 @@
 # ADR-002: Services Page Icon Rendering and Section Ordering
 
+> **Note:** Decision 1 (icon rendering library) is superseded by [ADR-003-icon-library-migration-to-tabler.md](ADR-003-icon-library-migration-to-tabler.md).
+
 **Status:** accepted
 **Date:** 2026-06-29
 

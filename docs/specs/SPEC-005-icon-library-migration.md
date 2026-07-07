@@ -1,10 +1,10 @@
 # Spec: Icon Library Migration — Heroicon to Tabler Icons
 
 **ID:** SPEC-005
-**Status:** ready
+**Status:** done
 **Priority:** medium
 **Created:** 2026-07-02
-**Updated:** 2026-07-02 (reviewer REQUEST_CHANGES + architect + UX review findings applied)
+**Updated:** 2026-07-02 (reviewer REQUEST_CHANGES + architect + UX review findings applied; gem-version-lag amendment — vendored car-suspension icon)
 **Author:** spec-agent
 
 ---
@@ -53,15 +53,34 @@ Note: Gemfile line 25 currently contains the comment `# Render Heroicons v2 as i
 Remove: `include Heroicon::ApplicationHelper`
 Add: the module include for `tabler_icons_ruby`. Verify the exact module constant name from the gem README before implementing (expected: `TablerIconsRuby::ApplicationHelper`).
 
+### Vendored Icon Fallback (`app/helpers/application_helper.rb`)
+
+`tabler_icons_ruby` v3.26.0 (the only rubygems release, January 2025) bundles ~5,847 icons but does not include `car-suspension.svg`, which was added to the upstream Tabler Icons project after that release.
+
+To handle this and any future gem-vs-upstream gaps, `ApplicationHelper` must define two additions:
+
+**`VENDORED_ICON_SVGS`** — a private frozen `Hash` constant mapping icon key strings to raw SVG markup strings. Each value is a complete `<svg ...>...</svg>` string with:
+- Attributes matching Tabler's design system conventions: `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-width="2"`, `stroke-linecap="round"`, `stroke-linejoin="round"`
+- A `class` attribute following the gem's own naming convention: `"icon icon-tabler icons-tabler-outline icon-tabler-<key>"` (e.g. `"icon icon-tabler icons-tabler-outline icon-tabler-car-suspension"`), with a placeholder string (e.g. `"ICON_CSS_CLASS_PLACEHOLDER"`) appended that the helper replaces at call time with the caller-supplied CSS size classes
+- The SVG body reproducing the upstream source verbatim (6 `<path>` elements for `car-suspension`)
+
+Currently contains one entry: `"car-suspension"` — sourced verbatim from `https://raw.githubusercontent.com/tabler/tabler-icons/main/icons/outline/car-suspension.svg` (MIT licensed). Byte-for-byte consistent with the gem's design system conventions as confirmed by diffing against `engine.svg` from the installed gem.
+
+**`service_icon(icon_key, css_class:)`** — a public helper method:
+- If `icon_key` is a key in `VENDORED_ICON_SVGS`, return the corresponding vendored SVG string with the placeholder replaced by `css_class`, marked `html_safe`
+- Otherwise delegate to `tabler_icon(icon_key, class: css_class)`
+
+This centralises the vendored-icon fallback in one place instead of duplicating a conditional across all three view call sites. Icons loaded via either path are visually indistinguishable: the vendored SVG uses the same viewBox, fill, stroke, stroke-width, linecap, and linejoin conventions as every icon the gem renders.
+
 ### View helper call sites
 
 | File | Current call | Replacement |
 |------|-------------|-------------|
-| `app/views/pages/services.html.erb:14` | `heroicon section.icon_key, variant: :outline, options: { class: "w-10 h-10" }` | tabler_icons_ruby equivalent — preserve size classes |
-| `app/views/admin/services_pages/show.html.erb:42` | `heroicon section.icon_key, variant: :outline, options: { class: "w-6 h-6" }` | tabler_icons_ruby equivalent — preserve size classes |
-| `app/views/admin/service_sections/_form.html.erb:36` | `heroicon key, variant: :outline, options: { class: "w-8 h-8" }` | tabler_icons_ruby equivalent — preserve size classes |
+| `app/views/pages/services.html.erb:14` | `heroicon section.icon_key, variant: :outline, options: { class: "w-10 h-10" }` | `service_icon(section.icon_key, css_class: "w-10 h-10")` |
+| `app/views/admin/services_pages/show.html.erb:42` | `heroicon section.icon_key, variant: :outline, options: { class: "w-6 h-6" }` | `service_icon(section.icon_key, css_class: "w-6 h-6")` |
+| `app/views/admin/service_sections/_form.html.erb:36` | `heroicon key, variant: :outline, options: { class: "w-8 h-8" }` | `service_icon(key, css_class: "w-8 h-8")` |
 
-Verify the exact method signature (name and class-passing convention) from the gem README before implementing.
+All three call sites use `service_icon` rather than `tabler_icon` directly so that both gem-backed and vendored icons flow through one consistent code path. Verify the exact `tabler_icon` method signature (name and class-passing convention) from the gem README before implementing `service_icon`'s delegation branch.
 
 ### ServiceSection::ICON_KEYS
 
@@ -138,7 +157,7 @@ R4: `ServiceSection::ICON_KEYS` must contain exactly the 18 Tabler key strings l
 
 R5: The `icon_key` model validation (`validates :icon_key, presence: true, inclusion: { in: ICON_KEYS }`) requires no logic change. After the constant update, all 14 old Heroicon-only keys are invalid; all 18 Tabler keys are valid.
 
-R6: All three `heroicon(...)` view call sites must be replaced with the tabler_icons_ruby helper call. The size CSS classes (`w-10 h-10`, `w-6 h-6`, `w-8 h-8`) must be preserved at each respective call site.
+R6: All three `heroicon(...)` view call sites must be replaced with calls to the new `service_icon(icon_key, css_class: ...)` helper — not directly to `tabler_icon(...)`. The size CSS classes (`w-10 h-10`, `w-6 h-6`, `w-8 h-8`) are passed as the `css_class:` keyword argument at each respective call site. Routing all icon renders through `service_icon` ensures both gem-backed and vendored icons (e.g. `car-suspension`) follow one consistent code path.
 
 R7: The icon picker in the admin section form must continue to render one pre-hidden `<span>` per key in ICON_KEYS and toggle visibility on dropdown `change` via the existing `icon-preview` Stimulus controller. No change to the Stimulus controller is required — only the underlying rendered icons change. After this migration the form renders 18 option elements and 18 icon spans (up from 14).
 
@@ -188,6 +207,8 @@ E6: Verification of the 4 new Tabler-only icon names (no Heroicon predecessor) i
 - `helmet.svg` — confirmed (sibling `helmet-off.svg` also exists but is not used).
 
 No further icon name verification work remains for the developer. All 18 ICON_KEYS entries (14 mapped + 4 new) are fully verified against the Tabler outline directory.
+
+Implementation note — gem version lag: despite `car-suspension.svg` existing in the upstream repository (confirmed above), `tabler_icons_ruby` v3.26.0 does not bundle it — the file was added to the upstream project after the gem's January 2025 release. This gap was discovered during implementation. Two alternatives were considered and rejected: (1) substituting `steering-wheel` — semantically inaccurate, as steering geometry is unrelated to suspension; (2) dropping the icon entirely. The user's explicit choice was to vendor `car-suspension.svg` directly via the `VENDORED_ICON_SVGS` constant in `ApplicationHelper`. The SVG is MIT-licensed (same as the rest of the Tabler library). `car-suspension` remains the canonical key in `ICON_KEYS`, seeds, migrations, and all spec references — the implementation must be corrected to match.
 
 ---
 
@@ -249,6 +270,10 @@ AC-16: `spec/models/service_section_spec.rb` asserts `ServiceSection::ICON_KEYS.
 AC-17: The "is valid for every value in ICON_KEYS" model spec passes for all 18 Tabler keys with zero failures.
 
 AC-18: No spec file contains a Heroicon-only key string (e.g. `"wrench"`, `"cog-6-tooth"`, `"cpu-chip"`, `"fire"`, `"beaker"`) as an expected-valid `icon_key` value.
+
+### Vendored Icon Fallback
+
+AC-19: `GET /services` with `services_page_published` true and a section with `icon_key: "car-suspension"` returns HTTP 200 and the response body contains `<svg` (confirming the vendored fallback path in `service_icon` renders correctly). `GET /admin/services` (authenticated) with the same section also returns HTTP 200 and the response body contains `<svg`.
 
 ---
 
@@ -350,6 +375,12 @@ When the tabler_icons_ruby view helper is called for each of the 18 keys in ICON
 Then no call raises and each returns a string containing `<svg`
 Covers: R13
 
+AT15
+Given `services_page_published` is true and a section exists with `icon_key = "car-suspension"`
+When `GET /services` and `GET /admin/services` (authenticated) are requested
+Then both return HTTP 200 and both response bodies contain `<svg` — confirming the vendored fallback in `service_icon` renders the car-suspension SVG through the same assertion path as gem-backed icons
+Covers: R6, AC-19
+
 ---
 
 ## Implementation Decisions
@@ -384,11 +415,11 @@ Covers: R13
 | T2 | Update `ServiceSection::ICON_KEYS` to the 18-entry Tabler array. All 18 keys are fully verified: the 14 mapped keys were confirmed in the previous verification pass (E2); the 4 new-only keys (`engine`, `car-suspension`, `motorbike`, `helmet`) were confirmed via direct query of the Tabler Icons GitHub repo outline directory (E6). No further icon name verification work is required. | AC-3, AC-4, AC-5, AC-6 | 1 |
 | T3 | Write data migration: backfill icon_key using explicit 14-key mapping; raise on unknown key (R8c); `down` block must first guard against rows with any of the 4 new-only keys and raise if found (R8d amended; AC-13b), then reverse all 14 mapped pairs for every row — not only the 3 seeded rows (AC-13c) | AC-11, AC-12, AC-13, AC-13b, AC-13c | 3 |
 | T4 | Update `db/seeds.rb` with new Tabler icon_key values for all three default sections | AC-14 | 1 |
-| T5 | Update all 3 view call sites (`services.html.erb`, `admin/services_pages/show.html.erb`, `admin/service_sections/_form.html.erb`) to tabler_icons_ruby helper syntax; confirm E4 (variant param) and E3 (visual distinction of settings/settings-2) | AC-7, AC-8, AC-9, AC-10 | 2 |
+| T5 | Add `VENDORED_ICON_SVGS` frozen Hash constant (with `car-suspension` SVG sourced verbatim from upstream Tabler, MIT licensed — 6 `<path>` elements, same viewBox/stroke/fill/linecap/linejoin conventions as the gem) and `service_icon(icon_key, css_class:)` helper to `ApplicationHelper`; update all 3 view call sites (`services.html.erb`, `admin/services_pages/show.html.erb`, `admin/service_sections/_form.html.erb`) to call `service_icon(icon_key, css_class: ...)` instead of `tabler_icon(...)` directly; confirm E4 (variant param) and E3 (visual distinction of settings/settings-2) | AC-7, AC-8, AC-9, AC-10, AC-19 | 3 |
 | T6 | Add a one-line forward-reference note at the top of `docs/architecture/ADR-002-services-page-icon-rendering-and-ordering.md` stating that Decision 1 (icon rendering library) is superseded by `ADR-003-icon-library-migration-to-tabler.md`. Note: ADR-003 already exists at `docs/architecture/ADR-003-icon-library-migration-to-tabler.md` (created by the architect) and `docs/architecture/README.md` is already updated — no ADR authoring required, only the forward-reference note on ADR-002. | AC-15 | 1 |
 | T7 | Update `spec/models/service_section_spec.rb` (ICON_KEYS count 14→18); update all files in R12 to replace Heroicon key strings with Tabler equivalents: `spec/factories/service_sections.rb` (both factories), `spec/requests/admin/service_sections_spec.rb` (lines 44, 65), `spec/requests/pages_spec.rb` (lines 8, 10), `spec/system/admin/service_sections_spec.rb` (lines 27, 49, 74 — exercise care on the Capybara `select` call at ~line 49), `spec/system/admin/services_page_spec.rb` (line 9) | AC-16, AC-17, AC-18 | 2 |
 
-Total estimated points: 11
+Total estimated points: 12
 
 ---
 
@@ -399,3 +430,4 @@ Total estimated points: 11
 | 2026-07-02 | Initial draft | All | New spec |
 | 2026-07-02 | Corrected `adjustments-vertical` mapping; resolved all three E2 verification flags | Explicit Key Mapping table, ICON_KEYS array, E2, T2, Implementation Decisions | Verified against Tabler Icons GitHub repo (main branch, icons/outline/). `adjustments-vertical` does not exist in Tabler; corrected to `adjustments`. `adjustments-horizontal` and `chart-bar` confirmed exact. `settings` and `settings-2` confirmed exact and visually distinct. All ⚠ flags removed. |
 | 2026-07-02 | Applied reviewer (REQUEST_CHANGES), architect, and UX review findings; status promoted to ready | R8(d), R10, R12, E3, E6 (new), AC-1, AC-13b (new), AC-13c (new), AC-15, AT10b (new), AT10c (new), AT13, T1, T2, T3, T6, T7, Implementation Decisions | Reviewer majors: (1) added E6 with hard evidence for 4 new Tabler-only icon names verified via Tabler GitHub tree query; tightened T2 language (all 18 verified, no further work needed); (2) replaced R12 catch-all with explicit enumerated file list including line numbers and Capybara ElementNotFound warning. Reviewer minors: (3) added AC-13c and AT10c to ensure full 14-pair reversal in down block, not just 3 seeded rows; (4) added Gemfile comment note and explicit bundle install/Gemfile.lock step to T1 and AC-1. Architect: (5) amended R8(d) with guard for 4 new-only keys before reversal attempt; (6) added AC-13b; (7) added AT10b; (8) updated R10/AC-15/T6/AT13 to reflect ADR-003 already created — developer action is ADR-002 forward-reference note only. UX: (9) added Kamal deployment-window decision to Implementation Decisions table; (10) added deliberate-tradeoff note to E3 for settings/settings-2 picker label ambiguity, with corresponding Implementation Decisions row. |
+| 2026-07-02 | Gem-version-lag amendment: `car-suspension.svg` absent from `tabler_icons_ruby` v3.26.0; added Vendored Icon Fallback interface (`VENDORED_ICON_SVGS` constant and `service_icon` helper); amended R6 to require `service_icon` at all call sites; added vendor-path ACs and AT; noted gem-version-lag in E6; updated T5; status reset to `ready` pending implementation correction | Interfaces (new Vendored Icon Fallback section), View helper call sites table, R6, E6, AC-19 (new), AT15 (new), T5, Status | `tabler_icons_ruby` v3.26.0 does not bundle `car-suspension.svg` (added to upstream Tabler Icons after the January 2025 gem release). Discovered during implementation: developer substituted `steering-wheel`. Two alternatives considered and rejected by the user: (1) `steering-wheel` — semantically inaccurate; (2) dropping the icon. User's explicit choice: vendor the SVG directly in `VENDORED_ICON_SVGS`. `car-suspension` remains the canonical key throughout the spec; the implementation must be corrected to match. |

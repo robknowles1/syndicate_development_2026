@@ -15,7 +15,7 @@ RSpec.describe ServiceSection, type: :model do
       # The before_validation callback generates the slug, so we test uniqueness
       # by ensuring two sections with colliding headings get distinct slugs
       s1 = create(:service_section, heading: "UNIQUE NAME")
-      s2 = ServiceSection.new(heading: "UNIQUE NAME", icon_key: "wrench", position: 99)
+      s2 = ServiceSection.new(heading: "UNIQUE NAME", icon_key: "tool", position: 99)
       s2.service_bullets.build(body: "bullet", position: 0)
       s2.valid?
       expect(s2.slug).not_to eq(s1.slug)
@@ -83,7 +83,7 @@ RSpec.describe ServiceSection, type: :model do
       # Create another section that would generate the same slug
       s = ServiceSection.new(
         heading: "Engines",
-        icon_key: "wrench",
+        icon_key: "tool",
         position: 99
       )
       s.service_bullets.build(body: "Some bullet", position: 0)
@@ -94,8 +94,8 @@ RSpec.describe ServiceSection, type: :model do
   end
 
   describe "ICON_KEYS constant" do
-    it "contains exactly 14 values" do
-      expect(ServiceSection::ICON_KEYS.length).to eq(14)
+    it "contains exactly 18 values" do
+      expect(ServiceSection::ICON_KEYS.length).to eq(18)
     end
   end
 end
