@@ -1,7 +1,7 @@
 # Spec: Services Page — Dynamic Content with Admin CRUD
 
 **ID:** SPEC-002
-**Status:** ready
+**Status:** done
 **Priority:** medium
 **Created:** 2026-03-18
 **Updated:** 2026-06-29

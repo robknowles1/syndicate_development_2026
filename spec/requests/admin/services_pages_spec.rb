@@ -7,7 +7,7 @@ RSpec.describe "Admin::ServicesPages", type: :request do
     post admin_login_path, params: { email: admin.email, password: "password123" }
   end
 
-  let!(:section) { create(:service_section, slug: "precision_engines", heading: "PRECISION ENGINES") }
+  let!(:section) { create(:service_section, heading: "PRECISION ENGINES", position: 0) }
 
   describe "GET /admin/services_page" do
     context "when authenticated" do
@@ -18,15 +18,23 @@ RSpec.describe "Admin::ServicesPages", type: :request do
         expect(response).to have_http_status(:ok)
       end
 
-      it "includes headings for all service sections" do
+      it "includes headings for all service sections ordered by position (AT5)" do
+        b = create(:service_section, heading: "SUSPENSION", position: 1)
         get admin_services_page_path
-        expect(response.body).to include("PRECISION ENGINES")
+        body = response.body
+        expect(body.index("PRECISION ENGINES")).to be < body.index("SUSPENSION")
       end
 
       it "shows the current published state" do
         SiteSetting.set("services_page_published", "false")
         get admin_services_page_path
         expect(response.body).to include(I18n.t("admin.services_page.heading"))
+      end
+
+      it "renders the add-first link when no sections exist (E5)" do
+        ServiceSection.destroy_all
+        get admin_services_page_path
+        expect(response.body).to include(I18n.t("admin.service_sections.add_first"))
       end
     end
 
@@ -38,7 +46,7 @@ RSpec.describe "Admin::ServicesPages", type: :request do
     end
   end
 
-  describe "PATCH /admin/services_page (toggle)" do
+  describe "PATCH /admin/services_page (toggle published)" do
     before do
       sign_in_admin
       SiteSetting.find_or_create_by!(key: "services_page_published") { |s| s.value = "false" }
@@ -60,50 +68,10 @@ RSpec.describe "Admin::ServicesPages", type: :request do
 
     context "when unauthenticated" do
       it "redirects to login" do
-        sign_out = -> { delete admin_logout_path }
-        sign_out.call
+        delete admin_logout_path
         patch admin_services_page_path, params: { published: "true" }
         expect(response).to redirect_to(admin_login_path)
       end
-    end
-  end
-
-  describe "PATCH /admin/services_page (content update)" do
-    before do
-      sign_in_admin
-    end
-
-    it "persists new heading and redirects with flash notice" do
-      bullet = section.service_bullets.first
-      patch admin_services_page_path, params: {
-        service_sections: {
-          "precision_engines" => {
-            heading: "Updated Heading",
-            service_bullets_attributes: {
-              "0" => { id: bullet.id.to_s, body: bullet.body, position: "0", _destroy: "0" }
-            }
-          }
-        }
-      }
-      expect(response).to redirect_to(admin_services_page_path)
-      expect(flash[:notice]).to eq(I18n.t("admin.services_page.content_notice"))
-      expect(section.reload.heading).to eq("Updated Heading")
-    end
-
-    it "re-renders with validation error when zero bullets are submitted for a section" do
-      bullet = section.service_bullets.first
-      patch admin_services_page_path, params: {
-        service_sections: {
-          "precision_engines" => {
-            heading: "PRECISION ENGINES",
-            service_bullets_attributes: {
-              "0" => { id: bullet.id.to_s, body: bullet.body, position: "0", _destroy: "1" }
-            }
-          }
-        }
-      }
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(response.body).to include(I18n.t("admin.services_page.validation_error"))
     end
   end
 end
