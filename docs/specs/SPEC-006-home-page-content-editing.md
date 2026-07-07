@@ -52,12 +52,17 @@ Allow Doug to edit the hero tagline, mission heading, mission subheading, and mi
 |------|------|--------|
 | GET | /admin/home_page_content | `Admin::HomePageContentsController#show` — renders the content edit form |
 | PATCH | /admin/home_page_content | `Admin::HomePageContentsController#update` — persists content and/or publish state |
+| PATCH | /admin/home_page_content/restore_defaults | `Admin::HomePageContentsController#restore_defaults` — overwrites all 4 editable fields with current i18n values; does not touch `published`; redirects to edit form with flash notice |
 
 Route declaration (to be added to the existing `namespace :admin` block):
 
 ```ruby
-resource :home_page_content, only: [:show, :update]
+resource :home_page_content, only: [:show, :update] do
+  patch :restore_defaults
+end
 ```
+
+Named route generated: `restore_defaults_admin_home_page_content_path`.
 
 ### Data Model
 
@@ -95,6 +100,9 @@ Add under `admin.home_page_content` in `config/locales/en.yml`:
 | `status_unpublished` | Unpublished state label; e.g. "Unpublished" |
 | `save` | Submit button text |
 | `update_notice` | Success flash after save |
+| `restore_defaults_label` | Text on the "Restore Original Copy" button in the edit form |
+| `confirm_restore_defaults` | Turbo confirmation dialog text shown before the restore executes; e.g. "This will replace your current edits with the original default text. Continue?" |
+| `flash.restored` | Flash notice displayed after a successful restore; e.g. "Home page content has been restored to the original defaults." |
 
 Add under `admin.dashboard`: `home_page_link` — link text on the dashboard pointing to the home page content admin.
 
@@ -124,7 +132,7 @@ R9: The `<p>` element wrapping the mission body on the public home page must car
 
 R10: `HomePageContent` is a singleton. The controller always reads and writes via `HomePageContent.first_or_initialize`. The application must never create a second row. No DB-level unique constraint is required on a surrogate column; the singleton contract is enforced by application code.
 
-R11: `db/seeds.rb` must create exactly one `HomePageContent` row using `HomePageContent.first_or_initialize` with the following initial values: `hero_tagline: "Performance, Passion, Precision."`, `mission_heading: "DREAM IT. BUILD IT. RIDE IT. LOVE IT."`, `mission_subheading: "SPECIALIZING IN CUSTOM PERFORMANCE MOTOCROSS AND SUPERCROSS MOTORCYCLES"`, `mission_body:` (the exact 4-line block-scalar string from `pages.home.mission_body` in `en.yml`), `published: false`. If `first_or_initialize` returns an already-persisted record (`new_record?` is `false`), no attribute values may be overwritten and `save!` must not be called — initial seed values are applied ONLY when creating the first row (`new_record?` is `true`). Running seeds twice must not raise or produce a second row. (See ADR-004 implementation note 3.)
+R11: `db/seeds.rb` must create exactly one `HomePageContent` row using `HomePageContent.first_or_initialize` with the following initial values: `hero_tagline: "Performance, Passion, Precision."`, `mission_heading: "DREAM IT. BUILD IT. RIDE IT. LOVE IT."`, `mission_subheading: "SPECIALIZING IN CUSTOM PERFORMANCE MOTOCROSS AND SUPERCROSS MOTORCYCLES"`, `mission_body:` (the exact 4-line block-scalar string from `pages.home.mission_body` in `en.yml`), `published: false`. If `first_or_initialize` returns an already-persisted record (`new_record?` is `false`), no attribute values may be overwritten and `save!` must not be called — initial seed values are applied ONLY when creating the first row (`new_record?` is `true`). Running seeds twice must not raise or produce a second row. (See ADR-004 implementation note 3.) Maintenance constraint (advisory): `db/seeds.rb` must be kept in sync with the canonical i18n defaults in `config/locales/en.yml` under `pages.home.*` — if those i18n values are ever updated, `db/seeds.rb`'s literal strings must be updated to match in the same change, since seeds.rb only applies its literal values to a brand-new row (the `new_record?` guard above) and will otherwise silently seed stale copy on any fresh environment created after the i18n update.
 
 R12: `GET /admin/home_page_content` renders a form pre-filled with the current `HomePageContent` values (or i18n defaults / blank if no row exists). The form includes labeled inputs for all 4 editable fields, a `published` checkbox with hidden field to send `"false"` when unchecked, and a submit button. The form must not raise if no `HomePageContent` row exists.
 
@@ -137,6 +145,14 @@ R15: All admin-facing UI strings — field labels, hints, button text, flash mes
 R16: The admin dashboard view (`GET /admin`) must include a link to `admin_home_page_content_path` using `t("admin.dashboard.home_page_link")`.
 
 R17: The admin home page content form follows the mobile-first design rules from CLAUDE.md: all text inputs and the textarea carry `w-full`; the `mission_body` textarea specifies `rows: 8` as a minimum (the default `rows: 4` is too short for a 4-line field and forces inner scrolling while editing on mobile); the submit button carries at minimum `py-3` padding; no horizontal scroll occurs at any viewport width. The `hero_tagline_hint` text must be permanently visible beneath the `hero_tagline` input (not only shown after a validation error) and must explicitly state the maximum character count (e.g. "Maximum 50 characters"). The `published` checkbox must use the `<label class="flex items-center gap-3 cursor-pointer">` wrapper pattern from `app/views/admin/services_pages/show.html.erb` (lines ~8–12) so that the full label area is tappable on mobile, not just the small checkbox square. Class and structural patterns for all other fields match `app/views/admin/service_sections/_form.html.erb`.
+
+R18: The original copy has exactly one canonical location — the i18n keys `pages.home.hero_tagline`, `pages.home.mission_heading`, `pages.home.mission_subheading`, and `pages.home.mission_body` in `config/locales/en.yml`. Both the public unpublished-fallback path (R1) and the restore-defaults action (R19) read from these same keys at runtime. No second hardcoded copy of the original strings may exist anywhere in the codebase — not in a migration, not as controller constants, not as seed defaults beyond the initial `db/seeds.rb` seeded values, and not embedded in view templates. This ensures there is never a risk of "the original" drifting into two different versions.
+
+R19: `PATCH /admin/home_page_content/restore_defaults` reads the current values of `t("pages.home.hero_tagline")`, `t("pages.home.mission_heading")`, `t("pages.home.mission_subheading")`, and `t("pages.home.mission_body")` at request time and persists them to the `HomePageContent` row via `first_or_initialize`. The `published` flag must not be read or written by this action — restoring content is an explicitly separate decision from whether that content is visible to the public, and the two must not be coupled. On success the action redirects to `admin_home_page_content_path` with `flash[:notice]` set to `t("admin.home_page_content.flash.restored")`.
+
+R20: The restore-defaults action (R19) always overwrites the 4 editable fields regardless of whether the `HomePageContent` row already exists. This is the opposite intent from the seed guard in R11, which explicitly does NOT overwrite an existing row. A developer must not conflate the two: R11's `new_record?` guard is a protective mechanism that prevents accidental data loss on redeploy; R19's restore performs an unconditional, intentional overwrite because it has been explicitly confirmed by the admin before submission (R21). If no row exists, `first_or_initialize` creates one; if a row already exists with custom values, those values are overwritten. In both cases the `published` flag remains unchanged (default `false` for a new row, unchanged for an existing one).
+
+R21: The "Restore Original Copy" button in the admin form must: (a) use a secondary/outline visual style that is clearly distinct from the primary Save button, so it is not accidentally confused with a save action; (b) carry at minimum `py-3` padding for an adequate touch target per mobile-first convention (CLAUDE.md); (c) use `data: { turbo_method: :patch, turbo_confirm: t("admin.home_page_content.confirm_restore_defaults") }` to require explicit confirmation before submitting — matching the `data: { turbo_method: :delete, turbo_confirm: ... }` precedent in `app/views/admin/services_pages/show.html.erb:65`; (d) render its label via `t("admin.home_page_content.restore_defaults_label")` with no hardcoded English string.
 
 ---
 
@@ -155,6 +171,8 @@ E5: `mission_body` submitted with embedded `\n` characters (line breaks typed in
 E6: i18n fallback path with `whitespace-pre-line`: the `pages.home.mission_body` block-scalar string in `en.yml` contains `\n` characters. Once `whitespace-pre-line` is applied (R9), the fallback will render as 4 separate visual lines instead of the current single continuous paragraph. This is an intentional behavior improvement that QA must verify does not introduce unexpected whitespace.
 
 E7: `mission_body` submitted as all-whitespace (e.g. `"   "`). Rails `validates :mission_body, presence: true` must reject this — `present?` returns `false` for blank strings after trimming — and HTTP 422 re-renders the form.
+
+E8: `PATCH /admin/home_page_content/restore_defaults` is called when no `HomePageContent` row exists (e.g. before the admin has ever saved anything and seeds have not run). The action calls `first_or_initialize`, which returns a new unsaved record; the action sets all 4 fields to i18n values and saves. The `published` field defaults to `false` for the newly created row. The action must not raise and must redirect normally. This is the only code path that creates a `HomePageContent` row outside of seeds and the `update` action.
 
 ---
 
@@ -203,6 +221,16 @@ AC-17: The admin home page content form renders without horizontal scroll at 375
 AC-18: A migration creates the `home_page_contents` table with columns and constraints matching the Data Model table in the Interfaces section. Running the migration on a fresh database succeeds without error.
 
 AC-19: `db/seeds.rb` uses `HomePageContent.first_or_initialize` to create exactly one row with the current i18n copy (R11 values) and `published: false`. Running seeds twice produces no error and no second `HomePageContent` row.
+
+### Restore Defaults
+
+AC-20: Given admin is authenticated and no `HomePageContent` row exists, when `PATCH /admin/home_page_content/restore_defaults`, then exactly one `HomePageContent` row is created, all 4 fields (`hero_tagline`, `mission_heading`, `mission_subheading`, `mission_body`) equal the current i18n values for `pages.home.*`, `published` is `false`, and the response redirects to `admin_home_page_content_path` with `flash[:notice]`.
+
+AC-21: Given admin is authenticated and `HomePageContent` exists with `hero_tagline: "Custom tagline"` and `published: true`, when `PATCH /admin/home_page_content/restore_defaults`, then `HomePageContent.first.hero_tagline` equals `t("pages.home.hero_tagline")` (not "Custom tagline"), `HomePageContent.first.published` remains `true` (unchanged), and the response redirects to `admin_home_page_content_path` with `flash[:notice]`.
+
+AC-22: Given a request is NOT authenticated, when `PATCH /admin/home_page_content/restore_defaults`, then the response is a redirect (authentication guard, same behavior as all other admin actions). No `HomePageContent` data is changed.
+
+AC-23: The admin form rendered by `GET /admin/home_page_content` includes a "Restore Original Copy" button that: (a) targets `restore_defaults_admin_home_page_content_path` with HTTP method PATCH; (b) carries a `data-turbo-confirm` attribute; (c) has a visual class indicating secondary/outline styling (distinct from the Save button's primary styling); (d) carries at minimum `py-3` in its class attribute.
 
 ---
 
@@ -310,6 +338,30 @@ When `HomePageContent.count` is queried
 Then it equals 1 (idempotent, no second row)
 Covers: R10, R11, AC-19
 
+AT18
+Given admin is authenticated and no `HomePageContent` row exists
+When `PATCH /admin/home_page_content/restore_defaults`
+Then exactly one `HomePageContent` row exists; `hero_tagline` equals `I18n.t("pages.home.hero_tagline")`; `mission_heading` equals `I18n.t("pages.home.mission_heading")`; `mission_subheading` equals `I18n.t("pages.home.mission_subheading")`; `mission_body` equals `I18n.t("pages.home.mission_body")`; `published` is `false`; and the response redirects to `admin_home_page_content_path` with `flash[:notice]` present
+Covers: R18, R19, R20, E8, AC-20
+
+AT19
+Given admin is authenticated and `HomePageContent` exists with `hero_tagline: "My Custom Line"` and `published: true`
+When `PATCH /admin/home_page_content/restore_defaults`
+Then `HomePageContent.first.hero_tagline` equals `I18n.t("pages.home.hero_tagline")` (not "My Custom Line"); `HomePageContent.first.published` is `true` (unchanged); and the response redirects to `admin_home_page_content_path` with `flash[:notice]` present
+Covers: R19, R20, AC-21
+
+AT20
+Given no active admin session (unauthenticated)
+When `PATCH /admin/home_page_content/restore_defaults`
+Then the response redirects (auth guard) and `HomePageContent.count` is unchanged
+Covers: R19, AC-22
+
+AT21
+Given admin is authenticated
+When `GET /admin/home_page_content`
+Then the response body includes (a) a form action or link targeting the path for `restore_defaults_admin_home_page_content_path` with method `patch`; (b) a `data-turbo-confirm` attribute on the restore element; and (c) a `py-3` class on the restore button element
+Covers: R21, AC-23
+
 ---
 
 ## Open Questions
@@ -347,11 +399,11 @@ OQ2 — **Resolved by ADR-004:** Use `md:truncate` on the hero tagline `<p>` ele
 |------|-------------|-------------|--------|
 | T1 | Migration: create `home_page_contents` table with all columns and constraints per the data model. Create `HomePageContent` model with validations (R6, R7, R8) and singleton read pattern (R10). Update `db/seeds.rb` with idempotent seed row (R11). Add FactoryBot factory. | AC-18, AC-19, R6, R7, R8, R10, R11 | 2 |
 | T2 | Public page update: update `PagesController#home` to load `HomePageContent.first` (R3); update `app/views/pages/home.html.erb` to conditionally render DB vs. i18n (R1, R2, R3a) using a single `content` local variable (R3a — do not scatter four independent `published?` checks); add `md:whitespace-nowrap` to hero h1 class list (R4); add `md:truncate` to hero tagline `<p>` class list (R5); apply `whitespace-pre-line` to mission body `<p>` (R9). | AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, R1, R2, R3, R3a, R4, R5, R9 | 2 |
-| T3 | Admin controller and routes: add `resource :home_page_content, only: [:show, :update]` to the admin namespace in `config/routes.rb`; create `Admin::HomePageContentsController` with `show` and `update` actions (actions ordered alphabetically per `.claude/standards/practices/architecture.md §1.8`); add all required i18n keys under `admin.home_page_content` and `admin.dashboard.home_page_link` (R15, R16); update dashboard view link (R16). | AC-7, AC-10, AC-11, AC-12, AC-13, AC-14, AC-15, AC-16, R12, R13, R14, R15, R16 | 2 |
-| T4 | Admin view: create `app/views/admin/home_page_contents/show.html.erb` with a mobile-first form (R17); include error display block, labeled inputs for all 4 fields, `hero_tagline_hint` permanently visible beneath the hero tagline input (R17), `mission_body` textarea with `rows: 8` (R17), a `published` checkbox using the `<label class="flex items-center gap-3 cursor-pointer">` wrapper pattern from `app/views/admin/services_pages/show.html.erb` (lines ~8–12) with accompanying hidden field for unchecked state (R17), `published_hint` help text and `current_status_label`/`status_published`/`status_unpublished` status display, and a submit button. Advisory (not blocking): consider a live character-counter Stimulus controller on the hero tagline input (e.g. "32 / 50") to reduce the friction of a failed save on mobile. Class and structural patterns for non-checkbox fields match `app/views/admin/service_sections/_form.html.erb`. | AC-7, AC-8, AC-9, AC-16, AC-17, R12, R17 | 2 |
-| T5 | Tests: `HomePageContent` model spec (validations, singleton first_or_initialize, published default); request spec for `PagesController#home` (no row → fallback, unpublished → fallback, published → DB values); request spec for `Admin::HomePageContentsController` (auth guard on show and update, show pre-fills, update happy path, update validation failures); system spec for admin form at 375 px viewport (AC-17). All tests use AAA pattern, inline variables only, no `let`/`let!`, no domain-setup `before` hooks (per testing.md). | All ATs | 3 |
+| T3 | Admin controller and routes: add `resource :home_page_content, only: [:show, :update] do patch :restore_defaults end` to the admin namespace in `config/routes.rb`; create `Admin::HomePageContentsController` with `restore_defaults`, `show`, and `update` actions (alphabetical order per `.claude/standards/practices/architecture.md §1.8`); add all required i18n keys under `admin.home_page_content` (including `restore_defaults_label`, `confirm_restore_defaults`, `flash.restored`) and `admin.dashboard.home_page_link` (R15, R16, R18, R19); update dashboard view link (R16). The `restore_defaults` action reads i18n values via `I18n.t("pages.home.*")` — the same keys used by the public fallback path — and must not define a second copy of the original strings anywhere in the controller (R18). | AC-7, AC-10, AC-11, AC-12, AC-13, AC-14, AC-15, AC-16, AC-20, AC-21, AC-22, R12, R13, R14, R15, R16, R18, R19, R20 | 3 |
+| T4 | Admin view: create `app/views/admin/home_page_contents/show.html.erb` with a mobile-first form (R17); include error display block, labeled inputs for all 4 fields, `hero_tagline_hint` permanently visible beneath the hero tagline input (R17), `mission_body` textarea with `rows: 8` (R17), a `published` checkbox using the `<label class="flex items-center gap-3 cursor-pointer">` wrapper pattern from `app/views/admin/services_pages/show.html.erb` (lines ~8–12) with accompanying hidden field for unchecked state (R17), `published_hint` help text and `current_status_label`/`status_published`/`status_unpublished` status display, a primary Save button, and a secondary/outline "Restore Original Copy" button that targets `restore_defaults_admin_home_page_content_path` via `data: { turbo_method: :patch, turbo_confirm: t("admin.home_page_content.confirm_restore_defaults") }` with at minimum `py-3` padding (R21). The restore button must be visually distinct from Save — it must not share the same primary-color CTA class. Advisory (not blocking): consider a live character-counter Stimulus controller on the hero tagline input (e.g. "32 / 50"). Class and structural patterns for non-checkbox fields match `app/views/admin/service_sections/_form.html.erb`. | AC-7, AC-8, AC-9, AC-16, AC-17, AC-23, R12, R17, R21 | 2 |
+| T5 | Tests: `HomePageContent` model spec (validations, singleton first_or_initialize, published default); request spec for `PagesController#home` (no row → fallback, unpublished → fallback, published → DB values); request spec for `Admin::HomePageContentsController` (auth guard on show, update, and restore_defaults; show pre-fills; update happy path; update validation failures; restore_defaults when no row; restore_defaults overwrites fields but leaves published unchanged); system spec for admin form at 375 px viewport (AC-17 and AC-23). All tests use AAA pattern, inline variables only, no `let`/`let!`, no domain-setup `before` hooks (per testing.md). | All ATs (AT1–AT21) | 5 |
 
-Total estimated points: 11
+Total estimated points: 13
 
 ---
 
@@ -361,3 +413,5 @@ Total estimated points: 11
 |------|--------|-------------|-----------|
 | 2026-07-07 | Initial draft | All | New spec |
 | 2026-07-07 | Applied consolidated review findings (architect ADR-004, reviewer critical/major/minor, UX): resolved OQ1 and OQ2; added R3a (single-computation content pattern; `published?` predicate requirement); updated R5 to `md:truncate` with accessibility note; updated R6 with Unicode-character clarification; expanded R11 with non-overwrite constraint referencing ADR-004 note 3; expanded R17 with `hero_tagline_hint` permanent-visibility requirement, `mission_body` `rows: 8` minimum, and `published` checkbox wrapper pattern; added AT12 (exactly 50-character boundary test); renumbered old AT12–AT16 to AT13–AT17; added `published_hint`, `current_status_label`, `status_published`, `status_unpublished` i18n keys; revised `published_label` rationale; updated T2, T3, T4; removed OQ1/OQ2 blockers; removed "Final structure subject to OQ1" from Implementation Decisions; promoted status to `ready`. | All | Reviewer critical + major + minor; ADR-004; UX review |
+| 2026-07-07 | Added Restore Original Copy capability: new route `PATCH /admin/home_page_content/restore_defaults`; added R18 (single source of truth for original copy — i18n keys only, no second hardcoded copy), R19 (restore action behavior: overwrites 4 fields from i18n, does not touch `published`, redirects with flash), R20 (restore vs. seed distinction — unconditional overwrite vs. R11's protective guard), R21 (restore button UX: secondary/outline style, `py-3` touch target, `data-turbo-confirm`); added E8 (restore when no row exists); added AC-20–AC-23 and AT18–AT21; added i18n keys `restore_defaults_label`, `confirm_restore_defaults`, `flash.restored`; updated Interfaces admin table and route declaration; updated T3 (+1 point, 2→3), T5 (+2 points, 3→5); T4 unchanged at 2 points. Total estimate updated 11→13. Status remains `ready`. | R18, R19, R20, R21, E8, AC-20, AC-21, AC-22, AC-23, AT18, AT19, AT20, AT21, T3, T4, T5, i18n table | New requirement added post-initial review |
+| 2026-07-07 | Added maintenance constraint sentence to R11: `db/seeds.rb` literal strings must be kept in sync with `config/locales/en.yml` `pages.home.*` values — any i18n update requires a matching seeds.rb update in the same change, otherwise stale copy is silently seeded on fresh environments. Advisory (not blocking). Status remains `ready`. | R11 | Reviewer advisory finding |
