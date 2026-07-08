@@ -1,0 +1,113 @@
+<h1 class="text-2xl font-bold mb-6"><%= t("admin.about_page_content.heading") %></h1>
+
+<section class="bg-white rounded-lg shadow p-4 md:p-6">
+  <%= form_with model: [:admin, @about_page_content], url: admin_about_page_content_path, method: :patch, html: { class: "space-y-6" } do |f| %>
+    <% if @about_page_content.errors.any? %>
+      <div class="bg-red-50 border border-red-300 rounded p-4">
+        <ul class="list-disc list-inside text-red-700 text-sm space-y-1">
+          <% @about_page_content.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div>
+      <%= f.label :shop_heading, t("admin.about_page_content.shop_heading_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.text_field :shop_heading,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <div>
+      <%= f.label :shop_phone_label, t("admin.about_page_content.shop_phone_label_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.text_field :shop_phone_label,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <div>
+      <%= f.label :shop_phone_number, t("admin.about_page_content.shop_phone_number_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.text_field :shop_phone_number,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+      <p class="text-sm text-gray-500 mt-1"><%= t("admin.about_page_content.shop_phone_number_hint") %></p>
+    </div>
+
+    <div>
+      <%= f.label :shop_address_label, t("admin.about_page_content.shop_address_label_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.text_field :shop_address_label,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <div>
+      <%= f.label :shop_address, t("admin.about_page_content.shop_address_value_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.text_field :shop_address,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <div>
+      <%= f.label :bio_heading, t("admin.about_page_content.bio_heading_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.text_field :bio_heading,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <div>
+      <%= f.label :bio_body, t("admin.about_page_content.bio_body_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.text_area :bio_body, rows: 8,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+      <p class="text-sm text-gray-500 mt-1"><%= t("admin.about_page_content.bio_body_hint") %></p>
+    </div>
+
+    <div>
+      <%= f.label :slideshow_alt_1, t("admin.about_page_content.slideshow_alt_1_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.text_field :slideshow_alt_1,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <div>
+      <%= f.label :slideshow_alt_2, t("admin.about_page_content.slideshow_alt_2_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.text_field :slideshow_alt_2,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <div>
+      <%= f.label :slideshow_alt_3, t("admin.about_page_content.slideshow_alt_3_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.text_field :slideshow_alt_3,
+            class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <%# Published toggle %>
+    <div>
+      <input type="hidden" name="about_page_content[published]" value="false">
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" name="about_page_content[published]" value="true"
+               <%= "checked" if @about_page_content.published? %>
+               class="w-5 h-5 accent-red-600">
+        <span class="font-semibold"><%= t("admin.about_page_content.published_label") %></span>
+      </label>
+      <p class="text-sm text-gray-500 mt-2"><%= t("admin.about_page_content.published_hint") %></p>
+      <p class="text-sm text-gray-500 mt-1">
+        <%= t("admin.about_page_content.current_status_label") %>
+        <strong><%= @about_page_content.published? ? t("admin.about_page_content.status_published") : t("admin.about_page_content.status_unpublished") %></strong>
+      </p>
+    </div>
+
+    <div class="flex flex-wrap gap-4 items-center">
+      <%= f.submit t("admin.about_page_content.save"),
+            class: "w-full md:w-auto bg-red-600 text-white font-bold py-3 px-6 rounded hover:bg-red-700 cursor-pointer" %>
+
+      <%= link_to t("admin.about_page_content.restore_defaults_label"),
+            restore_defaults_admin_about_page_content_path,
+            data: { turbo_method: :patch, turbo_confirm: t("admin.about_page_content.confirm_restore_defaults") },
+            class: "w-full md:w-auto inline-block text-center border-2 border-gray-400 text-gray-700 font-bold py-3 px-6 rounded hover:bg-gray-100 cursor-pointer" %>
+    </div>
+  <% end %>
+</section>

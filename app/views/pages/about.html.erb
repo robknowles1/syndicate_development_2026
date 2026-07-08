@@ -1,3 +1,5 @@
+<% content = @about_page_content&.published? ? @about_page_content : nil %>
+
 <%# CSS Fade Slideshow %>
 <style>
   .slideshow {
@@ -33,36 +35,37 @@
 
 <%# Slideshow Section %>
 <section class="slideshow mt-[70px]">
-  <%= image_tag "gallery/m45a2920.jpg", alt: t("pages.about.slideshow_alt", n: 1) %>
-  <%= image_tag "gallery/m45a2927.jpg", alt: t("pages.about.slideshow_alt", n: 2) %>
-  <%= image_tag "gallery/m45a2928.jpg", alt: t("pages.about.slideshow_alt", n: 3) %>
+  <%= image_tag "gallery/m45a2920.jpg", alt: content&.slideshow_alt_1 || t("pages.about.slideshow_alt_1") %>
+  <%= image_tag "gallery/m45a2927.jpg", alt: content&.slideshow_alt_2 || t("pages.about.slideshow_alt_2") %>
+  <%= image_tag "gallery/m45a2928.jpg", alt: content&.slideshow_alt_3 || t("pages.about.slideshow_alt_3") %>
 </section>
 
 <%# Shop Info Section %>
 <section class="py-16 px-6 max-w-4xl mx-auto">
   <h2 class="text-3xl md:text-4xl font-black uppercase tracking-wide mb-6" style="color: #242121;">
-    <%= t("pages.about.shop_heading") %>
+    <%= content&.shop_heading || t("pages.about.shop_heading") %>
   </h2>
 
+  <% shop_phone_number = content&.shop_phone_number || t("pages.about.shop_phone_number") %>
   <div class="mb-6 text-gray-700 text-lg">
     <p class="mb-2">
-      <strong><%= t("pages.about.shop_phone_label") %></strong>
-      <a href="tel:2082519536" class="hover:text-red-600 transition-colors">208-251-9536</a>
+      <strong><%= content&.shop_phone_label || t("pages.about.shop_phone_label") %></strong>
+      <a href="tel:<%= shop_phone_number.gsub(/\D/, "") %>" class="hover:text-red-600 transition-colors"><%= shop_phone_number %></a>
     </p>
     <p>
-      <strong><%= t("pages.about.shop_address_label") %></strong>
+      <strong><%= content&.shop_address_label || t("pages.about.shop_address_label") %></strong>
       <a href="https://goo.gl/maps/k6PjesVBsAqDArb27"
          target="_blank"
          rel="noopener noreferrer"
          class="hover:text-red-600 transition-colors">
-        <%= t("pages.about.shop_address") %>
+        <%= content&.shop_address || t("pages.about.shop_address") %>
       </a>
     </p>
   </div>
 
-  <h3 class="text-2xl font-bold uppercase mb-4" style="color: #242121;"><%= t("pages.about.bio_heading") %></h3>
-  <p class="text-gray-700 text-base md:text-lg leading-relaxed mb-12">
-    <%= t("pages.about.bio_body") %>
+  <h3 class="text-2xl font-bold uppercase mb-4" style="color: #242121;"><%= content&.bio_heading || t("pages.about.bio_heading") %></h3>
+  <p class="text-gray-700 text-base md:text-lg leading-relaxed mb-12 whitespace-pre-line">
+    <%= content&.bio_body || t("pages.about.bio_body") %>
   </p>
 
   <%# Contact Form %>

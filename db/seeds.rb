@@ -15,6 +15,25 @@ if home_content.new_record?
   home_content.save!
 end
 
+# --- About Page Content ---
+about_content = AboutPageContent.first_or_initialize
+if about_content.new_record?
+  about_content.assign_attributes(
+    shop_heading: "SYNDICATE DEVELOPMENT",
+    shop_phone_label: "Shop Phone:",
+    shop_phone_number: "208-251-9536",
+    shop_address_label: "Shop Address:",
+    shop_address: "1801 N. Arthur Ave., Pocatello, ID, 83204",
+    bio_heading: "About Doug Haskett",
+    bio_body: I18n.t("pages.about.bio_body"),
+    slideshow_alt_1: "Syndicate Development motorcycle 1",
+    slideshow_alt_2: "Syndicate Development motorcycle 2",
+    slideshow_alt_3: "Syndicate Development motorcycle 3",
+    published: false
+  )
+  about_content.save!
+end
+
 # --- Admin User ---
 admin_password = ENV.fetch("ADMIN_SEED_PASSWORD") { raise "Set ADMIN_SEED_PASSWORD env var before seeding" }
 AdminUser.find_or_create_by(email: "doug@syndicate-development.com") do |u|
