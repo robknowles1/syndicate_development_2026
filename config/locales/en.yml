@@ -105,6 +105,26 @@ en:
     dashboard:
       heading: "Admin Dashboard"
       services_link: "Manage Services Page"
+      home_page_link: "Edit Home Page Content"
+    home_page_content:
+      heading: "Home Page Content"
+      hero_tagline_label: "Hero Tagline"
+      hero_tagline_hint: "Maximum 50 characters"
+      mission_heading_label: "Mission Heading"
+      mission_subheading_label: "Mission Subheading"
+      mission_body_label: "Mission Body"
+      mission_body_hint: "Line breaks (Enter key) are preserved on the public page."
+      published_label: "Home page content is published (visible to the public)"
+      published_hint: "When unchecked, your saved changes are hidden — visitors see the original default text, not a blank page."
+      current_status_label: "Current status:"
+      status_published: "Published"
+      status_unpublished: "Unpublished"
+      save: "Save Changes"
+      update_notice: "Home page content saved."
+      restore_defaults_label: "Restore Original Copy"
+      confirm_restore_defaults: "This will replace your current edits with the original default text. Continue?"
+      flash:
+        restored: "Home page content has been restored to the original defaults."
     services_page:
       heading: "Services Page Settings"
       published_label: "Services page is published (visible to the public)"

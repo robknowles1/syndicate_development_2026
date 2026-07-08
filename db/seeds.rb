@@ -2,6 +2,19 @@
 # development, test). The code here should be idempotent so that it can be executed at any point in every environment.
 # The data can then be loaded with the bin/rails db:seed command (or created alongside the database with db:setup).
 
+# --- Home Page Content ---
+home_content = HomePageContent.first_or_initialize
+if home_content.new_record?
+  home_content.assign_attributes(
+    hero_tagline: "Performance, Passion, Precision.",
+    mission_heading: "DREAM IT. BUILD IT. RIDE IT. LOVE IT.",
+    mission_subheading: "SPECIALIZING IN CUSTOM PERFORMANCE MOTOCROSS AND SUPERCROSS MOTORCYCLES",
+    mission_body: I18n.t("pages.home.mission_body"),
+    published: false
+  )
+  home_content.save!
+end
+
 # --- Admin User ---
 admin_password = ENV.fetch("ADMIN_SEED_PASSWORD") { raise "Set ADMIN_SEED_PASSWORD env var before seeding" }
 AdminUser.find_or_create_by(email: "doug@syndicate-development.com") do |u|

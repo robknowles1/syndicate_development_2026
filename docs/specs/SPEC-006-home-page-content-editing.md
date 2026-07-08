@@ -1,7 +1,7 @@
 # Spec: Home Page Content Editing — Admin-Managed Hero and Mission Copy
 
 **ID:** SPEC-006
-**Status:** ready
+**Status:** done
 **Priority:** medium
 **Created:** 2026-07-07
 **Author:** spec-agent
