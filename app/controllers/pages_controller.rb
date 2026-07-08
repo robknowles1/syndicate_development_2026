@@ -2,6 +2,7 @@ class PagesController < ApplicationController
   before_action :check_services_published, only: :services
 
   def home
+    @home_page_content = HomePageContent.first
   end
 
   def about
