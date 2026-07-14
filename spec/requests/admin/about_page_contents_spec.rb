@@ -100,6 +100,22 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
+    it "pre-fills the form with i18n originals when no AboutPageContent row exists" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      sign_in_admin(admin)
+      # No AboutPageContent row
+
+      # Act
+      get admin_about_page_content_path
+
+      # Assert
+      expect(response.body).to include(CGI.escapeHTML(I18n.t("pages.about.shop_heading")))
+      expect(response.body).to include(CGI.escapeHTML(I18n.t("pages.about.shop_phone_number")))
+      expect(response.body).to include(CGI.escapeHTML(I18n.t("pages.about.bio_heading")))
+      expect(AboutPageContent.count).to eq(0)
+    end
+
     it "renders the shop_phone_number_hint text permanently (R10)" do
       # Arrange
       admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")

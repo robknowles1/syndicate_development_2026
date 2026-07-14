@@ -2,12 +2,7 @@ module Admin
   class HomePageContentsController < BaseController
     def restore_defaults
       home_page_content = HomePageContent.first_or_initialize
-      home_page_content.assign_attributes(
-        hero_tagline:       I18n.t("pages.home.hero_tagline"),
-        mission_heading:    I18n.t("pages.home.mission_heading"),
-        mission_subheading: I18n.t("pages.home.mission_subheading"),
-        mission_body:       I18n.t("pages.home.mission_body")
-      )
+      home_page_content.assign_attributes(i18n_default_attributes)
       home_page_content.save!
       flash[:notice] = I18n.t("admin.home_page_content.flash.restored")
       redirect_to admin_home_page_content_path
@@ -15,6 +10,7 @@ module Admin
 
     def show
       @home_page_content = HomePageContent.first_or_initialize
+      @home_page_content.assign_attributes(i18n_default_attributes) if @home_page_content.new_record?
     end
 
     def update
@@ -28,6 +24,15 @@ module Admin
     end
 
     private
+
+    def i18n_default_attributes
+      {
+        hero_tagline:       I18n.t("pages.home.hero_tagline"),
+        mission_heading:    I18n.t("pages.home.mission_heading"),
+        mission_subheading: I18n.t("pages.home.mission_subheading"),
+        mission_body:       I18n.t("pages.home.mission_body")
+      }
+    end
 
     def home_page_content_params
       params.require(:home_page_content).permit(
