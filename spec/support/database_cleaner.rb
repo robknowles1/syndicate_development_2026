@@ -11,7 +11,7 @@ RSpec.configure do |config|
     example.run
 
     # Clean up committed records after the example
-    [ HomePageContent, AboutPageContent, ServiceBullet, ServiceSection, SiteSetting, AdminUser ].each do |model|
+    [ HomePageContent, AboutPageContent, ServiceBullet, ServiceSection, SiteSetting, AdminUser, GalleryPhoto ].each do |model|
       model.delete_all
     end
 
