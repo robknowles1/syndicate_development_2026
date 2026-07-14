@@ -110,6 +110,7 @@ en:
       services_link: "Manage Services Page"
       home_page_link: "Edit Home Page Content"
       about_page_link: "Edit About Page Content"
+      gallery_link: "Manage Gallery Photos"
     home_page_content:
       heading: "Home Page Content"
       hero_tagline_label: "Hero Tagline"
@@ -195,6 +196,20 @@ en:
         updated: "Service section updated."
         destroyed: "Service section deleted."
         moved: "Service section reordered."
+    gallery_photos:
+      heading: "Gallery Photos"
+      image_label: "Photo"
+      image_hint: "JPEG, PNG, or WEBP. Maximum 15 MB."
+      save: "Upload Photo"
+      move_up: "Up"
+      move_down: "Down"
+      delete: "Delete"
+      confirm_delete: "Are you sure you want to delete this photo?"
+      empty_state: "No gallery photos yet."
+      flash:
+        uploaded: "Photo uploaded."
+        deleted: "Photo deleted."
+        moved: "Photo reordered."
     layout:
       title: "Admin — Syndicate Development"
       header: "Syndicate Development Admin"
@@ -207,6 +222,9 @@ en:
           attributes:
             base:
               at_least_one_bullet: "Each service section must have at least one bullet item."
+      messages:
+        invalid_content_type: "must be a JPEG, PNG, or WEBP image"
+        file_too_large: "must be smaller than 15 MB"
 
   mailer:
     contact_email:
