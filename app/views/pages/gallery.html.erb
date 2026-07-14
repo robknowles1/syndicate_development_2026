@@ -4,9 +4,9 @@
   </h1>
 
   <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-    <% @images.each do |image_path| %>
-      <a href="<%= asset_path(image_path) %>" class="block overflow-hidden">
-        <%= image_tag image_path,
+    <% @photos.each do |photo| %>
+      <a href="<%= url_for(photo.display_variant) %>" class="block overflow-hidden">
+        <%= image_tag photo.display_variant,
               alt: t("pages.gallery.photo_alt"),
               class: "object-cover aspect-square w-full h-full hover:opacity-90 transition-opacity" %>
       </a>

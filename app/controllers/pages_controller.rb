@@ -10,9 +10,7 @@ class PagesController < ApplicationController
   end
 
   def gallery
-    @images = Dir.glob(Rails.root.join("app/assets/images/gallery/*.jpg")).map do |path|
-      "gallery/#{File.basename(path)}"
-    end.sort
+    @photos = GalleryPhoto.order(:position)
   end
 
   def services
