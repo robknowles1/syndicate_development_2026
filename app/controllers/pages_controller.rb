@@ -10,7 +10,7 @@ class PagesController < ApplicationController
   end
 
   def gallery
-    @photos = GalleryPhoto.order(:position)
+    @photos = GalleryPhoto.with_attached_image.order(:position)
   end
 
   def services

@@ -11,7 +11,7 @@ module Admin
         flash[:notice] = I18n.t("admin.gallery_photos.flash.uploaded")
         redirect_to admin_gallery_photos_path
       else
-        @photos = GalleryPhoto.order(:position)
+        @photos = GalleryPhoto.with_attached_image.order(:position)
         render :index, status: :unprocessable_entity
       end
     end
