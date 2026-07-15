@@ -284,6 +284,23 @@ RSpec.describe "Admin::GalleryPhotos", type: :request do
         expect(photo_b.reload.position).to eq(original_position)
       end
     end
+
+    context "when not authenticated" do
+      it "redirects to login and does not change positions (AT27, AC-28)" do
+        # Arrange
+        photo_a = create(:gallery_photo, position: 0)
+        photo_b = create(:gallery_photo, position: 1)
+        original_position = photo_a.position
+
+        # Act
+        patch move_down_admin_gallery_photo_path(photo_a)
+
+        # Assert
+        expect(response).to redirect_to(admin_login_path)
+        expect(photo_a.reload.position).to eq(original_position)
+        expect(photo_b.reload.position).to eq(1)
+      end
+    end
   end
 
   describe "GET /admin" do

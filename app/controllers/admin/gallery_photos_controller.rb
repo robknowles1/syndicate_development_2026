@@ -24,7 +24,7 @@ module Admin
     end
 
     def index
-      @photos = GalleryPhoto.order(:position)
+      @photos = GalleryPhoto.with_attached_image.order(:position)
       @gallery_photo = GalleryPhoto.new
     end
 
