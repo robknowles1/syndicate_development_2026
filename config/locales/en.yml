@@ -57,10 +57,11 @@ en:
     about:
       shop_heading: "SYNDICATE DEVELOPMENT"
       shop_phone_label: "Shop Phone:"
+      shop_phone_number: "208-251-9536"
       shop_address_label: "Shop Address:"
       shop_address: "1801 N. Arthur Ave., Pocatello, ID, 83204"
       bio_heading: "About Doug Haskett"
-      bio_body: |
+      bio_body: >-
         Doug Haskett has been involved with motorcycles and racing for most of his life. Since 1998 he has been perfecting
         his skills in the mechanics of the machine, learning the fine craft of engine, suspension and ECU tuning, and overall
         bike fixes, upgrades and performance. He has worked at the highest levels of dirt bike racing, having experience with
@@ -69,7 +70,9 @@ en:
         race, and his lifelong passion for bikes combined with his knowledge and state of the art performance equipment and dyno
         room make him a highly sought-after mechanic today. Have a question? Send a message!
       contact_heading: "CONTACT THE SHOP"
-      slideshow_alt: "Syndicate Development motorcycle %{n}"
+      slideshow_alt_1: "Syndicate Development motorcycle 1"
+      slideshow_alt_2: "Syndicate Development motorcycle 2"
+      slideshow_alt_3: "Syndicate Development motorcycle 3"
       form:
         name_label: "Name *"
         name_placeholder: "Your name"
@@ -106,6 +109,7 @@ en:
       heading: "Admin Dashboard"
       services_link: "Manage Services Page"
       home_page_link: "Edit Home Page Content"
+      about_page_link: "Edit About Page Content"
     home_page_content:
       heading: "Home Page Content"
       hero_tagline_label: "Hero Tagline"
@@ -125,6 +129,31 @@ en:
       confirm_restore_defaults: "This will replace your current edits with the original default text. Continue?"
       flash:
         restored: "Home page content has been restored to the original defaults."
+    about_page_content:
+      heading: "About Page Content"
+      shop_heading_label: "Shop Heading"
+      shop_phone_label_label: "Shop Phone Label"
+      shop_phone_number_label: "Shop Phone Number"
+      shop_phone_number_hint: "Only digits are used to build the tap-to-call link. Formatting like spaces, dashes, or parentheses is preserved as displayed text."
+      shop_address_label_label: "Shop Address Label"
+      shop_address_value_label: "Shop Address"
+      bio_heading_label: "Bio Heading"
+      bio_body_label: "Bio Body"
+      bio_body_hint: "Line breaks (Enter key) are preserved on the public page."
+      slideshow_alt_1_label: "Slideshow Image 1 Alt Text"
+      slideshow_alt_2_label: "Slideshow Image 2 Alt Text"
+      slideshow_alt_3_label: "Slideshow Image 3 Alt Text"
+      published_label: "About page content is published (visible to the public)"
+      published_hint: "When unchecked, your saved changes are hidden — visitors see the original default text, not a blank page."
+      current_status_label: "Current status:"
+      status_published: "Published"
+      status_unpublished: "Unpublished"
+      save: "Save Changes"
+      update_notice: "About page content saved."
+      restore_defaults_label: "Restore Original Copy"
+      confirm_restore_defaults: "This will replace your current edits with the original default text. Continue?"
+      flash:
+        restored: "About page content has been restored to the original defaults."
     services_page:
       heading: "Services Page Settings"
       published_label: "Services page is published (visible to the public)"

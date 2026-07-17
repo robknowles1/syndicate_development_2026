@@ -24,6 +24,9 @@ Rails.application.routes.draw do
     resource :home_page_content, only: [ :show, :update ] do
       patch :restore_defaults
     end
+    resource :about_page_content, only: [ :show, :update ] do
+      patch :restore_defaults
+    end
     resource  :services_page,    only: [ :show, :update ]
     resources :service_sections, only: [ :new, :create, :edit, :update, :destroy ] do
       member do

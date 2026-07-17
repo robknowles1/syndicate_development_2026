@@ -6,6 +6,7 @@ class PagesController < ApplicationController
   end
 
   def about
+    @about_page_content = AboutPageContent.first
   end
 
   def gallery

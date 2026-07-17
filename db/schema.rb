@@ -10,9 +10,25 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_07_224523) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_08_044141) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "about_page_contents", force: :cascade do |t|
+    t.text "bio_body", null: false
+    t.string "bio_heading", null: false
+    t.datetime "created_at", null: false
+    t.boolean "published", default: false, null: false
+    t.string "shop_address", null: false
+    t.string "shop_address_label", null: false
+    t.string "shop_heading", null: false
+    t.string "shop_phone_label", null: false
+    t.string "shop_phone_number", null: false
+    t.string "slideshow_alt_1", null: false
+    t.string "slideshow_alt_2", null: false
+    t.string "slideshow_alt_3", null: false
+    t.datetime "updated_at", null: false
+  end
 
   create_table "admin_users", force: :cascade do |t|
     t.datetime "created_at", null: false

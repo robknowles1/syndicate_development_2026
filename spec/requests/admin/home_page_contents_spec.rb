@@ -78,6 +78,21 @@ RSpec.describe "Admin::HomePageContents", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
+    it "pre-fills the form with i18n originals when no HomePageContent row exists" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      sign_in_admin(admin)
+      # No HomePageContent row
+
+      # Act
+      get admin_home_page_content_path
+
+      # Assert
+      expect(response.body).to include(CGI.escapeHTML(I18n.t("pages.home.hero_tagline")))
+      expect(response.body).to include(CGI.escapeHTML(I18n.t("pages.home.mission_heading")))
+      expect(HomePageContent.count).to eq(0)
+    end
+
     it "renders the hero_tagline_hint text permanently (R17)" do
       # Arrange
       admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
