@@ -8,6 +8,10 @@ export default class extends Controller {
     this.sortable = Sortable.create(this.element, {
       animation: 150,
       ghostClass: "opacity-50",
+      delay: 150,
+      delayOnTouchOnly: true,
+      filter: "[data-turbo-method='delete']",
+      preventOnFilter: false,
       onEnd: this.onEnd.bind(this)
     })
   }
