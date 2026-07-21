@@ -50,7 +50,7 @@ RSpec.describe "GET /gallery (SPEC-008 gallery photo management)", type: :reques
       expect(img_src).not_to match(%r{/rails/active_storage/blobs/})
     end
 
-    it "wraps the img in an <a> tag whose href equals the same display-variant URL (AT3, R10, R12, AC-3)" do
+    it "wraps the img in a lightbox-trigger button carrying the same display-variant URL as a param, not a navigable <a> href (AT3, R10, R12, AC-3)" do
       # Arrange
       photo = create(:gallery_photo, position: 0)
 
@@ -58,10 +58,28 @@ RSpec.describe "GET /gallery (SPEC-008 gallery photo management)", type: :reques
       get gallery_path
 
       # Assert
-      link = Nokogiri::HTML(response.body).css("div.grid a").first
-      expect(URI(link["href"]).path).to eq(URI(link.at_css("img")["src"]).path)
-      expect(link["href"]).to match(%r{/rails/active_storage/representations/})
-      expect(link["href"]).to include(photo.image.blob.signed_id)
+      document = Nokogiri::HTML(response.body)
+      expect(document.css("div.grid a")).to be_empty
+      trigger = document.css("div.grid button").first
+      expect(trigger["data-action"]).to include("gallery-lightbox#open")
+      expect(URI(trigger["data-gallery-lightbox-src-param"]).path).to eq(URI(trigger.at_css("img")["src"]).path)
+      expect(trigger["data-gallery-lightbox-src-param"]).to match(%r{/rails/active_storage/representations/})
+      expect(trigger["data-gallery-lightbox-src-param"]).to include(photo.image.blob.signed_id)
+    end
+
+    it "renders a lightbox overlay with a close button, hidden by default" do
+      # Arrange
+      create(:gallery_photo, position: 0)
+
+      # Act
+      get gallery_path
+
+      # Assert
+      document = Nokogiri::HTML(response.body)
+      overlay = document.css("[data-gallery-lightbox-target='overlay']").first
+      expect(overlay["class"]).to include("hidden")
+      expect(overlay.css("button[data-action*='gallery-lightbox#close']")).not_to be_empty
+      expect(overlay["role"]).to eq("dialog")
     end
   end
 

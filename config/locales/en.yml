@@ -86,6 +86,8 @@ en:
     gallery:
       heading: "PROJECT GALLERY"
       photo_alt: "Syndicate Development project photo"
+      lightbox_aria_label: "Photo preview"
+      lightbox_close_aria_label: "Close photo preview"
     services:
       heading: "Services"
       empty_message: "Contact us to learn about our services."

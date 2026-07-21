@@ -1,15 +1,35 @@
-<section class="mt-[70px] px-4 py-8">
+<section class="mt-[70px] px-4 py-8" data-controller="gallery-lightbox" data-action="keydown.esc@window->gallery-lightbox#close">
   <h1 class="text-3xl md:text-4xl font-black uppercase tracking-wide text-center mb-8" style="color: #242121;">
     <%= t("pages.gallery.heading") %>
   </h1>
 
   <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
     <% @photos.each do |photo| %>
-      <a href="<%= url_for(photo.display_variant) %>" class="block overflow-hidden">
+      <button type="button"
+              class="block overflow-hidden w-full"
+              data-action="gallery-lightbox#open"
+              data-gallery-lightbox-src-param="<%= url_for(photo.display_variant) %>"
+              data-gallery-lightbox-alt-param="<%= t("pages.gallery.photo_alt") %>">
         <%= image_tag photo.display_variant,
               alt: t("pages.gallery.photo_alt"),
               class: "object-cover aspect-square w-full h-full hover:opacity-90 transition-opacity" %>
-      </a>
+      </button>
     <% end %>
+  </div>
+
+  <div data-gallery-lightbox-target="overlay"
+       data-action="click->gallery-lightbox#closeOnBackdrop"
+       class="hidden fixed inset-0 bg-black/90 flex items-center justify-center p-4"
+       style="z-index: 1000"
+       role="dialog"
+       aria-modal="true"
+       aria-label="<%= t("pages.gallery.lightbox_aria_label") %>">
+    <button type="button"
+            data-action="gallery-lightbox#close"
+            class="absolute top-4 right-4 text-white p-3 hover:opacity-75"
+            aria-label="<%= t("pages.gallery.lightbox_close_aria_label") %>">
+      <%= tabler_icon("x", class: "w-8 h-8 pointer-events-none") %>
+    </button>
+    <img data-gallery-lightbox-target="image" src="" alt="" class="max-w-full max-h-full object-contain">
   </div>
 </section>
