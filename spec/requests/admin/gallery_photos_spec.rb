@@ -7,7 +7,7 @@ RSpec.describe "Admin::GalleryPhotos", type: :request do
 
   describe "GET /admin/gallery_photos" do
     context "when authenticated and 2 GalleryPhoto rows exist" do
-      it "returns HTTP 200 with Move Up/Move Down/Delete controls for each (AT12, AC-13)" do
+      it "returns HTTP 200 with a draggable grid, a Delete control per tile, and no Move Up/Down controls (AT12, AC-13)" do
         # Arrange
         admin = create(:admin_user)
         sign_in_admin(admin)
@@ -19,10 +19,31 @@ RSpec.describe "Admin::GalleryPhotos", type: :request do
 
         # Assert
         expect(response).to have_http_status(:ok)
+        expect(response.body).to include("grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2")
         document = Nokogiri::HTML(response.body)
-        expect(document.css("a[href*='move_up']").count).to eq(2)
-        expect(document.css("a[href*='move_down']").count).to eq(2)
+        expect(document.css("[data-gallery-photo-id]").count).to eq(2)
         expect(document.css("a[data-turbo-method='delete']").count).to eq(2)
+        expect(document.css("a[href*='move_up']")).to be_empty
+        expect(document.css("a[href*='move_down']")).to be_empty
+      end
+    end
+
+    context "when authenticated and 2 GalleryPhoto rows exist" do
+      it "carries data-controller=gallery-sort on the grid and data-gallery-photo-id on each tile (AT35, AC-36)" do
+        # Arrange
+        admin = create(:admin_user)
+        sign_in_admin(admin)
+        photo_a = create(:gallery_photo, position: 0)
+        photo_b = create(:gallery_photo, position: 1)
+
+        # Act
+        get admin_gallery_photos_path
+
+        # Assert
+        document = Nokogiri::HTML(response.body)
+        expect(document.css("[data-controller='gallery-sort']")).not_to be_empty
+        tile_ids = document.css("[data-gallery-photo-id]").map { |node| node["data-gallery-photo-id"] }
+        expect(tile_ids).to contain_exactly(photo_a.id.to_s, photo_b.id.to_s)
       end
     end
 
@@ -211,9 +232,76 @@ RSpec.describe "Admin::GalleryPhotos", type: :request do
     end
   end
 
-  describe "PATCH /admin/gallery_photos/:id/move_up" do
+  describe "PATCH /admin/gallery_photos/reorder" do
+    def reorder(photo_ids)
+      patch reorder_admin_gallery_photos_path,
+        params: { photo_ids: photo_ids }.to_json,
+        headers: { "Content-Type" => "application/json" }
+    end
+
     context "when authenticated and 3 rows exist at positions 0, 1, 2" do
-      it "swaps the row at position 1 with the position-0 row (AT21, AC-22)" do
+      it "reassigns every position to match the submitted order and returns an empty 200 (AT21, AC-22)" do
+        # Arrange
+        admin = create(:admin_user)
+        sign_in_admin(admin)
+        photo_a = create(:gallery_photo, position: 0)
+        photo_b = create(:gallery_photo, position: 1)
+        photo_c = create(:gallery_photo, position: 2)
+
+        # Act
+        reorder([ photo_c.id, photo_a.id, photo_b.id ])
+
+        # Assert
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to be_empty
+        expect(photo_c.reload.position).to eq(0)
+        expect(photo_a.reload.position).to eq(1)
+        expect(photo_b.reload.position).to eq(2)
+      end
+    end
+
+    context "when authenticated and the submitted order matches the current order" do
+      it "succeeds and leaves every position unchanged" do
+        # Arrange
+        admin = create(:admin_user)
+        sign_in_admin(admin)
+        photo_a = create(:gallery_photo, position: 0)
+        photo_b = create(:gallery_photo, position: 1)
+        photo_c = create(:gallery_photo, position: 2)
+
+        # Act
+        reorder([ photo_a.id, photo_b.id, photo_c.id ])
+
+        # Assert
+        expect(response).to have_http_status(:ok)
+        expect(photo_a.reload.position).to eq(0)
+        expect(photo_b.reload.position).to eq(1)
+        expect(photo_c.reload.position).to eq(2)
+      end
+    end
+
+    context "when authenticated and photo_ids contains an id that does not belong to any existing GalleryPhoto" do
+      it "returns HTTP 422 and changes no position (AT22, AC-23, E6)" do
+        # Arrange
+        admin = create(:admin_user)
+        sign_in_admin(admin)
+        photo_a = create(:gallery_photo, position: 0)
+        photo_b = create(:gallery_photo, position: 1)
+        create(:gallery_photo, position: 2)
+        foreign_id = GalleryPhoto.maximum(:id).to_i + 1000
+
+        # Act
+        reorder([ foreign_id, photo_a.id, photo_b.id ])
+
+        # Assert
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(photo_a.reload.position).to eq(0)
+        expect(photo_b.reload.position).to eq(1)
+      end
+    end
+
+    context "when authenticated and photo_ids omits an existing GalleryPhoto" do
+      it "returns HTTP 422 and changes no position (AT22, AC-23, E6)" do
         # Arrange
         admin = create(:admin_user)
         sign_in_admin(admin)
@@ -222,82 +310,84 @@ RSpec.describe "Admin::GalleryPhotos", type: :request do
         create(:gallery_photo, position: 2)
 
         # Act
-        patch move_up_admin_gallery_photo_path(photo_b)
+        reorder([ photo_b.id, photo_a.id ])
 
         # Assert
-        expect(response).to redirect_to(admin_gallery_photos_path)
-        expect(photo_b.reload.position).to eq(0)
-        expect(photo_a.reload.position).to eq(1)
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(photo_a.reload.position).to eq(0)
+        expect(photo_b.reload.position).to eq(1)
       end
     end
 
-    context "when authenticated and called on the row at the lowest position" do
-      it "does not change positions and redirects normally (AT23, AC-24, E6)" do
+    context "when authenticated and photo_ids contains a duplicate id" do
+      it "returns HTTP 422 and changes no position (AT22, AC-23, E6)" do
+        # Arrange
+        admin = create(:admin_user)
+        sign_in_admin(admin)
+        photo_a = create(:gallery_photo, position: 0)
+        photo_b = create(:gallery_photo, position: 1)
+        photo_c = create(:gallery_photo, position: 2)
+
+        # Act
+        reorder([ photo_a.id, photo_a.id, photo_b.id ])
+
+        # Assert
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(photo_a.reload.position).to eq(0)
+        expect(photo_b.reload.position).to eq(1)
+        expect(photo_c.reload.position).to eq(2)
+      end
+    end
+
+    context "when authenticated and photo_ids is an empty array" do
+      it "returns HTTP 422 and changes no position (AT23, AC-24, E7)" do
         # Arrange
         admin = create(:admin_user)
         sign_in_admin(admin)
         photo_a = create(:gallery_photo, position: 0)
         create(:gallery_photo, position: 1)
-        original_position = photo_a.position
+        create(:gallery_photo, position: 2)
 
         # Act
-        patch move_up_admin_gallery_photo_path(photo_a)
+        reorder([])
 
         # Assert
-        expect(response).to redirect_to(admin_gallery_photos_path)
-        expect(photo_a.reload.position).to eq(original_position)
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(photo_a.reload.position).to eq(0)
       end
     end
 
-    context "when not authenticated" do
-      it "redirects to login and does not change positions (AT27, AC-28)" do
-        # Arrange
-        photo = create(:gallery_photo, position: 0)
-        original_position = photo.position
-
-        # Act
-        patch move_up_admin_gallery_photo_path(photo)
-
-        # Assert
-        expect(response).to redirect_to(admin_login_path)
-        expect(photo.reload.position).to eq(original_position)
-      end
-    end
-  end
-
-  describe "PATCH /admin/gallery_photos/:id/move_down" do
-    context "when authenticated and called on the row at the highest position" do
-      it "does not change positions and redirects with a flash (AT22, AC-23, E5)" do
+    context "when authenticated and photo_ids is absent entirely" do
+      it "returns HTTP 422 and changes no position (AT23, AC-24, E7)" do
         # Arrange
         admin = create(:admin_user)
         sign_in_admin(admin)
-        create(:gallery_photo, position: 0)
-        photo_b = create(:gallery_photo, position: 1)
-        original_position = photo_b.position
+        photo_a = create(:gallery_photo, position: 0)
+        create(:gallery_photo, position: 1)
 
         # Act
-        patch move_down_admin_gallery_photo_path(photo_b)
+        patch reorder_admin_gallery_photos_path,
+          params: {}.to_json,
+          headers: { "Content-Type" => "application/json" }
 
         # Assert
-        expect(response).to redirect_to(admin_gallery_photos_path)
-        expect(flash[:notice]).to eq(I18n.t("admin.gallery_photos.flash.moved"))
-        expect(photo_b.reload.position).to eq(original_position)
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(photo_a.reload.position).to eq(0)
       end
     end
 
     context "when not authenticated" do
-      it "redirects to login and does not change positions (AT27, AC-28)" do
+      it "redirects to login and changes no position (AT27, AC-28)" do
         # Arrange
         photo_a = create(:gallery_photo, position: 0)
         photo_b = create(:gallery_photo, position: 1)
-        original_position = photo_a.position
 
         # Act
-        patch move_down_admin_gallery_photo_path(photo_a)
+        reorder([ photo_b.id, photo_a.id ])
 
         # Assert
         expect(response).to redirect_to(admin_login_path)
-        expect(photo_a.reload.position).to eq(original_position)
+        expect(photo_a.reload.position).to eq(0)
         expect(photo_b.reload.position).to eq(1)
       end
     end

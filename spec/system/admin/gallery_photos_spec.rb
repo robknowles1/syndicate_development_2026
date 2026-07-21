@@ -11,8 +11,8 @@ RSpec.describe "Admin gallery photos list", type: :system do
     expect(page).to have_current_path(admin_root_path)
   end
 
-  describe "admin gallery photo list at 375 px viewport (AT26, R20, AC-27)" do
-    it "renders with no horizontal scroll and wrapping action buttons" do
+  describe "admin gallery photo grid at 375 px viewport (AT26, R20, AC-27)" do
+    it "renders with no horizontal scroll, grid-cols-2, and a touch-sized delete control per tile" do
       # Arrange
       admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
       create(:gallery_photo, position: 0)
@@ -30,11 +30,15 @@ RSpec.describe "Admin gallery photos list", type: :system do
       expect(viewport_width).to be < 768
       expect(document_width).to be <= viewport_width
 
-      # Assert — action buttons wrap via flex flex-wrap
-      button_rows = page.all(".flex.flex-wrap.gap-2", visible: false)
-      expect(button_rows).not_to be_empty
+      # Assert — the draggable grid renders at grid-cols-2 at this viewport width
+      grid = find("[data-controller='gallery-sort']")
+      expect(grid[:class]).to include("grid-cols-2")
 
-      # Assert — list action buttons carry py-2 minimum, upload submit carries py-3
+      # Assert — each tile's overlaid Delete control meets a minimum 44x44 px touch target
+      delete_link = page.all("a[aria-label='#{I18n.t('admin.gallery_photos.delete')}']").first
+      expect(delete_link[:class]).to include("w-11").and include("h-11")
+
+      # Assert — upload submit button carries py-3
       expect(page).to have_button(I18n.t("admin.gallery_photos.save"))
       save_button = find_button(I18n.t("admin.gallery_photos.save"))
       expect(save_button[:class]).to include("py-3")
