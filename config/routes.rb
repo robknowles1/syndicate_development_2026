@@ -35,9 +35,8 @@ Rails.application.routes.draw do
       end
     end
     resources :gallery_photos, only: [ :index, :create, :destroy ] do
-      member do
-        patch :move_up
-        patch :move_down
+      collection do
+        patch :reorder
       end
     end
   end

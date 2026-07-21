@@ -1,6 +1,6 @@
 module Admin
   class GalleryPhotosController < BaseController
-    before_action :set_gallery_photo, only: [ :destroy, :move_up, :move_down ]
+    before_action :set_gallery_photo, only: [ :destroy ]
 
     def create
       @gallery_photo = GalleryPhoto.new(gallery_photo_params)
@@ -28,37 +28,32 @@ module Admin
       @gallery_photo = GalleryPhoto.new
     end
 
-    def move_down
-      neighbour = GalleryPhoto.where("position > ?", @gallery_photo.position)
-                              .order(position: :asc)
-                              .first
-      if neighbour
-        original_position = @gallery_photo.position
-        ActiveRecord::Base.transaction do
-          @gallery_photo.update_column(:position, neighbour.position)
-          neighbour.update_column(:position, original_position)
-        end
-      end
-      flash[:notice] = I18n.t("admin.gallery_photos.flash.moved")
-      redirect_to admin_gallery_photos_path
-    end
+    def reorder
+      photo_ids = params[:photo_ids]
 
-    def move_up
-      neighbour = GalleryPhoto.where("position < ?", @gallery_photo.position)
-                              .order(position: :desc)
-                              .first
-      if neighbour
-        original_position = @gallery_photo.position
-        ActiveRecord::Base.transaction do
-          @gallery_photo.update_column(:position, neighbour.position)
-          neighbour.update_column(:position, original_position)
+      unless valid_reorder_ids?(photo_ids)
+        head :unprocessable_entity
+        return
+      end
+
+      ActiveRecord::Base.transaction do
+        photo_ids.each_with_index do |id, index|
+          GalleryPhoto.where(id: id).update_all(position: index)
         end
       end
-      flash[:notice] = I18n.t("admin.gallery_photos.flash.moved")
-      redirect_to admin_gallery_photos_path
+
+      head :ok
     end
 
     private
+
+    def valid_reorder_ids?(photo_ids)
+      return false unless photo_ids.is_a?(Array)
+      return false if photo_ids.empty?
+      return false if photo_ids.uniq.length != photo_ids.length
+
+      photo_ids.map(&:to_i).to_set == GalleryPhoto.pluck(:id).to_set
+    end
 
     def set_gallery_photo
       @gallery_photo = GalleryPhoto.find(params[:id])

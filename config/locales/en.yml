@@ -201,15 +201,14 @@ en:
       image_label: "Photo"
       image_hint: "JPEG, PNG, or WEBP. Maximum 15 MB."
       save: "Upload Photo"
-      move_up: "Up"
-      move_down: "Down"
+      drag_hint: "Drag and drop to reorder."
       delete: "Delete"
       confirm_delete: "Are you sure you want to delete this photo?"
       empty_state: "No gallery photos yet."
       flash:
         uploaded: "Photo uploaded."
         deleted: "Photo deleted."
-        moved: "Photo reordered."
+        reorder_failed: "Could not save the new photo order. The page will reload."
     layout:
       title: "Admin — Syndicate Development"
       header: "Syndicate Development Admin"
