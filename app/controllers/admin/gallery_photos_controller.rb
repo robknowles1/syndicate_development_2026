@@ -29,9 +29,9 @@ module Admin
     end
 
     def reorder
-      photo_ids = params[:photo_ids]
+      photo_ids = normalized_reorder_ids(params[:photo_ids])
 
-      unless valid_reorder_ids?(photo_ids)
+      unless photo_ids && valid_reorder_ids?(photo_ids)
         head :unprocessable_entity
         return
       end
@@ -47,12 +47,18 @@ module Admin
 
     private
 
+    def normalized_reorder_ids(raw_ids)
+      return nil unless raw_ids.is_a?(Array)
+      return nil unless raw_ids.all? { |id| id.is_a?(String) || id.is_a?(Integer) }
+
+      raw_ids.map(&:to_i)
+    end
+
     def valid_reorder_ids?(photo_ids)
-      return false unless photo_ids.is_a?(Array)
       return false if photo_ids.empty?
       return false if photo_ids.uniq.length != photo_ids.length
 
-      photo_ids.map(&:to_i).to_set == GalleryPhoto.pluck(:id).to_set
+      photo_ids.to_set == GalleryPhoto.pluck(:id).to_set
     end
 
     def set_gallery_photo

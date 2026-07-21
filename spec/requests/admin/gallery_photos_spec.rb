@@ -28,7 +28,7 @@ RSpec.describe "Admin::GalleryPhotos", type: :request do
       end
     end
 
-    context "when authenticated and 2 GalleryPhoto rows exist" do
+    context "when authenticated and 2 GalleryPhoto rows exist, checking Stimulus wiring" do
       it "carries data-controller=gallery-sort on the grid and data-gallery-photo-id on each tile (AT35, AC-36)" do
         # Arrange
         admin = create(:admin_user)
@@ -373,6 +373,42 @@ RSpec.describe "Admin::GalleryPhotos", type: :request do
         # Assert
         expect(response).to have_http_status(:unprocessable_entity)
         expect(photo_a.reload.position).to eq(0)
+      end
+    end
+
+    context "when authenticated and photo_ids is a JSON object instead of an array" do
+      it "returns HTTP 422 and changes no position, without raising" do
+        # Arrange
+        admin = create(:admin_user)
+        sign_in_admin(admin)
+        photo_a = create(:gallery_photo, position: 0)
+
+        # Act
+        patch reorder_admin_gallery_photos_path,
+          params: { photo_ids: { "0" => photo_a.id } }.to_json,
+          headers: { "Content-Type" => "application/json" }
+
+        # Assert
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(photo_a.reload.position).to eq(0)
+      end
+    end
+
+    context "when authenticated and photo_ids contains ids that are equal only after naive-to_i coercion" do
+      it "returns HTTP 422 rather than silently collapsing distinct ids" do
+        # Arrange
+        admin = create(:admin_user)
+        sign_in_admin(admin)
+        photo_a = create(:gallery_photo, position: 0)
+        photo_b = create(:gallery_photo, position: 1)
+
+        # Act
+        reorder([ photo_a.id.to_s, "#{photo_a.id}x", photo_b.id ])
+
+        # Assert
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(photo_a.reload.position).to eq(0)
+        expect(photo_b.reload.position).to eq(1)
       end
     end
 
