@@ -1,0 +1,51 @@
+<h1 class="text-2xl font-bold mb-6"><%= t("admin.gallery_photos.heading") %></h1>
+
+<section class="bg-white rounded-lg shadow p-4 md:p-6 mb-6">
+  <%= form_with model: [ :admin, @gallery_photo ], html: { class: "w-full" } do |f| %>
+    <% if @gallery_photo.errors.any? %>
+      <div class="bg-red-50 border border-red-300 rounded p-4 mb-4">
+        <ul class="list-disc list-inside text-red-700 text-sm space-y-1">
+          <% @gallery_photo.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="w-full">
+      <%= f.label :image, t("admin.gallery_photos.image_label"), class: "block text-sm font-semibold mb-1" %>
+      <%= f.file_field :image, class: "w-full border border-gray-300 rounded px-3 py-2" %>
+      <p class="mt-1 text-xs text-gray-500"><%= t("admin.gallery_photos.image_hint") %></p>
+    </div>
+
+    <%= f.submit t("admin.gallery_photos.save"),
+          class: "mt-4 w-full md:w-auto bg-red-600 text-white font-bold py-3 px-5 rounded hover:bg-red-700 cursor-pointer" %>
+  <% end %>
+</section>
+
+<section class="bg-white rounded-lg shadow p-4 md:p-6">
+  <% if @photos.empty? %>
+    <p class="text-gray-500 italic"><%= t("admin.gallery_photos.empty_state") %></p>
+  <% else %>
+    <p class="text-sm text-gray-500 mb-3"><%= t("admin.gallery_photos.drag_hint") %></p>
+
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"
+         data-controller="gallery-sort"
+         data-gallery-sort-url-value="<%= reorder_admin_gallery_photos_path %>"
+         data-gallery-sort-failed-message-value="<%= t("admin.gallery_photos.flash.reorder_failed") %>">
+      <% @photos.each do |photo| %>
+        <div class="relative aspect-square overflow-hidden rounded" data-gallery-photo-id="<%= photo.id %>">
+          <%= image_tag photo.display_variant,
+                alt: t("pages.gallery.photo_alt"),
+                class: "w-full h-full object-cover cursor-move" %>
+          <%= link_to admin_gallery_photo_path(photo),
+                data: { turbo_method: :delete, turbo_confirm: t("admin.gallery_photos.confirm_delete") },
+                "aria-label": t("admin.gallery_photos.delete"),
+                class: "absolute top-1 right-1 flex items-center justify-center w-11 h-11 rounded-full bg-red-600/90 text-white hover:bg-red-700 text-lg font-bold leading-none" do %>
+            &times;
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</section>

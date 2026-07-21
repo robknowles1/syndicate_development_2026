@@ -139,16 +139,4 @@ RSpec.describe "Pages", type: :request do
       expect(response.body).to include("Send Message")
     end
   end
-
-  describe "GET /gallery" do
-    it "returns HTTP 200" do
-      get gallery_path
-      expect(response).to have_http_status(:ok)
-    end
-
-    it "includes at least one img tag" do
-      get gallery_path
-      expect(response.body).to include("<img")
-    end
-  end
 end

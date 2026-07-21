@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_08_044141) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_14_220256) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -30,12 +30,46 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_08_044141) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "active_storage_attachments", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "record_id", null: false
+    t.string "record_type", null: false
+    t.index ["blob_id"], name: "index_active_storage_attachments_on_blob_id"
+    t.index ["record_type", "record_id", "name", "blob_id"], name: "index_active_storage_attachments_uniqueness", unique: true
+  end
+
+  create_table "active_storage_blobs", force: :cascade do |t|
+    t.bigint "byte_size", null: false
+    t.string "checksum"
+    t.string "content_type"
+    t.datetime "created_at", null: false
+    t.string "filename", null: false
+    t.string "key", null: false
+    t.text "metadata"
+    t.string "service_name", null: false
+    t.index ["key"], name: "index_active_storage_blobs_on_key", unique: true
+  end
+
+  create_table "active_storage_variant_records", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.string "variation_digest", null: false
+    t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
   create_table "admin_users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", null: false
     t.string "password_digest", null: false
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_admin_users_on_email", unique: true
+  end
+
+  create_table "gallery_photos", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "home_page_contents", force: :cascade do |t|
@@ -61,7 +95,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_08_044141) do
     t.datetime "created_at", null: false
     t.string "heading", null: false
     t.string "icon_key", null: false
-    t.integer "position", default: 0, null: false
+    t.integer "position", null: false
     t.string "slug", null: false
     t.datetime "updated_at", null: false
     t.index ["slug"], name: "index_service_sections_on_slug", unique: true
@@ -75,5 +109,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_08_044141) do
     t.index ["key"], name: "index_site_settings_on_key", unique: true
   end
 
+  add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "service_bullets", "service_sections"
 end
