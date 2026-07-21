@@ -18,6 +18,8 @@ Allow Doug to replace any of the 3 About page slideshow images through the exist
 
 This spec's Rules, ACs, and ATs below are complete and unambiguous (status `ready`), but implementation cannot begin until both dependencies are merged.
 
+**Independent addendum (2026-07-21):** This spec also covers a second, unrelated scope item folded in at explicit user request, to ship in the same implementation pass as the About slideshow work above: persistent "back to dashboard" navigation in the shared admin layout header, affecting every admin page (Home, About, Gallery, Services). This addendum is not blocked by SPEC-007/SPEC-008 and is not derived from ADR-005 — see the "Admin Layout" subsections within Rules, Edge Cases, Acceptance Criteria, and Acceptance Tests below, and the 2026-07-21 Change Log entry.
+
 ---
 
 ## Non Goals
@@ -104,6 +106,16 @@ Add under `admin.about_page_content` in `config/locales/en.yml` (all other keys 
 |-----|----------------------|-----------|
 | `confirm_restore_defaults` | "This will replace your current edits with the original default text. Continue?" | "This will replace your current edits with the original default text and remove any uploaded slideshow images. Continue?" |
 
+### Admin Layout (Persistent Back-to-Dashboard Navigation)
+
+No new routes or controllers. `app/views/layouts/admin.html.erb` — the single shared layout rendered by every `Admin::BaseController` subclass, including `Admin::AboutPageContentsController` — gains a conditional `link_to admin_root_path` in its `<header>`, alongside the existing logout `button_to`.
+
+Add under `admin.layout` in `config/locales/en.yml` (alongside the existing `title`, `header`, `logout` keys):
+
+| Key | Purpose |
+|-----|---------|
+| `dashboard_link` | Text for the persistent "back to dashboard" link shown in the admin header on every non-dashboard admin page |
+
 ---
 
 ## Rules
@@ -134,6 +146,18 @@ R12: No dimension, aspect-ratio, or minimum-resolution validation is added for s
 
 R13: The 3 new file inputs follow the mobile-first rules from CLAUDE.md: each carries `w-full` (to the extent applicable to a file input), positioned within the existing form's `space-y-6` vertical rhythm, introducing no horizontal scroll at any viewport width including 375 px.
 
+### Admin Layout — Persistent "Back to Dashboard" Navigation (added 2026-07-21, independent scope)
+
+R14: The admin layout (`app/views/layouts/admin.html.erb`) renders a "back to dashboard" link — a real `link_to admin_root_path`, not a JavaScript history-back control — in the header, whenever `current_admin` is present. This mirrors the existing logout button's guard (same conditional), so the link is absent on the unauthenticated login page.
+
+R15: The back-to-dashboard link does not render when the current page is the dashboard itself, determined via `current_page?(admin_root_path)` (or equivalent) — no self-referential link.
+
+R16: The link text is sourced from a new i18n key, `admin.layout.dashboard_link`, added under the existing `admin.layout` namespace in `config/locales/en.yml` alongside the existing `title`, `header`, and `logout` keys. No hardcoded string is used.
+
+R17: The link carries touch-target padding consistent with this codebase's existing mobile-first interactive elements (e.g. `py-3 px-4`, matching the `py-3 px-6` / `py-3 px-5` pattern already used on admin form buttons, per CLAUDE.md's mobile-first mandate) and does not depend on hover-only affordance (no visibility or tappability gated solely behind `:hover`), since the primary admin user (Doug) navigates by touch on his phone.
+
+R18: Because `Admin::BaseController` sets `layout "admin"` for every admin controller, this is a single-file change to `app/views/layouts/admin.html.erb` — no per-view edits are made to `app/views/admin/home_page_contents/show.html.erb`, `app/views/admin/about_page_contents/show.html.erb`, `app/views/admin/gallery_photos/index.html.erb`, or `app/views/admin/services_pages/show.html.erb`. All four pages, and any future admin page using this layout, gain the link automatically.
+
 ---
 
 ## Edge Cases
@@ -155,6 +179,14 @@ E7: `restore_defaults` is called when zero slots are attached. Each purge call i
 E8: A new file is uploaded to a slot that already has an attachment, via a normal (non-restore) `#update`. The old blob is replaced and purged automatically (R8); only the new image is visible afterward.
 
 E9: `AboutPageContent.first` returns nil entirely (fresh deployment, before any save or restore has ever happened). The slideshow renders all 3 static fallbacks; no `NoMethodError` (extends SPEC-007 E1/R3).
+
+### Admin Layout — Persistent "Back to Dashboard" Navigation (added 2026-07-21, independent scope)
+
+E10: `current_admin` is `nil` (the unauthenticated login page, `GET /admin/login`). The back-to-dashboard link does not render, mirroring the existing logout button's absence in the same state.
+
+E11: An admin navigates directly to an edit page (e.g. `GET /admin/about_page_content`) via a bookmarked or freshly typed URL, with no prior entry in browser history. Because the link is a real `link_to`, not a JS `history.back()` call, it still navigates correctly to `admin_root_path` regardless of history state.
+
+E12: Admin is already on the dashboard (`GET /admin`). The back-to-dashboard link does not render (R15); only the logout button and dashboard content are shown.
 
 ---
 
@@ -193,6 +225,18 @@ AC-13: No hardcoded English strings are introduced by this spec's view or contro
 AC-14: The admin About form renders without horizontal scroll at 375 px viewport width, including the 3 new file inputs, each carrying `w-full`.
 
 AC-15: Given a request is NOT authenticated, when `PATCH /admin/about_page_content/restore_defaults`, then the response redirects (auth guard, unchanged from SPEC-007) and no `AboutPageContent` data changes — confirms adding the purge logic (R7) introduces no auth regression.
+
+### Admin Layout — Persistent "Back to Dashboard" Navigation (added 2026-07-21, independent scope)
+
+AC-16: Given admin is authenticated, when `GET /admin/about_page_content`, then the response includes a link to `admin_root_path` whose text equals `I18n.t("admin.layout.dashboard_link")`.
+
+AC-17: Given admin is authenticated, when `GET /admin` (the dashboard itself), then the response does not include the back-to-dashboard link.
+
+AC-18: Given no active admin session, when `GET /admin/login`, then the response does not include the back-to-dashboard link.
+
+AC-19: Given admin is authenticated, when each of `GET /admin/home_page_content`, `GET /admin/about_page_content`, `GET /admin/gallery_photos`, and `GET /admin/services_page` is requested, then each response includes the back-to-dashboard link — confirming the layout-level change covers all four existing admin edit pages without any per-view modification.
+
+AC-20: The back-to-dashboard link's markup carries touch-target padding classes consistent with this codebase's other mobile-first interactive elements (e.g. `py-3 px-4` or equivalent) and includes no styling that gates its visibility or tappability behind `:hover`.
 
 ---
 
@@ -300,6 +344,38 @@ When the `AboutPageContent` record is validated
 Then it is valid — no minimum-dimension validation is applied
 Covers: R12
 
+### Admin Layout — Persistent "Back to Dashboard" Navigation (added 2026-07-21, independent scope)
+
+AT18
+Given admin is authenticated
+When `GET /admin/about_page_content`
+Then the response includes a link to `admin_root_path` with text equal to `I18n.t("admin.layout.dashboard_link")`
+Covers: R14, R16, AC-16, E11
+
+AT19
+Given admin is authenticated
+When `GET /admin` (the dashboard)
+Then the response does not include the back-to-dashboard link
+Covers: R15, AC-17, E12
+
+AT20
+Given no active admin session
+When `GET /admin/login`
+Then the response does not include the back-to-dashboard link
+Covers: R14, AC-18, E10
+
+AT21
+Given admin is authenticated
+When `GET /admin/home_page_content`, `GET /admin/about_page_content`, `GET /admin/gallery_photos`, and `GET /admin/services_page` are each requested
+Then each response includes the back-to-dashboard link
+Covers: R14, R18, AC-19
+
+AT22
+Given the admin layout header markup for the back-to-dashboard link
+When inspected
+Then it carries touch-target padding classes consistent with existing mobile-first buttons (e.g. `py-3 px-4`) and no hover-only visibility/tappability styling
+Covers: R17, AC-20
+
 ---
 
 ## Implementation Decisions
@@ -338,8 +414,9 @@ Covers: R12
 | T4 | Admin view: add 3 `f.file_field` inputs to the existing About form, each positioned near its corresponding alt-text input, mobile-first (`w-full`) (R9, R13). | AC-10, AC-13, AC-14 | 2 |
 | T5 | Tests: `AboutPageContent` model spec (content-type/size validations for all 3 slots; confirms no presence requirement); request spec for `PagesController#about` (per-slot independent fallback, publish gating, all-3-attached case, alt-text unchanged). All AAA pattern, inline variables, no `let`/`let!`. | AC-1, AC-2, AC-3, AC-4 | 3 |
 | T6 | Tests: request spec for `Admin::AboutPageContentsController` (upload happy path; content-type/size rejection; `restore_defaults` purge behavior including zero-attached no-op; reattachment replaces rather than accumulates; auth guard regression check); system spec extending SPEC-007's 375 px coverage to include the 3 new file inputs; i18n audit of new strings. | AC-5, AC-6, AC-7, AC-8, AC-9, AC-10, AC-11, AC-12, AC-13, AC-14, AC-15 | 4 |
+| T7 | Admin layout: add a persistent "back to dashboard" link to `app/views/layouts/admin.html.erb`'s header, guarded by `current_admin` presence (R14) and `current_page?(admin_root_path)` absence (R15); add the `admin.layout.dashboard_link` i18n key (R16); apply mobile-first touch-target styling (R17). Independent scope, folded in at explicit user request — not part of ADR-005. Request spec asserting the link's presence across Home/About/Gallery/Services admin pages and its absence on the dashboard and login pages. | AC-16, AC-17, AC-18, AC-19, AC-20 | 1 |
 
-Total estimated points: 15 (all tasks ≤ 4 points; no split review required under the ≥ 5-point guardrail)
+Total estimated points: 16 (all tasks ≤ 4 points; no split review required under the ≥ 5-point guardrail)
 
 ---
 
@@ -348,9 +425,10 @@ Total estimated points: 15 (all tasks ≤ 4 points; no split review required und
 | Date | Change | Affected IDs | Rationale |
 |------|--------|-------------|-----------|
 | 2026-07-14 | Initial draft | All | Translates ADR-005 (Decision 1, Decision 3, and the About-specific portions of Decisions 4–6, Implementation Notes 8–10) into implementation-ready spec format. Explicitly documents the SPEC-008 and SPEC-007/PR#38 blocking dependencies per ADR-005 Implementation Note 12. Resolves the ADR's "Handoff to Spec Agent" open items as they apply to About: confirmed the shared 1200×1200 quality-80 variant via a per-slot helper method; confirmed no soft minimum-dimension guard (consistent with SPEC-008); confirmed no per-slot alt-text change (SPEC-007 R20 unchanged); wrote the `confirm_restore_defaults` copy update and the 4 new admin i18n keys; wrote full acceptance criteria including content-type/size rejection request specs and a 375 px mobile-first system spec extension. |
+| 2026-07-21 | Added independent scope: persistent "back to dashboard" navigation link in the shared admin layout header (`app/views/layouts/admin.html.erb`) | R14–R18, E10–E12, AC-16–AC-20, AT18–AT22, T7 | Folded into this spec at explicit user request, to ship alongside the About-slideshow-image-uploads work in the same implementation pass — **not** derived from ADR-005 and unrelated to the slideshow scope above. Addresses a mobile-usability gap: every admin edit page (Home, About, Gallery, Services) was a navigational dead end with no way back to the dashboard except the browser's back button, which is unreliable on Doug's phone per CLAUDE.md's mobile-first mandate. Fixed once at the shared-layout level rather than per-view so all current and future admin pages get it automatically. |
 
 ---
 
 ## Open Questions
 
-None. All items from ADR-005's "Handoff to Spec Agent" section that apply to the About slideshow are resolved above (see Implementation Decisions). This spec's only open item is procedural, not a spec ambiguity: implementation cannot start until the two Dependencies listed above land on `main`.
+None. All items from ADR-005's "Handoff to Spec Agent" section that apply to the About slideshow are resolved above (see Implementation Decisions). This spec's only open item is procedural, not a spec ambiguity: implementation of the About-slideshow-image-uploads scope (R1–R13) cannot start until the two Dependencies listed above land on `main`. The Admin Layout addendum (R14–R18, added 2026-07-21) has no such blocker and may be implemented independently at any time — see the Goal section's Independent addendum note.
