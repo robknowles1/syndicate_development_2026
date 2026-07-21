@@ -27,31 +27,25 @@
   <% if @photos.empty? %>
     <p class="text-gray-500 italic"><%= t("admin.gallery_photos.empty_state") %></p>
   <% else %>
-    <ul class="divide-y divide-gray-100">
-      <% @photos.each do |photo| %>
-        <li class="py-4 first:pt-0 last:pb-0">
-          <div class="mb-3">
-            <%= image_tag photo.display_variant,
-                  alt: t("pages.gallery.photo_alt"),
-                  class: "w-24 h-24 object-cover rounded" %>
-          </div>
+    <p class="text-sm text-gray-500 mb-3"><%= t("admin.gallery_photos.drag_hint") %></p>
 
-          <div class="flex flex-wrap gap-2">
-            <%= link_to t("admin.gallery_photos.move_up"),
-                  move_up_admin_gallery_photo_path(photo),
-                  data: { turbo_method: :patch },
-                  class: "text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded font-semibold" %>
-            <%= link_to t("admin.gallery_photos.move_down"),
-                  move_down_admin_gallery_photo_path(photo),
-                  data: { turbo_method: :patch },
-                  class: "text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded font-semibold" %>
-            <%= link_to t("admin.gallery_photos.delete"),
-                  admin_gallery_photo_path(photo),
-                  data: { turbo_method: :delete, turbo_confirm: t("admin.gallery_photos.confirm_delete") },
-                  class: "text-sm font-semibold px-3 py-2 rounded text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100" %>
-          </div>
-        </li>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"
+         data-controller="gallery-sort"
+         data-gallery-sort-url-value="<%= reorder_admin_gallery_photos_path %>"
+         data-gallery-sort-failed-message-value="<%= t("admin.gallery_photos.flash.reorder_failed") %>">
+      <% @photos.each do |photo| %>
+        <div class="relative aspect-square overflow-hidden rounded" data-gallery-photo-id="<%= photo.id %>">
+          <%= image_tag photo.display_variant,
+                alt: t("pages.gallery.photo_alt"),
+                class: "w-full h-full object-cover cursor-move" %>
+          <%= link_to admin_gallery_photo_path(photo),
+                data: { turbo_method: :delete, turbo_confirm: t("admin.gallery_photos.confirm_delete") },
+                "aria-label": t("admin.gallery_photos.delete"),
+                class: "absolute top-1 right-1 flex items-center justify-center w-11 h-11 rounded-full bg-red-600/90 text-white hover:bg-red-700 text-lg font-bold leading-none" do %>
+            &times;
+          <% end %>
+        </div>
       <% end %>
-    </ul>
+    </div>
   <% end %>
 </section>
