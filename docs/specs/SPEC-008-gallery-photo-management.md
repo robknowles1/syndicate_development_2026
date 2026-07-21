@@ -170,6 +170,13 @@ Add under `activerecord.errors.messages` (top-level, sibling to `activerecord.er
 | `invalid_content_type` | "must be a JPEG, PNG, or WEBP image" |
 | `file_too_large` | "must be smaller than 15 MB" |
 
+Add under `pages.gallery` in `config/locales/en.yml` (added by the lightbox fix — see Change Log 2026-07-21):
+
+| Key | Purpose |
+|-----|---------|
+| `lightbox_aria_label` | `aria-label` on the lightbox overlay `<div role="dialog">` |
+| `lightbox_close_aria_label` | `aria-label` on the lightbox's close `<button>` |
+
 ---
 
 ## Rules
@@ -196,7 +203,11 @@ R10: `GalleryPhoto#display_variant` returns `image.variant(resize_to_limit: [120
 
 R11: `PagesController#gallery` assigns `@photos = GalleryPhoto.order(:position)`. The existing `Dir.glob(Rails.root.join("app/assets/images/gallery/*.jpg"))` call is removed entirely from `PagesController#gallery`.
 
-R12: `app/views/pages/gallery.html.erb` renders each `@photos` entry via `image_tag photo.display_variant, alt: t("pages.gallery.photo_alt")` — the same generic alt string for every photo, unchanged from current behavior. The wrapping `<a href>` targets `url_for(photo.display_variant)` — the same variant, not the raw original blob's download URL. Visitors never receive a camera-original file from this page at any point.
+R12: `app/views/pages/gallery.html.erb` renders each `@photos` entry inside a `<button type="button" data-action="gallery-lightbox#open" data-gallery-lightbox-src-param="<%= url_for(photo.display_variant) %>" data-gallery-lightbox-alt-param="<%= t("pages.gallery.photo_alt") %>">` wrapping `image_tag photo.display_variant, alt: t("pages.gallery.photo_alt")` — the same generic alt string for every photo, unchanged from current behavior. No grid thumbnail is wrapped in an `<a href>`; clicking a thumbnail never navigates the browser away from the page. The button's `data-gallery-lightbox-src-param` carries the same `display_variant` URL as the `<img src>` — never the raw original blob's download URL — so visitors never receive a camera-original file from this page at any point.
+
+The page section root carries `data-controller="gallery-lightbox"` and `data-action="keydown.esc@window->gallery-lightbox#close"` (Stimulus's built-in `.esc` key filter). A single sibling `<div data-gallery-lightbox-target="overlay">` (one per page, not one per photo) is hidden by default via the `hidden` Tailwind class, and carries `role="dialog"`, `aria-modal="true"`, and `style="z-index: 1000"` — the overlay must render above the site's fixed nav bar (`z-index: 999`, `app/views/shared/_nav.html.erb`); this was a real bug in an earlier pass of this implementation (the overlay rendered underneath the nav) that had to be fixed. The overlay contains a close `<button data-action="gallery-lightbox#close">` (its icon carries `pointer-events-none` so a click always hit-tests to the button, not the glyph) and a target `<img data-gallery-lightbox-target="image">`, whose `src`/`alt` are populated from the clicked button's Stimulus params on open. Opening the lightbox also adds `overflow-hidden` to `document.body` (blocking background scroll); closing removes it.
+
+Exactly three mechanisms close the lightbox: (1) clicking the close button; (2) clicking the backdrop — `closeOnBackdrop` closes only when `event.target === this.overlayTarget` exactly, so a click that lands on the displayed image or the close button does not close it, only a click landing on the overlay element itself; (3) pressing Escape anywhere on the page, via the section root's `keydown.esc@window` binding. There is no other way to close the lightbox (e.g., no click-anywhere-on-image dismissal).
 
 R13: `GET /admin/gallery_photos` (`#index`) lists `GalleryPhoto.order(:position)` as a responsive grid — `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2`, matching the public Gallery page's own grid exactly — where each cell is a draggable thumbnail tile (via `display_variant`) carrying a `data-gallery-photo-id="<id>"` attribute and a small per-tile Delete control overlaid on the thumbnail (not a button row below it, since Move Up/Move Down no longer occupy that space) — plus a single `f.file_field :image` upload form and a permanently visible drag-instruction hint (`t("admin.gallery_photos.drag_hint")`). The grid container carries `data-controller="gallery-sort"` so `gallery_sort_controller.js` can initialize SortableJS on it. When zero photos exist, an empty-state message (`t("admin.gallery_photos.empty_state")`) is shown instead of an empty grid.
 
@@ -285,7 +296,7 @@ AC-1: Given 3 `GalleryPhoto` rows exist with `position` 0, 1, 2 (each with an at
 
 AC-2: Given a `GalleryPhoto` with an attached image, when `GET /gallery`, then the `<img src>` resolves to the display-variant representation path, not the raw original blob's URL.
 
-AC-3: Given a `GalleryPhoto`, when `GET /gallery`, then the wrapping `<a href>` also resolves to the same display-variant URL as the `<img src>` — never the raw original.
+AC-3: Given a `GalleryPhoto`, when `GET /gallery`, then no `<a>` element wraps any grid image (`div.grid a` is empty), and the `<button>` wrapping each thumbnail carries `data-action` including `gallery-lightbox#open` and a `data-gallery-lightbox-src-param` equal to the same display-variant URL as the wrapped `<img>`'s `src` — never the raw original.
 
 AC-4: Given zero `GalleryPhoto` rows exist, when `GET /gallery`, then HTTP 200, the page renders with zero images, and no error is raised.
 
@@ -367,6 +378,18 @@ AC-37: `gallery_sort_controller.js`'s `onEnd` handler contains a guard that retu
 
 AC-38: The reorder `fetch()` request sent by `gallery_sort_controller.js` sets an `X-CSRF-Token` header whose value is read from the page's `<meta name="csrf-token">` tag.
 
+### Public Page — Lightbox
+
+AC-39: Given a `GalleryPhoto` is rendered on the gallery page, when `GET /gallery`, then the lightbox overlay element is present, carries the `hidden` class by default, carries `role="dialog"`, and contains a close button whose `data-action` includes `gallery-lightbox#close`.
+
+AC-40: Given the gallery page is open in a browser and a thumbnail button is clicked, when observed, then the lightbox overlay's `hidden` class is removed and its target `<img>` shows the clicked photo.
+
+AC-41: Given the lightbox is open, when the close button is clicked, then the overlay's `hidden` class is restored (lightbox closes).
+
+AC-42: Given the lightbox is open, when a click event's target is the overlay element itself (not the displayed image or the close button), then the overlay's `hidden` class is restored (lightbox closes).
+
+AC-43: Given the lightbox is open, when the Escape key is pressed, then the overlay's `hidden` class is restored (lightbox closes).
+
 ---
 
 ## Acceptance Tests
@@ -386,7 +409,7 @@ Covers: R4, R10, R12, AC-2
 AT3
 Given a `GalleryPhoto` with an attached image
 When `GET /gallery`
-Then the wrapping `<a>` tag's `href` equals the same display-variant URL as the `<img>` `src`
+Then no `<a>` tag wraps any grid image, and the wrapping `<button>` carries `data-action` including `gallery-lightbox#open` and a `data-gallery-lightbox-src-param` equal to the same display-variant URL as the `<img>` `src`
 Covers: R10, R12, AC-3
 
 AT4
@@ -593,6 +616,30 @@ When inspected
 Then the reorder `fetch()` call sets an `X-CSRF-Token` header sourced from `document.querySelector('meta[name="csrf-token"]').content`
 Covers: R26, AC-38
 
+AT38
+Given a `GalleryPhoto` renders on the gallery page
+When `GET /gallery`
+Then the lightbox overlay carries the `hidden` class by default, `role="dialog"`, and contains a close button whose `data-action` includes `gallery-lightbox#close`
+Covers: R12, AC-39
+
+AT39
+Given the gallery page is open in a browser (system spec) with one `GalleryPhoto`
+When its thumbnail button is clicked, then its close button is clicked
+Then the overlay's `hidden` class is removed after the first click (lightbox opens) and restored after the second click (lightbox closes)
+Covers: R12, AC-40, AC-41
+
+AT40
+Given the lightbox is open (system spec)
+When a click event is dispatched whose target is the overlay element itself
+Then the overlay's `hidden` class is restored (lightbox closes)
+Covers: R12, AC-42
+
+AT41
+Given the lightbox is open (system spec)
+When the Escape key is pressed
+Then the overlay's `hidden` class is restored (lightbox closes)
+Covers: R12, AC-43
+
 ---
 
 ## Implementation Decisions
@@ -635,7 +682,7 @@ Covers: R26, AC-38
 |------|-------------|-------------|--------|
 | T1 | Prerequisite: run `bin/rails active_storage:install`, commit the generated migration. Add `gem "ruby-vips"` to `Gemfile`, `bundle install`. | AC-6 (partial: AS tables), AC-8 | 1 |
 | T2 | Migration: create `gallery_photos` table (R3). Create `GalleryPhoto` model with `has_one_attached :image` (R4), `image_must_be_attached` presence validation (R5), `app/models/concerns/image_attachment_validatable.rb` concern (R6–R9), and `#display_variant` (R10). Add `activerecord.errors.messages.invalid_content_type`/`file_too_large` i18n keys. Add FactoryBot factory with a fixture-attached valid image. | AC-6 (gallery_photos table), AC-7, AC-9, AC-10, AC-11, AC-12 | 3 |
-| T3 | Public page update: `PagesController#gallery` loads `GalleryPhoto.order(:position)`, removes `Dir.glob` (R11); update `app/views/pages/gallery.html.erb` to render `display_variant` for both `<img src>` and the wrapping `<a href>` (R12). | AC-1, AC-2, AC-3, AC-4, AC-5 | 2 |
+| T3 | Public page update: `PagesController#gallery` loads `GalleryPhoto.order(:position)`, removes `Dir.glob` (R11); update `app/views/pages/gallery.html.erb` to render `display_variant` on the `<img src>` and as the lightbox-trigger button's `data-gallery-lightbox-src-param` (R12). | AC-1, AC-2, AC-3, AC-4, AC-5 | 2 |
 | T4 | Admin controller and routes: replace the `member { patch :move_up; patch :move_down }` block in `config/routes.rb` with `collection { patch :reorder }`; remove `#move_up`/`#move_down` and their `before_action` entry from `Admin::GalleryPhotosController`; add `#reorder` implementing R17's set-equality/uniqueness validation, transactional position reassignment, and `head :ok`/`head :unprocessable_entity` responses; actions remain alphabetical (`create, destroy, index, reorder`) per `.claude/standards/practices/architecture.md §1.8`; remove `move_up`/`move_down`/`flash.moved` i18n keys, add `drag_hint`/`flash.reorder_failed` (R18, R19, R27); dashboard link unchanged. | AC-16 through AC-25, AC-28, AC-33 | 3 |
 | T5 | Admin view: rewrite `app/views/admin/gallery_photos/index.html.erb` from the stacked `<ul>` to a `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2` container (R13); each tile gets `data-gallery-photo-id` and an overlaid Delete control sized per R20's touch-target rule; the container gets `data-controller="gallery-sort"`; add the permanently visible `drag_hint` text; empty-state message and mobile-first (`w-full`) upload form carry over unchanged. | AC-13, AC-14, AC-15, AC-26, AC-27, AC-36 | 3 |
 | T6 | Backfill: create `lib/tasks/gallery_photos.rake` with the `gallery_photos:backfill` task exactly per R21; document the required manual deploy step (R22) in the deploy runbook/README. Add spec fixture files (`spec/fixtures/files/gallery_photo.jpg` valid, `gallery_photo.svg` invalid, and a size-appropriate oversized fixture or a stubbed `byte_size` approach) for use across T7/T8. | AC-29, AC-30, AC-31, AC-32 | 2 |
@@ -654,6 +701,7 @@ Total estimated points: 24 (all tasks ≤ 4 points; no split review required und
 | 2026-07-14 | Initial draft | All | Translates ADR-005 (Decisions 2–6, Implementation Notes 1–7, 11–12) into implementation-ready spec format. Resolves the ADR's "Handoff to Spec Agent" open items: confirmed `:display` variant at 1200×1200 quality 80; decided against a soft minimum-dimension guard; wrote full `admin.gallery_photos.*` i18n copy; confirmed no per-photo alt text change; wrote full acceptance criteria including content-type/size rejection request specs and a 375 px mobile-first system spec for the admin list. |
 | 2026-07-17 | Reversed the Gallery admin reordering mechanism from Move Up/Move Down buttons to drag-and-drop (SortableJS + a new `gallery_sort_controller.js` Stimulus controller), per ADR-005's 2026-07-17 addendum. Flipped the drag-and-drop Non-Goal to a Move-Up/Down-fallback Non-Goal; replaced the `gap-tolerant swap`/`stacked-card list pattern` Definitions with `responsive photo grid`/`SortableJS`/`gallery_sort_controller`/`reorder request`; replaced the `move_up`/`move_down` member routes and i18n keys with a `PATCH /admin/gallery_photos/reorder` collection route and `drag_hint`/`flash.reorder_failed` keys; added the Interfaces → Client-Side Reordering subsection specifying the `photo_ids` JSON request contract, CSRF header handling, and success/failure response codes; rewrote R13 (grid + drag admin view) and R17 (reorder validation/transaction/response contract) and R20 (grid-based mobile-first rules); added R23–R27 (SortableJS pin, Stimulus controller init, same-position no-op, CSRF header, removal of move_up/move_down); replaced E5/E6 with drag-specific edge cases and renumbered the backfill edge cases to E8/E9; rewrote AC-13, AC-22, AC-23, AC-24, AC-27 and added AC-33–AC-38 (AC-38 and its AT37 close a self-test gap: R26's CSRF-header requirement had no dedicated acceptance test); rewrote AT12, AT21, AT22, AT23, AT26 and added AT32–AT37; rewrote Task Breakdown T4/T5/T8 and added T9 for the new client-side dependency (total estimate 21→24; T9's AC list was corrected to the client-artifact ACs it actually produces — AC-22–AC-24 are endpoint-correctness ACs owned by T4, not T9); updated Dependencies to note ADR-002's swap pattern is no longer reused by `GalleryPhoto` and to flag the new `sortablejs` third-party JS dependency and its vendoring. Status remains `ready`; this revision targets PR #40 before merge — the underlying feature was already implemented, reviewed, and QA-passed with Move Up/Move Down, but not yet merged to `main`. | Non Goals, Definitions, Interfaces, R13, R17, R20, R23, R24, R25, R26, R27, E5, E6, E7, E8, E9, AC-13, AC-22, AC-23, AC-24, AC-27, AC-33, AC-34, AC-35, AC-36, AC-37, AC-38, AT12, AT21, AT22, AT23, AT26, AT32, AT33, AT34, AT35, AT36, AT37, T4, T5, T8, T9, Dependencies | Product/UX decision after using the shipped Move Up/Down implementation on PR #40 — reordering a photo collection via repeated taps was judged clunky by the product owner (Doug); ADR-005's 2026-07-17 addendum authorizes SortableJS-based drag-and-drop as the replacement mechanism. |
 | 2026-07-21 | Reviewer finding on the first drag-and-drop implementation: `Sortable.create` was missing touch-scroll-conflict guards, meaning a plain vertical swipe on the grid would have been hijacked into a drag on touch devices - the exact "scroll-vs-drag conflict" ADR-005's addendum cited as the reason for choosing SortableJS over native HTML5 drag-and-drop in the first place, left unaddressed by an incomplete options object. Added `delay: 150`, `delayOnTouchOnly: true` (press-and-hold required to start a drag on touch; mouse unaffected), and `filter: "[data-turbo-method='delete']"` / `preventOnFilter: false` (the per-tile Delete control cannot initiate a drag). Updated R24 and the Interfaces Client-Side Reordering section's `Sortable.create` options string and T9 to match. No AC/AT numbering changed - this refines R24's existing options-string requirement rather than adding new observable behavior; the existing static-inspection test for the controller's structure/wiring was not asserting the literal options string, so no test needed updating. Fixed before the product owner's first manual phone test, per reviewer recommendation. | R24, Interfaces (Client-Side Reordering), T9 | Reviewer finding - touch-drag would have conflicted with scrolling and with tapping Delete |
+| 2026-07-21 | Reconciled R12/AC-3/AT3 with the public gallery lightbox implementation actually shipped on PR #40 (branch `feature/spec-008-photo-uploads`), which this spec's initial draft never described. R12 still specified wrapping each thumbnail in an `<a href>` pointing at the display-variant URL - the original `Dir.glob`-era behavior, carried over unchanged into this spec. In manual phone testing, clicking a photo under that pattern navigated the browser fully away from the site to a bare full-page image view with no in-page close control (only the back button) - a real, pre-existing UX bug found during testing, not a new feature request. It was fixed by replacing the `<a href>` with a `<button data-action="gallery-lightbox#open">` plus a new `gallery_lightbox_controller.js` Stimulus controller driving an in-page overlay (`role="dialog"`, hidden by default, `z-index: 1000` to clear the fixed nav's `z-index: 999`) with three close mechanisms - close button, backdrop click (exact `event.target` match), and Escape. `spec/requests/pages_gallery_spec.rb` was updated at implementation time to assert the new markup (including that `div.grid a` is now empty) and `spec/system/gallery_spec.rb` was added to cover the open/close interactions in a real browser, but this spec document was never updated to match - a reviewer pass on the otherwise-approved PR flagged the spec/code mismatch as the sole blocking issue. Rewrote R12 to describe the button/data-param structure, the overlay's default-hidden state, all three close mechanisms, and the z-index requirement; rewrote AC-3/AT3 to assert no `<a>` wraps the grid images and the button's data param carries the correct display-variant URL; added AC-39-AC-43 and AT38-AT41 covering the overlay's default-hidden state/dialog role and the three close mechanisms; added the two new `pages.gallery.lightbox_aria_label`/`lightbox_close_aria_label` i18n keys to the Interfaces i18n table; corrected Task Breakdown T3's stale `<a href>` reference to match. This is a spec-to-match-shipped-code reconciliation, not new work - no application code changed as part of this revision. Reordering/drag-and-drop, the backfill task, and SPEC-009 are unaffected and out of scope for this entry. Status remains `ready`. | R12, AC-3, AT3, AC-39, AC-40, AC-41, AC-42, AC-43, AT38, AT39, AT40, AT41, Interfaces (Required i18n Keys), T3 | Pre-existing UX bug found during manual phone testing (thumbnail click fully navigated away from the site with no in-page close control), fixed on PR #40 before merge; a reviewer pass flagged the resulting spec/code mismatch as the PR's sole blocking issue, requiring this reconciliation. |
 
 ---
 
