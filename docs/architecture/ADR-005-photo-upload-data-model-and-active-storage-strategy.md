@@ -313,3 +313,22 @@ Not decided here, left for the spec agent:
 - Exact i18n keys, flash messages, and confirmation-dialog copy (including the updated `confirm_restore_defaults` wording per Implementation Note 9).
 - Whether `GalleryPhoto` needs a per-photo caption/alt-text field, or continues using the single generic `t("pages.gallery.photo_alt")` string for every photo as it does today — this ADR does not change that behavior, only the storage/CRUD mechanism.
 - Full acceptance criteria and test plan, including request specs for content-type/size rejection and a system spec confirming the Gallery admin list has no horizontal scroll at 375px per CLAUDE.md's mobile-first mandate.
+
+
+## Addendum (2026-07-17): Reordering mechanism reversed to drag-and-drop
+
+**Status of this addendum:** Accepted, supersedes Decision 6 and the "Gallery reordering mechanism" alternatives table for the Gallery admin UI only. Everything else in this ADR (data model, validation, backfill, variants, About slideshow) is unchanged.
+
+**Original decision:** Move Up / Move Down buttons with gap-tolerant position-swap queries, explicitly chosen over drag-and-drop. Rationale at the time: zero new dependency, reuse of the already-shipped `ServiceSection` pattern, and a stated concern that "touch drag-and-drop on mobile Safari is notoriously fiddly to get right (scroll-vs-drag conflicts)."
+
+**Reversal:** After using the shipped Move Up/Down implementation, the product owner (Doug, via the person testing on his behalf) found it clunky for a photo collection and requested a genuine drag-and-drop grid instead. This is a subjective UX call the architecture process cannot make on his behalf — noted here rather than treated as an oversight in the original analysis.
+
+**Revised decision:**
+- Admin Gallery view changes from a stacked-card list to a responsive grid (`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2`, matching the public Gallery page's own grid, per `app/views/pages/gallery.html.erb`), each cell a draggable thumbnail tile.
+- Reordering is handled by **SortableJS**, pinned via `bin/importmap pin sortablejs` — the first third-party JS dependency in this codebase (previously only Hotwire/Stimulus). Chosen specifically because it does not rely on the native HTML5 Drag and Drop API, which is mouse-only and does not fire on touchscreens at all — the exact failure mode the original decision was worried about. SortableJS implements its own pointer-event-based dragging, which works on both mouse and touch, and is a widely-used, dependency-free, actively maintained library with no build-step requirement (ships as a single ESM-compatible file, pinnable directly via importmap from a CDN).
+- A new Stimulus controller (`gallery_sort_controller.js`) initializes `Sortable` on the grid container and, on drag-end, POSTs the new ordered list of photo IDs to a new controller action.
+- `Admin::GalleryPhotosController#move_up` / `#move_down` and their routes are removed. A new `PATCH /admin/gallery_photos/reorder` action (`Admin::GalleryPhotosController#reorder`) replaces them: accepts an ordered array of IDs, updates every `GalleryPhoto`'s `position` in a single `ActiveRecord::Base.transaction`, and returns a minimal success response (Turbo Stream or a bare 200 — no full-page redirect needed since the client-side drag already reflects the new order).
+- Per explicit product decision, the Move Up/Move Down buttons are **fully removed**, not kept as a fallback. This does trade away keyboard-only reordering — acceptable here because this is a single-admin internal tool (only Doug has admin credentials), not a public-facing or multi-user surface, and CLAUDE.md's accessibility bar is scoped around mobile *usability*, not WCAG keyboard-operability compliance for this app.
+- Delete stays a per-tile affordance (a small icon/button overlaid on each grid thumbnail), unaffected by this addendum.
+
+**Consequence for Implementation Note 6 and Decision 6:** both are superseded for the Gallery admin UI. `Admin::ServiceSectionsController#move_up`/`#move_down` remains the correct, unchanged pattern for `ServiceSection` (ADR-002) — this addendum does not touch that feature. The gap-tolerant swap-query pattern is not reused by `GalleryPhoto` going forward; full-list position reassignment on drop is simpler and sufficient at this collection's scale (dozens, not hundreds, of rows).
