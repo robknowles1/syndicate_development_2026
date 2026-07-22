@@ -183,6 +183,80 @@ RSpec.describe "GET /about (about page — SPEC-007 content editing)", type: :re
     end
   end
 
+  describe "slideshow image fallback (SPEC-009 AT1-AT4, AT16)" do
+    it "renders all 3 static fallback paths when no AboutPageContent row exists (AT1, R4, R6, E1, E9)" do
+      # Arrange — table empty by default
+
+      # Act
+      get about_path
+
+      # Assert
+      document = Nokogiri::HTML(response.body)
+      slideshow_srcs = document.css("section.slideshow img").map { |img| img["src"] }
+      expect(slideshow_srcs[0]).to include("gallery/m45a2920")
+      expect(slideshow_srcs[1]).to include("gallery/m45a2927")
+      expect(slideshow_srcs[2]).to include("gallery/m45a2928")
+    end
+
+    it "renders slot 1 as an Active Storage representation while slots 2 and 3 stay static (AT2, R1, R3, R4, E3)" do
+      # Arrange
+      create(:about_page_content, :published, :with_slideshow_image_1)
+
+      # Act
+      get about_path
+
+      # Assert
+      document = Nokogiri::HTML(response.body)
+      slideshow_srcs = document.css("section.slideshow img").map { |img| img["src"] }
+      expect(slideshow_srcs[0]).to match(%r{/rails/active_storage/representations/})
+      expect(slideshow_srcs[1]).to include("gallery/m45a2927")
+      expect(slideshow_srcs[2]).to include("gallery/m45a2928")
+    end
+
+    it "renders all 3 static fallback paths when published is false despite an attached image (AT3, R4, R5, E2)" do
+      # Arrange
+      about_page_content = create(:about_page_content, :with_slideshow_image_1, published: false)
+
+      # Act
+      get about_path
+
+      # Assert
+      expect(about_page_content.slideshow_image_1).to be_attached
+      document = Nokogiri::HTML(response.body)
+      slideshow_srcs = document.css("section.slideshow img").map { |img| img["src"] }
+      expect(slideshow_srcs[0]).to include("gallery/m45a2920")
+      expect(slideshow_srcs[1]).to include("gallery/m45a2927")
+      expect(slideshow_srcs[2]).to include("gallery/m45a2928")
+    end
+
+    it "renders all 3 slots as Active Storage representations in document order when all 3 are attached (AT4, R3, R4)" do
+      # Arrange
+      create(:about_page_content, :published, :with_slideshow_image_1, :with_slideshow_image_2, :with_slideshow_image_3)
+
+      # Act
+      get about_path
+
+      # Assert
+      document = Nokogiri::HTML(response.body)
+      slideshow_srcs = document.css("section.slideshow img").map { |img| img["src"] }
+      expect(slideshow_srcs.count).to eq(3)
+      expect(slideshow_srcs).to all(match(%r{/rails/active_storage/representations/}))
+    end
+
+    it "renders custom alt text for slot 1 regardless of whether the image is uploaded or static (AT16, R11)" do
+      # Arrange
+      create(:about_page_content, :published, :with_slideshow_image_1, slideshow_alt_1: "Custom alt text")
+
+      # Act
+      get about_path
+
+      # Assert
+      document = Nokogiri::HTML(response.body)
+      slideshow_alts = document.css("section.slideshow img").map { |img| img["alt"] }
+      expect(slideshow_alts[0]).to eq("Custom alt text")
+    end
+  end
+
   describe "non-editable copy always renders from i18n (R1)" do
     it "always renders the contact heading from i18n regardless of publish state" do
       # Arrange

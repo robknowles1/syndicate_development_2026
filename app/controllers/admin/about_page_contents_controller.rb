@@ -4,6 +4,9 @@ module Admin
       about_page_content = AboutPageContent.first_or_initialize
       about_page_content.assign_attributes(i18n_default_attributes)
       about_page_content.save!
+      about_page_content.slideshow_image_1.purge if about_page_content.slideshow_image_1.attached?
+      about_page_content.slideshow_image_2.purge if about_page_content.slideshow_image_2.attached?
+      about_page_content.slideshow_image_3.purge if about_page_content.slideshow_image_3.attached?
       flash[:notice] = I18n.t("admin.about_page_content.flash.restored")
       redirect_to admin_about_page_content_path
     end
@@ -52,7 +55,10 @@ module Admin
         :slideshow_alt_1,
         :slideshow_alt_2,
         :slideshow_alt_3,
-        :published
+        :published,
+        :slideshow_image_1,
+        :slideshow_image_2,
+        :slideshow_image_3
       )
     end
   end

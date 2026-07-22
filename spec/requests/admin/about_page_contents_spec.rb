@@ -38,7 +38,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
       expect(response).to redirect_to(admin_login_path)
     end
 
-    it "redirects unauthenticated PATCH /admin/about_page_content/restore_defaults to login (AT26, AC-26)" do
+    it "redirects unauthenticated PATCH /admin/about_page_content/restore_defaults to login (AT15, AT26, R7, AC-15, AC-26)" do
       # Arrange
       create(:about_page_content)
       initial_count = AboutPageContent.count
@@ -259,6 +259,87 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
     end
   end
 
+  describe "GET /admin/about_page_content — slideshow image file inputs (AT10, R9)" do
+    it "includes 3 file inputs named for slideshow_image_1/2/3 (AT10, AC-10)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      sign_in_admin(admin)
+
+      # Act
+      get admin_about_page_content_path
+
+      # Assert
+      expect(response.body).to include("about_page_content[slideshow_image_1]")
+      expect(response.body).to include("about_page_content[slideshow_image_2]")
+      expect(response.body).to include("about_page_content[slideshow_image_3]")
+    end
+  end
+
+  describe "PATCH /admin/about_page_content — slideshow image uploads (AT5, AT6, AT7, AT12)" do
+    it "attaches a valid JPEG to slideshow_image_2 and redirects with flash (AT5, R1, R9, AC-5)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      sign_in_admin(admin)
+      file = fixture_file_upload("gallery_photo.jpg", "image/jpeg")
+      params = { about_page_content: valid_about_page_content_params(slideshow_image_2: file) }
+
+      # Act
+      patch admin_about_page_content_path, params: params
+
+      # Assert
+      expect(response).to redirect_to(admin_about_page_content_path)
+      expect(flash[:notice]).to eq(I18n.t("admin.about_page_content.update_notice"))
+      expect(AboutPageContent.first.slideshow_image_2).to be_attached
+    end
+
+    it "rejects an image/svg+xml file for slideshow_image_2 with HTTP 422 and no attachment (AT6, R2, E4, AC-6)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      sign_in_admin(admin)
+      file = fixture_file_upload("gallery_photo.svg", "image/svg+xml")
+      params = { about_page_content: valid_about_page_content_params(slideshow_image_2: file) }
+
+      # Act
+      patch admin_about_page_content_path, params: params
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(AboutPageContent.first&.slideshow_image_2&.attached?).to be_falsy
+      expect(response.body).to include(I18n.t("activerecord.errors.messages.invalid_content_type"))
+    end
+
+    it "rejects a slideshow_image_3 file exceeding 15 MB with HTTP 422 (AT7, R2, E5, AC-7)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      sign_in_admin(admin)
+      file = fixture_file_upload("gallery_photo_oversized.jpg", "image/jpeg")
+      params = { about_page_content: valid_about_page_content_params(slideshow_image_3: file) }
+
+      # Act
+      patch admin_about_page_content_path, params: params
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include(I18n.t("activerecord.errors.messages.file_too_large"))
+    end
+
+    it "replaces rather than accumulates the blob when slideshow_image_1 is already attached (AT12, R8, E8, AC-12)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      sign_in_admin(admin)
+      about_page_content = create(:about_page_content, :with_slideshow_image_1)
+      new_file = fixture_file_upload("gallery_photo.jpg", "image/jpeg")
+      params = { about_page_content: valid_about_page_content_params(slideshow_image_1: new_file) }
+
+      # Act
+      patch admin_about_page_content_path, params: params
+
+      # Assert
+      attachment_count = ActiveStorage::Attachment.where(record: about_page_content, name: "slideshow_image_1").count
+      expect(attachment_count).to eq(1)
+    end
+  end
+
   describe "GET /admin dashboard includes about page content link (AT21, R14, AC-19)" do
     it "returns HTTP 200 and includes href for admin_about_page_content_path (AT21)" do
       # Arrange
@@ -271,6 +352,16 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
       # Assert
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(admin_about_page_content_path)
+    end
+  end
+
+  describe "confirm_restore_defaults i18n content (AT11, R10, AC-11)" do
+    it "mentions uploaded images being removed, in addition to text" do
+      # Arrange / Act
+      confirmation_text = I18n.t("admin.about_page_content.confirm_restore_defaults")
+
+      # Assert
+      expect(confirmation_text).to match(/image/i)
     end
   end
 
@@ -327,6 +418,37 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
       # Assert
       expect(AboutPageContent.count).to eq(1)
+    end
+
+    it "purges all 3 slideshow attachments and resets text while leaving published unchanged (AT8, R7, AC-8)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      sign_in_admin(admin)
+      create(:about_page_content, :published, :with_slideshow_image_1, :with_slideshow_image_2, :with_slideshow_image_3)
+
+      # Act
+      patch restore_defaults_admin_about_page_content_path
+
+      # Assert
+      expect(response).to redirect_to(admin_about_page_content_path)
+      expect(flash[:notice]).to eq(I18n.t("admin.about_page_content.flash.restored"))
+      restored = AboutPageContent.first
+      expect(restored.slideshow_image_1).not_to be_attached
+      expect(restored.slideshow_image_2).not_to be_attached
+      expect(restored.slideshow_image_3).not_to be_attached
+      expect(restored.shop_heading).to eq(I18n.t("pages.about.shop_heading"))
+      expect(restored.published?).to be true
+    end
+
+    it "completes normally without raising when zero slots are attached (AT9, R7, E6, E7, AC-9)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      sign_in_admin(admin)
+      create(:about_page_content)
+
+      # Act / Assert
+      expect { patch restore_defaults_admin_about_page_content_path }.not_to raise_error
+      expect(response).to redirect_to(admin_about_page_content_path)
     end
   end
 
