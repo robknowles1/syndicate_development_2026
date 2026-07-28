@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin login", type: :system do
   before { driven_by(:selenium_chrome_headless) }
 
-  let!(:admin) { create(:admin_user, email: "admin@syndicate.com", password: "password123", password_confirmation: "password123") }
+  let!(:admin) { create(:admin_user, email: "admin@syndicate.com", password: "securepassword123", password_confirmation: "securepassword123") }
 
   describe "login form" do
     it "renders email field, password field, and submit button" do
@@ -20,7 +20,7 @@ RSpec.describe "Admin login", type: :system do
       visit admin_login_path
 
       fill_in "Email", with: admin.email
-      fill_in "Password", with: "password123"
+      fill_in "Password", with: "securepassword123"
       click_button I18n.t("admin.login.submit")
 
       expect(page).to have_current_path(admin_root_path)
@@ -45,7 +45,7 @@ RSpec.describe "Admin login", type: :system do
     before do
       visit admin_login_path
       fill_in "Email", with: admin.email
-      fill_in "Password", with: "password123"
+      fill_in "Password", with: "securepassword123"
       click_button I18n.t("admin.login.submit")
     end
 

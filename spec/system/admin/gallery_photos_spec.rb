@@ -6,7 +6,7 @@ RSpec.describe "Admin gallery photos list", type: :system do
   def sign_in_admin(admin)
     visit admin_login_path
     fill_in I18n.t("admin.login.email_label"), with: admin.email
-    fill_in I18n.t("admin.login.password_label"), with: "password123"
+    fill_in I18n.t("admin.login.password_label"), with: "securepassword123"
     click_button I18n.t("admin.login.submit")
     expect(page).to have_current_path(admin_root_path)
   end
@@ -14,7 +14,7 @@ RSpec.describe "Admin gallery photos list", type: :system do
   describe "admin gallery photo grid at 375 px viewport (AT26, R20, AC-27)" do
     it "renders with no horizontal scroll, grid-cols-2, and a touch-sized delete control per tile" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       create(:gallery_photo, position: 0)
       create(:gallery_photo, position: 1)
       emulate_viewport(width: 375, height: 812)

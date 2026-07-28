@@ -20,6 +20,20 @@ Rails.application.routes.draw do
     get    "login",  to: "sessions#new",     as: :login
     post   "login",  to: "sessions#create"
     delete "logout", to: "sessions#destroy", as: :logout
+
+    # Unauthenticated by necessity: the whole point is that the admin cannot sign in.
+    # The token in the path is the credential.
+    resource :password_reset, only: [ :new, :create ]
+    get   "password_reset/:token/edit", to: "password_resets#edit",   as: :edit_password_reset
+    patch "password_reset/:token",      to: "password_resets#update", as: :password_reset_update
+
+    # Also unauthenticated: an invited admin has no working password yet.
+    get   "invitation/:token/edit", to: "invitations#edit",   as: :edit_invitation
+    patch "invitation/:token",      to: "invitations#update", as: :invitation_update
+
+    resources :users, only: [ :index, :new, :create, :destroy ]
+    resource  :account, only: [ :edit, :update ]
+
     root to: "dashboard#index"
     resource :home_page_content, only: [ :show, :update ] do
       patch :restore_defaults

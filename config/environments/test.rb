@@ -20,7 +20,11 @@ Rails.application.configure do
 
   # Show full error reports.
   config.consider_all_requests_local = true
-  config.cache_store = :null_store
+  # A real store, not :null_store — rate_limit reads and writes through Rails.cache, and
+  # against a null store every increment is discarded, so the throttle silently never
+  # trips and its specs would pass without testing anything. Cleared between examples in
+  # spec/support/cache_cleaner.rb so counters cannot leak across tests.
+  config.cache_store = :memory_store
 
   # Render exception templates for rescuable exceptions and raise for other exceptions.
   config.action_dispatch.show_exceptions = :rescuable

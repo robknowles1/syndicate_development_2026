@@ -72,6 +72,9 @@ RSpec.configure do |config|
 
   # FactoryBot shorthand (create, build, etc.) without prefix
   config.include FactoryBot::Syntax::Methods
+
+  # travel / travel_to, needed to exercise token expiry without waiting for it.
+  config.include ActiveSupport::Testing::TimeHelpers
 end
 
 Shoulda::Matchers.configure do |config|
