@@ -3,6 +3,9 @@
     <h2><%= t("mailer.contact_email.heading") %></h2>
     <p><strong><%= t("mailer.contact_email.name_label") %></strong> <%= @name %></p>
     <p><strong><%= t("mailer.contact_email.email_label") %></strong> <%= @email %></p>
+    <% if @phone %>
+      <p><strong><%= t("mailer.contact_email.phone_label") %></strong> <%= @phone %></p>
+    <% end %>
     <p><strong><%= t("mailer.contact_email.subject_label") %></strong> <%= @subject %></p>
     <hr>
     <p><strong><%= t("mailer.contact_email.message_label") %></strong></p>

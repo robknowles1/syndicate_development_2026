@@ -22,6 +22,31 @@ RSpec.describe "Contact form", type: :system do
     expect(page).to have_text("Message sent! We'll be in touch soon.")
   end
 
+  it "submits successfully with the optional phone field filled in" do
+    visit about_path
+
+    fill_in "Name", with: "Jane Rider"
+    fill_in "Email", with: "jane@example.com"
+    fill_in "Phone", with: "208-555-0123"
+    fill_in "Subject", with: "Build inquiry"
+    fill_in "Message", with: "I want to talk about a full build."
+
+    submit_button = find("input[type='submit'][value='Send Message']")
+    page.execute_script("arguments[0].scrollIntoView({block: 'center'});", submit_button)
+    submit_button.click
+
+    expect(page).to have_text("Message sent! We'll be in touch soon.")
+    expect(ActionMailer::Base.deliveries.last.html_part.body.to_s).to include("208-555-0123")
+  end
+
+  it "leaves the phone field unmarked as required in the browser" do
+    visit about_path
+
+    # The browser must not block submission on a blank phone
+    expect(page).to have_css("input[name='phone']")
+    expect(page).not_to have_css("input[name='phone'][required]")
+  end
+
   it "submitting with missing required fields shows a flash alert" do
     visit about_path
 

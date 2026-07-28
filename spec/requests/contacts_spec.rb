@@ -75,5 +75,35 @@ RSpec.describe "Contacts", type: :request do
         expect(flash[:alert]).to be_present
       end
     end
+
+    context "when phone is omitted" do
+      it "still sends, since phone is optional" do
+        # Arrange
+        ActionMailer::Base.delivery_method = :test
+        ActionMailer::Base.deliveries.clear
+
+        # Act
+        post contact_path, params: valid_params.except(:phone)
+
+        # Assert
+        expect(response).to redirect_to(about_path)
+        expect(flash[:notice]).to eq(I18n.t("contact.notices.message_sent"))
+        expect(ActionMailer::Base.deliveries.size).to eq(1)
+      end
+    end
+
+    context "when phone is supplied" do
+      it "passes it through to the delivered email" do
+        # Arrange
+        ActionMailer::Base.delivery_method = :test
+        ActionMailer::Base.deliveries.clear
+
+        # Act
+        post contact_path, params: valid_params.merge(phone: "208-555-0123")
+
+        # Assert
+        expect(ActionMailer::Base.deliveries.last.html_part.body.to_s).to include("208-555-0123")
+      end
+    end
   end
 end
