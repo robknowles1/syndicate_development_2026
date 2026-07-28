@@ -84,6 +84,17 @@ test:
 # Read https://guides.rubyonrails.org/configuring.html#configuring-a-database
 # for a full overview on how database connection configuration can be specified.
 #
+# Staging deliberately runs a single primary database. The production block below
+# declares cache/queue/cable databases whose schema files (db/queue_schema.rb and
+# friends) are not in this repo, so `db:prepare` against them fails. Until Solid
+# Queue/Cache/Cable are actually set up, staging stays on one database that works.
+staging:
+  <<: *default
+  database: <%= ENV.fetch("STAGING_DATABASE_NAME", "syndicate_development_2026_staging") %>
+  username: <%= ENV.fetch("STAGING_DATABASE_USER", "syndicate_development_2026") %>
+  password: <%= ENV["SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD"] %>
+  host: <%= ENV.fetch("STAGING_DATABASE_HOST", "localhost") %>
+
 production:
   primary: &primary_production
     <<: *default
