@@ -92,7 +92,7 @@ staging:
   <<: *default
   database: <%= ENV.fetch("STAGING_DATABASE_NAME", "syndicate_development_2026_staging") %>
   username: <%= ENV.fetch("STAGING_DATABASE_USER", "syndicate_development_2026") %>
-  password: <%= ENV["SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD"] %>
+  password: <%= ENV["STAGING_DATABASE_PASSWORD"] %>
   host: <%= ENV.fetch("STAGING_DATABASE_HOST", "localhost") %>
 
 production:

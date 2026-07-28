@@ -24,14 +24,19 @@ Rails.application.configure do
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
 
-  # Assume all access to the app is happening through a SSL-terminating reverse proxy.
-  # config.assume_ssl = true
+  # REQUIRES A TERMINATING PROXY IN FRONT OF THE APP. `assume_ssl` makes Rails
+  # treat every request as HTTPS on the strength of the proxy's headers. Deploy
+  # without one (the `proxy:` block in config/deploy.yml is still commented out)
+  # and plaintext requests are read as secure: `force_ssl` stops redirecting, and
+  # the admin session cookie is marked `Secure` over HTTP, so browsers refuse to
+  # send it back and logins silently fail to persist. Enable the proxy first.
+  config.assume_ssl = true
 
-  # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
-  # config.force_ssl = true
+  # Marks the admin session cookie `Secure` and sends Strict-Transport-Security.
+  config.force_ssl = true
 
   # Skip http-to-https redirect for the default health check endpoint.
-  # config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
+  config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
   # Log to STDOUT with the current request id as a default log tag.
   config.log_tags = [ :request_id ]
@@ -59,20 +64,22 @@ Rails.application.configure do
   # Set host to be used by links generated in mailer templates. Must be the real host —
   # password reset and invitation links are built from it.
   config.action_mailer.default_url_options = {
-    host: ENV.fetch("APP_HOST", "syndicate-development.com"),
+    host: ENV.fetch("APP_HOST", "www.syndicate-development.com"),
     protocol: "https"
   }
 
-  # Resend SMTP. The username is the literal string "resend"; the password is the API key.
+  # Resolved here rather than in config/application.rb so that reading encrypted
+  # credentials happens after config.require_master_key is in force.
+  config.x.mail.resend_api_key = MailSettings.resend_api_key(override: ENV["RESEND_API_KEY"]) do
+    Rails.application.credentials.dig(:resend, :api_key)
+  end
+  MailSettings.validate_api_key!(
+    api_key: config.x.mail.resend_api_key,
+    required: MailSettings.credentials_required?
+  )
+
   config.action_mailer.delivery_method = :smtp
-  config.action_mailer.smtp_settings = {
-    address: "smtp.resend.com",
-    port: 587,
-    user_name: "resend",
-    password: Rails.application.config.x.mail.resend_api_key,
-    authentication: :plain,
-    enable_starttls_auto: true
-  }
+  config.action_mailer.smtp_settings = MailSettings.smtp_settings(api_key: config.x.mail.resend_api_key)
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation cannot be found).
@@ -84,12 +91,13 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
-  # Enable DNS rebinding protection and other `Host` header attacks.
-  # config.hosts = [
-  #   "example.com",     # Allow requests from example.com
-  #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
-  # ]
-  #
+  # A Host header not listed here is rejected with 403, so every name that can
+  # reach the app must appear. The apex is listed alongside APP_HOST because
+  # either name may be pointed at this server; APP_HOST additionally sets the
+  # canonical host used for mailer links.
+  config.hosts << ENV.fetch("APP_HOST", "www.syndicate-development.com")
+  config.hosts << "syndicate-development.com"
+
   # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 end

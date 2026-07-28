@@ -6,13 +6,17 @@ Rails.application.configure do
   config.enable_reloading = false
   config.eager_load = true
   config.consider_all_requests_local = false
+  config.action_controller.perform_caching = true
 
   config.public_file_server.headers = { "cache-control" => "public, max-age=#{1.year.to_i}" }
 
   config.active_storage.service = :local
 
+  # Both require a terminating proxy in front of the app — see the note in
+  # config/environments/production.rb. Without one, admin logins do not persist.
   config.assume_ssl = true
   config.force_ssl = true
+  config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
   # Differs from production: staging logs at debug, since diagnosing a failed deploy
   # matters more here than log volume does.
@@ -29,15 +33,16 @@ Rails.application.configure do
     host: ENV.fetch("APP_HOST", "staging.syndicate-development.com"),
     protocol: "https"
   }
+  config.x.mail.resend_api_key = MailSettings.resend_api_key(override: ENV["RESEND_API_KEY"]) do
+    Rails.application.credentials.dig(:resend, :api_key)
+  end
+  MailSettings.validate_api_key!(
+    api_key: config.x.mail.resend_api_key,
+    required: MailSettings.credentials_required?
+  )
+
   config.action_mailer.delivery_method = :smtp
-  config.action_mailer.smtp_settings = {
-    address: "smtp.resend.com",
-    port: 587,
-    user_name: "resend",
-    password: Rails.application.config.x.mail.resend_api_key,
-    authentication: :plain,
-    enable_starttls_auto: true
-  }
+  config.action_mailer.smtp_settings = MailSettings.smtp_settings(api_key: config.x.mail.resend_api_key)
 
   config.i18n.fallbacks = true
   config.active_record.dump_schema_after_migration = false

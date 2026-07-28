@@ -6,6 +6,8 @@ require "rails/all"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+require_relative "mail_settings"
+
 module SyndicateDevelopment2026
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
@@ -24,20 +26,18 @@ module SyndicateDevelopment2026
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
 
+    # Must be assigned before anything reads credentials: Rails memoises the
+    # credentials object on first access and captures this flag then, so setting
+    # it in config/environments/*.rb is too late to have any effect. Left off
+    # while precompiling assets, where no key is available by design.
+    config.require_master_key = !Rails.env.local? && MailSettings.credentials_required?
+
     # Outbound mail settings live here rather than in an initializer because the
     # environment files below need them at boot, and initializers run after those.
-    config.x.mail.from = ENV.fetch("MAIL_FROM_ADDRESS", "noreply@mail.syndicate-development.com")
-
-    # Where contact-form submissions land. Production reaches the shop; every other
-    # environment reaches the developer, so staging tests never email the customer.
-    config.x.mail.contact_recipient = ENV.fetch("CONTACT_RECIPIENT_EMAIL") do
-      Rails.env.production? ? "haskettd@live.com" : "robknowles105@gmail.com"
-    end
-
-    # Resend requires the literal username "resend" with the API key as the password.
-    # Read from the environment first so the key can be rotated without re-encrypting
-    # credentials; the encrypted credentials file is the fallback.
-    config.x.mail.resend_api_key =
-      ENV["RESEND_API_KEY"].presence || Rails.application.credentials.dig(:resend, :api_key)
+    config.x.mail.from = MailSettings.from_address(override: ENV["MAIL_FROM_ADDRESS"])
+    config.x.mail.contact_recipient = MailSettings.contact_recipient(
+      rails_env: Rails.env,
+      override: ENV["CONTACT_RECIPIENT_EMAIL"]
+    )
   end
 end
