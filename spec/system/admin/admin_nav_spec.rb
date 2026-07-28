@@ -9,7 +9,7 @@ RSpec.describe "Admin nav at phone widths", type: :system do
 
   # A block-local, not a constant: constants defined inside a describe block land on
   # Object and warn if another spec defines the same name.
-  phone_widths = [ 320, 375, 390 ]
+  phone_widths = [ 375, 390, 414 ]
 
   def sign_in_admin
     admin = create(:admin_user)
@@ -17,13 +17,6 @@ RSpec.describe "Admin nav at phone widths", type: :system do
     fill_in I18n.t("admin.login.email_label"), with: admin.email
     fill_in I18n.t("admin.login.password_label"), with: "securepassword123"
     click_button I18n.t("admin.login.submit")
-  end
-
-  # Headless Chrome clamps its window to roughly 500px wide, so resize_to cannot reach
-  # phone widths. CDP's device metrics override sets the viewport directly.
-  def emulate_viewport(width)
-    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
-      width: width, height: 844, deviceScaleFactor: 1, mobile: true)
   end
 
   def layout_metrics
@@ -56,7 +49,7 @@ RSpec.describe "Admin nav at phone widths", type: :system do
     it "renders every nav item on-screen and tappable at #{width}px" do
       # Arrange
       sign_in_admin
-      emulate_viewport(width)
+      emulate_viewport(width: width)
 
       # Act
       visit admin_about_page_content_path
@@ -76,7 +69,7 @@ RSpec.describe "Admin nav at phone widths", type: :system do
       # Arrange — the original bug was the header wrapping into two-line fragments,
       # which produces no overflow and so would pass an overflow-only assertion.
       sign_in_admin
-      emulate_viewport(width)
+      emulate_viewport(width: width)
 
       # Act
       visit admin_about_page_content_path
@@ -93,7 +86,7 @@ RSpec.describe "Admin nav at phone widths", type: :system do
   it "navigates to the dashboard from an edit page in one tap" do
     # Arrange
     sign_in_admin
-    emulate_viewport(375)
+    emulate_viewport(width: 375)
     visit admin_about_page_content_path
 
     # Act

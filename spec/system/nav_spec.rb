@@ -5,8 +5,8 @@ RSpec.describe "Navigation", type: :system do
 
   context "on a mobile viewport (375x667)" do
     before do
-      # Resize window BEFORE visiting page so media queries apply immediately
-      Capybara.current_session.driver.browser.manage.window.resize_to(375, 667)
+      # Set viewport BEFORE visiting page so media queries apply immediately
+      emulate_viewport(width: 375, height: 667)
       visit root_path
     end
 
