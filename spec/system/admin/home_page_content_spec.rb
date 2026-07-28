@@ -15,7 +15,7 @@ RSpec.describe "Admin home page content form", type: :system do
     it "renders all form inputs and submit button at mobile viewport without overflow" do
       # Arrange
       admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
-      page.driver.browser.manage.window.resize_to(375, 812)
+      emulate_viewport(width: 375, height: 812)
       sign_in_admin(admin)
 
       # Act

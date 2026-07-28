@@ -17,7 +17,7 @@ RSpec.describe "Admin gallery photos list", type: :system do
       admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
       create(:gallery_photo, position: 0)
       create(:gallery_photo, position: 1)
-      page.driver.browser.manage.window.resize_to(375, 812)
+      emulate_viewport(width: 375, height: 812)
       sign_in_admin(admin)
 
       # Act
