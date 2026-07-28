@@ -92,6 +92,45 @@ RSpec.describe "Admin::Accounts", type: :request do
       expect(admin.reload.authenticate("securepassword123")).to be_truthy
     end
 
+    it "rejects a blank password instead of reporting success" do
+      # Arrange — has_secure_password ignores a blank assignment, so the old digest
+      # survives while the flash claims the password was changed
+      admin = create(:admin_user)
+      sign_in(admin)
+
+      # Act
+      patch admin_account_path, params: {
+        admin_user: {
+          current_password: "securepassword123",
+          password: "",
+          password_confirmation: ""
+        }
+      }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(flash[:notice]).to be_nil
+      expect(admin.reload.authenticate("securepassword123")).to be_truthy
+    end
+
+    it "rejects a payload with no password key instead of reporting success" do
+      # Arrange — with the key absent, password= is never called at all, so nothing records
+      # a blank attempt and the update succeeds while the flash claims a change that never
+      # reached the digest
+      admin = create(:admin_user)
+      sign_in(admin)
+
+      # Act
+      patch admin_account_path, params: {
+        admin_user: { current_password: "securepassword123", unrelated: "x" }
+      }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(flash[:notice]).to be_nil
+      expect(admin.reload.authenticate("securepassword123")).to be_truthy
+    end
+
     it "invalidates any outstanding password reset link" do
       # Arrange
       admin = create(:admin_user)

@@ -9,15 +9,14 @@ module Admin
     end
 
     def create
-      @admin_user = AdminUser.new(user_params)
-      # A placeholder the invitee never learns; they set a real one via the emailed
-      # link. has_secure_password requires a password on create, so it cannot be blank.
-      @admin_user.password = SecureRandom.base58(32)
-      @admin_user.invited_at = Time.current
+      result = InviteAdminUser.new(user_params[:email]).call
+      @admin_user = result.admin_user
 
-      if @admin_user.save
-        AdminMailer.invitation(@admin_user).deliver_now
+      case result.status
+      when :invited
         redirect_to admin_users_path, notice: I18n.t("admin.users.invited", email: @admin_user.email)
+      when :delivery_failed
+        redirect_to new_admin_user_path, alert: I18n.t("admin.users.invitation_delivery_failed")
       else
         render :new, status: :unprocessable_entity
       end
@@ -26,12 +25,10 @@ module Admin
     def destroy
       admin_user = AdminUser.find(params[:id])
 
+      # Removing anyone other than yourself implies a second admin exists, so this guard
+      # is also what stops the last admin being removed.
       if admin_user == current_admin
         redirect_to admin_users_path, alert: I18n.t("admin.users.cannot_remove_self")
-      elsif AdminUser.count <= 1
-        # Belt and braces: the self check already covers the single-admin case, but this
-        # holds even if that logic changes and prevents locking everyone out.
-        redirect_to admin_users_path, alert: I18n.t("admin.users.cannot_remove_last")
       else
         admin_user.destroy
         redirect_to admin_users_path, notice: I18n.t("admin.users.removed", email: admin_user.email)

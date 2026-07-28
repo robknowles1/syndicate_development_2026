@@ -3,6 +3,10 @@ class AdminUser < ApplicationRecord
 
   has_secure_password
 
+  # Must come after has_secure_password so its password= override sits ahead of the
+  # generated one in the ancestor chain.
+  include PasswordPresenceValidatable
+
   # Not persisted. Backs the "confirm your current password" field on the account form
   # so it can use the form builder and carry validation errors like any other field.
   attr_accessor :current_password
@@ -30,7 +34,32 @@ class AdminUser < ApplicationRecord
     password_salt&.last(10)
   end
 
-  scope :pending_invitation, -> { where(invitation_accepted_at: nil).where.not(invited_at: nil) }
+  # Looks the account up and always performs one bcrypt comparison, including when no
+  # account matches. Returning early on an unknown address would make the response
+  # measurably faster for addresses that have no admin account, which is enough to
+  # enumerate them.
+  def self.authenticate_by_email(email, password)
+    admin_user = find_by(email: email)
+
+    if admin_user.nil?
+      # Spend the same bcrypt work on an address with no account as on a wrong password.
+      # Returning straight away here is what made a registered address measurable — 304ms
+      # against ~2ms at production cost, a reliable enumeration oracle.
+      BCrypt::Password.new(unmatchable_password_digest).is_password?(password.to_s)
+      return nil
+    end
+
+    admin_user.authenticate(password) || nil
+  end
+
+  # Cost must track has_secure_password's, or the dummy comparison takes a different
+  # amount of time than a real one and reintroduces the very difference it hides.
+  def self.unmatchable_password_digest
+    @unmatchable_password_digest ||= BCrypt::Password.create(
+      SecureRandom.base58(32),
+      cost: ActiveModel::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
+    )
+  end
 
   def invitation_pending?
     invited_at.present? && invitation_accepted_at.nil?
@@ -42,11 +71,39 @@ class AdminUser < ApplicationRecord
     !invitation_pending?
   end
 
-  def accept_invitation(password:, password_confirmation:)
-    update(
-      password: password,
-      password_confirmation: password_confirmation,
-      invitation_accepted_at: Time.current
+  # Takes a hash rather than keywords: permitted params omit keys the form did not send,
+  # and splatting those into required keywords raises rather than validating.
+  def accept_invitation(password_attributes)
+    update_password(
+      password_attributes.to_h.symbolize_keys.merge(invitation_accepted_at: Time.current)
     )
+  end
+
+  # Setting a password through a reset link proves control of the mailbox, which is the
+  # same thing an invitation asks for, so it settles a still-pending invitation too.
+  # Without this the account would be signed in while active? still reads false.
+  def reset_password(password_attributes)
+    update_password(
+      password_attributes.to_h.symbolize_keys.merge(
+        invitation_accepted_at: invitation_accepted_at || Time.current
+      )
+    )
+  end
+
+  def change_password(password_attributes)
+    update_password(password_attributes.to_h.symbolize_keys)
+  end
+
+  # Rotated at every sign-in and cleared at logout. The cookie store keeps nothing
+  # server-side, so without a value on the row there is nothing a logout could revoke and a
+  # captured cookie would stay usable until the password changed.
+  def rotate_session_token!
+    generated = SecureRandom.hex(32)
+    update_column(:session_token, generated)
+    generated
+  end
+
+  def clear_session_token!
+    update_column(:session_token, nil)
   end
 end

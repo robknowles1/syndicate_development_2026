@@ -23,6 +23,9 @@ RSpec.describe "Admin auth flows", type: :system do
     fill_in I18n.t("admin.login.email_label"), with: email
     fill_in I18n.t("admin.login.password_label"), with: password
     click_button I18n.t("admin.login.submit")
+    # Capybara does not wait for the navigation a click starts, so a visit that follows can
+    # race ahead of the session cookie the login response is still setting.
+    expect(page).to have_current_path(admin_root_path)
   end
 
   it "invites an admin, who sets a password and lands signed in" do

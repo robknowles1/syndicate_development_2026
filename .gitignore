@@ -40,3 +40,7 @@
 
 # Claude Code local settings (machine-specific, not shared)
 /.claude/settings.local.json
+
+# Isolated git worktrees created for background agents. These are checkouts of this
+# same repository, not content — committing one embeds a repo inside itself.
+/.claude/worktrees/

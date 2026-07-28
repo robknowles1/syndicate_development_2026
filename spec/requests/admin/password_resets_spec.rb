@@ -3,6 +3,13 @@ require "rails_helper"
 RSpec.describe "Admin::PasswordResets", type: :request do
   before { ActionMailer::Base.deliveries.clear }
 
+  # The emailed link only stashes the token and redirects; the form lives at a tokenless
+  # URL, so every spec that reaches the form has to follow that redirect.
+  def claim_reset(token)
+    get admin_claim_password_reset_path(token)
+    follow_redirect!
+  end
+
   describe "POST /admin/password_reset" do
     it "emails a reset link to a known address" do
       # Arrange
@@ -51,16 +58,71 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       # Assert
       expect(ActionMailer::Base.deliveries).to be_empty
     end
+
+    it "answers a delivery failure exactly as it answers an unknown address" do
+      # Arrange — a 500 here would mark the address as one that has an account
+      create(:admin_user, email: "known@example.com")
+      mailer = double(:mail)
+      allow(mailer).to receive(:deliver_now).and_raise(Net::SMTPServerBusy, "mailbox unavailable")
+      allow(AdminMailer).to receive(:password_reset).and_return(mailer)
+
+      # Act
+      post admin_password_reset_path, params: { email: "known@example.com" }
+
+      # Assert
+      expect(response).to redirect_to(admin_login_path)
+      expect(flash[:notice]).to eq(I18n.t("admin.password_reset.sent"))
+    end
   end
 
-  describe "PATCH /admin/password_reset/:token" do
-    it "updates the password and signs the admin in" do
-      # Arrange
+  describe "GET /admin/password_reset/:token/edit" do
+    it "keeps the token out of the URL that renders the form" do
+      # Arrange — a token in the path is logged on every request and leaks via Referer
       admin = create(:admin_user)
       token = admin.generate_token_for(:password_reset)
 
       # Act
-      patch admin_password_reset_update_path(token), params: {
+      get admin_claim_password_reset_path(token)
+
+      # Assert
+      expect(response).to redirect_to(admin_edit_password_reset_path)
+      expect(admin_edit_password_reset_path).not_to include(token)
+
+      follow_redirect!
+      expect(response.body).not_to include(token)
+    end
+
+    it "refuses to render the form without a claimed token" do
+      # Act
+      get admin_edit_password_reset_path
+
+      # Assert
+      expect(response).to redirect_to(new_admin_password_reset_path)
+    end
+
+    it "does not put an unresolvable token into the visitor's session" do
+      # Arrange — this is an unauthenticated GET any visitor can be sent to, and the session
+      # rides in a cookie: stashing the path segment unread lets a stranger choose several
+      # kilobytes of it, which overflows the 4KB cookie and 500s the request
+      oversized_token = "a" * 5_000
+
+      # Act
+      get admin_claim_password_reset_path(oversized_token)
+
+      # Assert
+      expect(response).to redirect_to(new_admin_password_reset_path)
+      expect(session[:password_reset_token]).to be_nil
+    end
+  end
+
+  describe "PATCH /admin/password_reset" do
+    it "updates the password and signs the admin in" do
+      # Arrange
+      admin = create(:admin_user)
+      claim_reset(admin.generate_token_for(:password_reset))
+
+      # Act
+      patch admin_password_reset_update_path, params: {
         admin_user: { password: "a-brand-new-password", password_confirmation: "a-brand-new-password" }
       }
 
@@ -76,12 +138,14 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       # Arrange — the first reset rotates the salt the token derives from
       admin = create(:admin_user)
       token = admin.generate_token_for(:password_reset)
-      patch admin_password_reset_update_path(token), params: {
+      claim_reset(token)
+      patch admin_password_reset_update_path, params: {
         admin_user: { password: "a-brand-new-password", password_confirmation: "a-brand-new-password" }
       }
 
       # Act
-      patch admin_password_reset_update_path(token), params: {
+      claim_reset(token)
+      patch admin_password_reset_update_path, params: {
         admin_user: { password: "yet-another-password", password_confirmation: "yet-another-password" }
       }
 
@@ -97,7 +161,8 @@ RSpec.describe "Admin::PasswordResets", type: :request do
 
       # Act
       travel 3.hours do
-        patch admin_password_reset_update_path(token), params: {
+        claim_reset(token)
+        patch admin_password_reset_update_path, params: {
           admin_user: { password: "a-brand-new-password", password_confirmation: "a-brand-new-password" }
         }
       end
@@ -110,20 +175,85 @@ RSpec.describe "Admin::PasswordResets", type: :request do
     it "re-renders when the password is too short" do
       # Arrange
       admin = create(:admin_user)
-      token = admin.generate_token_for(:password_reset)
+      claim_reset(admin.generate_token_for(:password_reset))
 
       # Act
-      patch admin_password_reset_update_path(token), params: {
+      patch admin_password_reset_update_path, params: {
         admin_user: { password: "short", password_confirmation: "short" }
       }
 
       # Assert
       expect(response).to have_http_status(:unprocessable_entity)
     end
+
+    it "rejects a blank password instead of reporting success" do
+      # Arrange — has_secure_password ignores a blank assignment, leaving the old digest
+      admin = create(:admin_user)
+      claim_reset(admin.generate_token_for(:password_reset))
+
+      # Act
+      patch admin_password_reset_update_path, params: {
+        admin_user: { password: "", password_confirmation: "" }
+      }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(flash[:notice]).to be_nil
+      expect(admin.reload.authenticate("securepassword123")).to be_truthy
+    end
+
+    it "rejects a payload with no password key instead of reporting success" do
+      # Arrange — with the key absent, password= is never called at all, so nothing records
+      # a blank attempt: the update succeeds against the existing digest, the caller is
+      # signed in, and the link stays resolvable for the rest of its two hours
+      admin = create(:admin_user)
+      claim_reset(admin.generate_token_for(:password_reset))
+
+      # Act
+      patch admin_password_reset_update_path, params: { admin_user: { unrelated: "x" } }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(flash[:notice]).to be_nil
+      expect(admin.reload.authenticate("securepassword123")).to be_truthy
+
+      get admin_root_path
+      expect(response).to redirect_to(admin_login_path)
+    end
+
+    it "settles a still-pending invitation rather than signing in an inactive account" do
+      # Arrange — every path that grants a session must leave the account able to log in
+      admin = create(:admin_user, :pending_invitation, email: "pending@example.com")
+      claim_reset(admin.generate_token_for(:password_reset))
+
+      # Act
+      patch admin_password_reset_update_path, params: {
+        admin_user: { password: "a-brand-new-password", password_confirmation: "a-brand-new-password" }
+      }
+
+      # Assert
+      admin.reload
+      expect(admin.invitation_accepted_at).to be_present
+      expect(admin.active?).to be(true)
+    end
+
+    it "refuses to update without a claimed token" do
+      # Arrange
+      admin = create(:admin_user)
+
+      # Act
+      patch admin_password_reset_update_path, params: {
+        admin_user: { password: "a-brand-new-password", password_confirmation: "a-brand-new-password" }
+      }
+
+      # Assert
+      expect(response).to redirect_to(new_admin_password_reset_path)
+      expect(admin.reload.authenticate("a-brand-new-password")).to be_falsey
+    end
   end
 
   describe "rate limiting" do
-    it "throttles repeated reset requests" do
+    it "throttles repeated reset requests for one address" do
       # Arrange
       create(:admin_user, email: "known@example.com")
 
@@ -132,6 +262,18 @@ RSpec.describe "Admin::PasswordResets", type: :request do
 
       # Assert
       expect(response).to redirect_to(new_admin_password_reset_path)
+      expect(flash[:alert]).to eq(I18n.t("admin.password_reset.too_many_requests"))
+    end
+
+    it "throttles an address regardless of the case it is typed in" do
+      # Arrange — keying on the raw string would let case variants multiply the allowance
+      create(:admin_user, email: "known@example.com")
+
+      # Act
+      3.times { post admin_password_reset_path, params: { email: "known@example.com" } }
+      3.times { post admin_password_reset_path, params: { email: "KNOWN@EXAMPLE.COM" } }
+
+      # Assert
       expect(flash[:alert]).to eq(I18n.t("admin.password_reset.too_many_requests"))
     end
   end

@@ -17,6 +17,9 @@ RSpec.describe "Admin nav at phone widths", type: :system do
     fill_in I18n.t("admin.login.email_label"), with: admin.email
     fill_in I18n.t("admin.login.password_label"), with: "securepassword123"
     click_button I18n.t("admin.login.submit")
+    # Capybara does not wait for the navigation a click starts, so a visit that follows can
+    # race ahead of the session cookie the login response is still setting.
+    expect(page).to have_current_path(admin_root_path)
   end
 
   def layout_metrics

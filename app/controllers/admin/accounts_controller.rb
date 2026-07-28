@@ -14,12 +14,11 @@ module Admin
         return render :edit, status: :unprocessable_entity
       end
 
-      if @admin_user.update(password_params)
-        # Changing the password rotates the salt, invalidating outstanding reset and
-        # invitation links. Re-establish this session so the admin is not logged out.
-        reset_session
-        session[:admin_user_id] = @admin_user.id
-        redirect_to admin_root_path, notice: I18n.t("admin.account.updated")
+      if @admin_user.change_password(password_params)
+        # Changing the password rotates the salt, which invalidates outstanding reset and
+        # invitation links and every other session for this account. Re-establish this one
+        # so the admin who made the change is not logged out by it.
+        sign_in_and_redirect(@admin_user, notice: I18n.t("admin.account.updated"))
       else
         render :edit, status: :unprocessable_entity
       end
