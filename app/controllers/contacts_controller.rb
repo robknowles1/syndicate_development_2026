@@ -2,6 +2,7 @@ class ContactsController < ApplicationController
   def create
     name = params[:name].to_s.strip
     email = params[:email].to_s.strip
+    phone = params[:phone].to_s.strip
     subject = params[:subject].to_s.strip
     message = params[:message].to_s.strip
 
@@ -11,6 +12,7 @@ class ContactsController < ApplicationController
       ContactMailer.contact_email(
         name: name,
         email: email,
+        phone: phone,
         subject: subject.presence || I18n.t("contact.form.no_subject"),
         message: message
       ).deliver_now

@@ -3,6 +3,9 @@
 
 <%= t("mailer.contact_email.name_label") %>    <%= @name %>
 <%= t("mailer.contact_email.email_label") %>   <%= @email %>
+<% if @phone -%>
+<%= t("mailer.contact_email.phone_label") %>   <%= @phone %>
+<% end -%>
 <%= t("mailer.contact_email.subject_label") %> <%= @subject %>
 
 <%= t("mailer.contact_email.message_label") %>

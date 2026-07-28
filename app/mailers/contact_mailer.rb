@@ -1,7 +1,10 @@
 class ContactMailer < ApplicationMailer
-  def contact_email(name:, email:, subject:, message:)
+  # phone is optional on the contact form, so it defaults to blank for any caller that
+  # predates the field.
+  def contact_email(name:, email:, subject:, message:, phone: nil)
     @name = name
     @email = email
+    @phone = phone.presence
     @subject = subject
     @message = message
 
