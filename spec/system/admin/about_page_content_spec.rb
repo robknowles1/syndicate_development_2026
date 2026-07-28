@@ -40,6 +40,30 @@ RSpec.describe "Admin about page content form", type: :system do
     end
   end
 
+  describe "slideshow image file inputs at 375 px viewport (AT14, R13, AC-14)" do
+    it "renders the 3 file inputs with w-full and no horizontal scroll" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      page.driver.browser.manage.window.resize_to(375, 812)
+      sign_in_admin(admin)
+
+      # Act
+      visit admin_about_page_content_path
+
+      # Assert
+      expect(page).to have_field(I18n.t("admin.about_page_content.slideshow_image_1_label"), type: "file")
+      expect(page).to have_field(I18n.t("admin.about_page_content.slideshow_image_2_label"), type: "file")
+      expect(page).to have_field(I18n.t("admin.about_page_content.slideshow_image_3_label"), type: "file")
+
+      file_inputs = page.all("input[type='file']", visible: :all)
+      expect(file_inputs.map { |input| input[:class] }).to all(include("w-full"))
+
+      body_scroll_width = page.evaluate_script("document.body.scrollWidth")
+      viewport_width = page.evaluate_script("window.innerWidth")
+      expect(body_scroll_width).to be <= viewport_width
+    end
+  end
+
   describe "restore defaults button attributes (AT27, R19, AC-27)" do
     it "restore button has data-turbo-confirm, py-3 class, and targets restore_defaults path" do
       # Arrange

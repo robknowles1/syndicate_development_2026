@@ -18,6 +18,8 @@ Allow Doug to replace any of the 3 About page slideshow images through the exist
 
 This spec's Rules, ACs, and ATs below are complete and unambiguous (status `ready`), but implementation cannot begin until both dependencies are merged.
 
+**Independent addendum (2026-07-21, revised 2026-07-27):** This spec also covers a second, unrelated scope item folded in at explicit user request, to ship in the same implementation pass as the About slideshow work above: a persistent admin nav bar in the shared admin layout, listing all five admin destinations (Dashboard, Home, About, Gallery, Services) and rendered on every admin page including the dashboard itself. It originally shipped as a single "back to dashboard" header link; see the 2026-07-27 Change Log entry for why that was replaced. This addendum is not blocked by SPEC-007/SPEC-008 and is not derived from ADR-005 — see the "Admin Layout" subsections within Rules, Edge Cases, Acceptance Criteria, and Acceptance Tests below.
+
 ---
 
 ## Non Goals
@@ -104,6 +106,33 @@ Add under `admin.about_page_content` in `config/locales/en.yml` (all other keys 
 |-----|----------------------|-----------|
 | `confirm_restore_defaults` | "This will replace your current edits with the original default text. Continue?" | "This will replace your current edits with the original default text and remove any uploaded slideshow images. Continue?" |
 
+### Admin Layout (Persistent Admin Nav Bar)
+
+No new routes or controllers. `app/views/layouts/admin.html.erb` — the single shared layout rendered by every `Admin::BaseController` subclass — gains a `<nav>` element beneath its `<header>`, holding a `<ul>` of five `link_to` destinations, rendered only when `current_admin` is present. The logout `button_to` stays in the header; the back-to-dashboard link previously in the header is removed, superseded by the nav's "Dashboard" item.
+
+New helper `app/helpers/admin_helper.rb`:
+
+| Method | Purpose |
+|--------|---------|
+| `admin_nav_items` | Ordered `[label, path]` pairs for the five admin destinations |
+| `admin_nav_current?(path)` | Whether `path` corresponds to the page being rendered. Deliberately **not** `current_page?`, which matches GET only and would drop the marking on a validation-failure re-render (a PATCH/POST). Matches on `request.path`; treats `/admin/service_sections*` as belonging to Services, which has no nav entry of its own |
+| `admin_nav_link_class(path)` | Tailwind classes for a nav item, applying the active fill when `admin_nav_current?` |
+
+Add under `admin.layout` in `config/locales/en.yml` (alongside the existing `title`, `header`, `logout` keys):
+
+| Key | Purpose |
+|-----|---------|
+| `nav.aria_label` | Accessible name for the `<nav>` landmark |
+| `nav.dashboard` | Nav label for the dashboard |
+| `nav.home` | Nav label for Home page content |
+| `nav.about` | Nav label for About page content |
+| `nav.gallery` | Nav label for gallery photo management |
+| `nav.services` | Nav label for the services page |
+
+Changed value: `admin.layout.header` is shortened from "Syndicate Development Admin" to "Syndicate Admin" so the header row does not wrap at phone width.
+
+Removed key: `admin.layout.dashboard_link`, which backed the superseded single header link.
+
 ---
 
 ## Rules
@@ -134,6 +163,18 @@ R12: No dimension, aspect-ratio, or minimum-resolution validation is added for s
 
 R13: The 3 new file inputs follow the mobile-first rules from CLAUDE.md: each carries `w-full` (to the extent applicable to a file input), positioned within the existing form's `space-y-6` vertical rhythm, introducing no horizontal scroll at any viewport width including 375 px.
 
+### Admin Layout — Persistent Admin Nav Bar (added 2026-07-21, revised 2026-07-27)
+
+R14: The admin layout (`app/views/layouts/admin.html.erb`) renders a persistent nav bar — a `<nav>` element carrying `aria-label` from `admin.layout.nav.aria_label`, holding a `<ul>` of real `link_to` destinations, not JavaScript history controls — directly beneath the header, whenever `current_admin` is present. This mirrors the existing logout button's guard (same conditional), so the nav is absent on the unauthenticated login page. The nav lists all five admin destinations in a fixed order: Dashboard, Home, About, Gallery, Services.
+
+R15: The nav item matching the current page is marked with `aria-current="page"` and rendered with a solid fill (`bg-red-600 text-white`) rather than a hover-only cue. Exactly one item is marked current on every admin page, including the dashboard (where "Dashboard" is active) and the service-section sub-pages at `/admin/service_sections/*` (where "Services" is active, as they have no nav entry of their own). The marking is computed by `admin_nav_current?`, **not** `current_page?`: `current_page?` returns false for any non-GET request, which would drop the marking on every validation-failure re-render, since those render in response to the original PATCH/POST. The current item remains a real, enabled link.
+
+R16: All nav labels are sourced from new i18n keys under a new `admin.layout.nav` namespace in `config/locales/en.yml` (`aria_label`, `dashboard`, `home`, `about`, `gallery`, `services`), alongside the existing `title`, `header`, and `logout` keys. No hardcoded string is used. `admin.layout.header` is shortened to "Syndicate Admin" so the header row does not wrap at phone width.
+
+R17: Every nav item carries touch-target padding (`py-3 px-3`, yielding a ≥44px tap height, matching the `py-3 px-6` / `py-3 px-5` pattern already used on admin form buttons per CLAUDE.md's mobile-first mandate) and does not depend on hover-only affordance (no visibility or tappability gated solely behind `:hover`), since the primary admin user (Doug) navigates by touch on his phone. The nav wraps to multiple rows (`flex-wrap`) rather than scrolling horizontally, per CLAUDE.md's prohibition on horizontal scrolling at any width.
+
+R18: Because `Admin::BaseController` sets `layout "admin"` for every admin controller, this is a change to `app/views/layouts/admin.html.erb` plus a new `app/helpers/admin_helper.rb` (holding `admin_nav_items` and `admin_nav_link_class`, so the destination list and active-state styling live in one testable place) — no per-view edits are made to `app/views/admin/home_page_contents/show.html.erb`, `app/views/admin/about_page_contents/show.html.erb`, `app/views/admin/gallery_photos/index.html.erb`, or `app/views/admin/services_pages/show.html.erb`. All admin pages, current and future, gain the nav automatically.
+
 ---
 
 ## Edge Cases
@@ -155,6 +196,20 @@ E7: `restore_defaults` is called when zero slots are attached. Each purge call i
 E8: A new file is uploaded to a slot that already has an attachment, via a normal (non-restore) `#update`. The old blob is replaced and purged automatically (R8); only the new image is visible afterward.
 
 E9: `AboutPageContent.first` returns nil entirely (fresh deployment, before any save or restore has ever happened). The slideshow renders all 3 static fallbacks; no `NoMethodError` (extends SPEC-007 E1/R3).
+
+### Admin Layout — Persistent Admin Nav Bar (added 2026-07-21, revised 2026-07-27)
+
+E10: `current_admin` is `nil` (the unauthenticated login page, `GET /admin/login`). The nav does not render, mirroring the existing logout button's absence in the same state.
+
+E11: An admin navigates directly to an edit page (e.g. `GET /admin/about_page_content`) via a bookmarked or freshly typed URL, with no prior entry in browser history. Because each nav item is a real `link_to`, not a JS `history.back()` call, it still navigates correctly regardless of history state.
+
+E12: Admin is already on the dashboard (`GET /admin`). The nav still renders, with "Dashboard" as the active item (R15) — it is not hidden, so the nav's position and item count stay stable across every admin page.
+
+E13: Viewport is narrower than the nav's total intrinsic width (any phone below ~500px). The nav wraps to a second row rather than overflowing; no item is pushed off-screen and `document.body.scrollWidth` does not exceed the viewport width (R17). The header row above it stays on a single unwrapped line.
+
+E14: A form submission fails validation and the controller re-renders the form (e.g. `Admin::AboutPageContentsController#update` → `render :show`, responding 422 to a PATCH). The nav renders with the correct item still marked current, because `admin_nav_current?` matches on `request.path` independently of HTTP verb (R15).
+
+E15: Admin is on an admin page with no nav entry of its own — `/admin/service_sections/new` or `/admin/service_sections/:id/edit`. The nav renders with "Services" marked current, so the admin is never left with no orientation cue (R15).
 
 ---
 
@@ -193,6 +248,24 @@ AC-13: No hardcoded English strings are introduced by this spec's view or contro
 AC-14: The admin About form renders without horizontal scroll at 375 px viewport width, including the 3 new file inputs, each carrying `w-full`.
 
 AC-15: Given a request is NOT authenticated, when `PATCH /admin/about_page_content/restore_defaults`, then the response redirects (auth guard, unchanged from SPEC-007) and no `AboutPageContent` data changes — confirms adding the purge logic (R7) introduces no auth regression.
+
+### Admin Layout — Persistent Admin Nav Bar (added 2026-07-21, revised 2026-07-27)
+
+AC-16: Given admin is authenticated, when any admin page is requested, then the response includes a `<nav>` labelled `I18n.t("admin.layout.nav.aria_label")` whose links' texts and hrefs equal, in order, the five destinations of `admin_nav_items` (Dashboard, Home, About, Gallery, Services).
+
+AC-17: Given admin is authenticated, when each admin page is requested, then exactly one nav link carries `aria-current="page"`, it is the link matching the requested page, and its class includes `bg-red-600`.
+
+AC-18: Given no active admin session, when `GET /admin/login`, then the response does not include the nav.
+
+AC-19: Given admin is authenticated, when each of `GET /admin`, `GET /admin/home_page_content`, `GET /admin/about_page_content`, `GET /admin/gallery_photos`, and `GET /admin/services_page` is requested, then each response includes the full nav — confirming the layout-level change covers every admin page without any per-view modification.
+
+AC-20: Every nav link's markup carries touch-target padding classes (`py-3 px-3` or equivalent) and includes no styling that gates its visibility or tappability behind `:hover`; the containing `<ul>` carries `flex-wrap` and does not carry `overflow-x-auto`.
+
+AC-21: At viewport widths of 320px, 375px, and 390px, the rendered admin nav produces no horizontal document overflow, keeps every item fully within the viewport, and renders each item at ≥44px tap height. At the same widths the header row keeps its title and logout button on one row, with the title unwrapped — the original failure mode, which produces no overflow and so is not caught by the overflow assertion alone.
+
+AC-22: Given admin is authenticated, when a `PATCH /admin/about_page_content` fails validation and re-renders (HTTP 422), then the nav still marks "About" as the current page.
+
+AC-23: Given admin is authenticated, when `GET /admin/service_sections/new` is requested, then the nav marks "Services" as the current page.
 
 ---
 
@@ -300,6 +373,50 @@ When the `AboutPageContent` record is validated
 Then it is valid — no minimum-dimension validation is applied
 Covers: R12
 
+### Admin Layout — Persistent Admin Nav Bar (added 2026-07-21, revised 2026-07-27)
+
+AT18
+Given admin is authenticated
+When each of `GET /admin`, `GET /admin/home_page_content`, `GET /admin/about_page_content`, `GET /admin/gallery_photos`, and `GET /admin/services_page` is requested
+Then each response's nav contains exactly the five expected labels and hrefs, in `admin_nav_items` order
+Covers: R14, R16, R18, AC-16, AC-19, E11
+
+AT19
+Given admin is authenticated
+When each admin page is requested
+Then exactly one nav link carries `aria-current="page"`, it is the one matching the requested page, and its class includes `bg-red-600`
+Covers: R15, AC-17, E12
+
+AT20
+Given no active admin session
+When `GET /admin/login`
+Then the response does not include the nav
+Covers: R14, AC-18, E10
+
+AT21
+Given admin is authenticated and the browser viewport is set to 320px, 375px, and 390px in turn
+When `GET /admin/about_page_content` is rendered in a real browser
+Then `document.body.scrollWidth` does not exceed the viewport width, no nav item's bounding box falls outside the viewport, every nav item renders at ≥44px tap height, and the header title and logout button share one row with the title unwrapped
+Covers: R17, AC-21, E13
+
+AT23
+Given admin is authenticated
+When `PATCH /admin/about_page_content` is submitted with a blank required field and re-renders 422
+Then exactly one nav link carries `aria-current="page"` and it is "About"
+Covers: R15, AC-22, E14
+
+AT24
+Given admin is authenticated
+When `GET /admin/service_sections/new`
+Then exactly one nav link carries `aria-current="page"` and it is "Services"
+Covers: R15, AC-23, E15
+
+AT22
+Given the admin layout nav markup
+When inspected
+Then every link carries touch-target padding classes (`py-3 px-3`) with no hover-only visibility/tappability styling, and the containing `<ul>` carries `flex-wrap` but not `overflow-x-auto`
+Covers: R17, AC-20
+
 ---
 
 ## Implementation Decisions
@@ -338,8 +455,9 @@ Covers: R12
 | T4 | Admin view: add 3 `f.file_field` inputs to the existing About form, each positioned near its corresponding alt-text input, mobile-first (`w-full`) (R9, R13). | AC-10, AC-13, AC-14 | 2 |
 | T5 | Tests: `AboutPageContent` model spec (content-type/size validations for all 3 slots; confirms no presence requirement); request spec for `PagesController#about` (per-slot independent fallback, publish gating, all-3-attached case, alt-text unchanged). All AAA pattern, inline variables, no `let`/`let!`. | AC-1, AC-2, AC-3, AC-4 | 3 |
 | T6 | Tests: request spec for `Admin::AboutPageContentsController` (upload happy path; content-type/size rejection; `restore_defaults` purge behavior including zero-attached no-op; reattachment replaces rather than accumulates; auth guard regression check); system spec extending SPEC-007's 375 px coverage to include the 3 new file inputs; i18n audit of new strings. | AC-5, AC-6, AC-7, AC-8, AC-9, AC-10, AC-11, AC-12, AC-13, AC-14, AC-15 | 4 |
+| T7 | Admin layout: add a persistent nav bar to `app/views/layouts/admin.html.erb` beneath the header, guarded by `current_admin` presence (R14), listing all five admin destinations with the active one marked via `aria-current` and a solid fill (R15); add the `admin.layout.nav.*` i18n keys and shorten `admin.layout.header` (R16); apply mobile-first touch targets and `flex-wrap` (R17); extract `admin_nav_items` / `admin_nav_link_class` into `app/helpers/admin_helper.rb` (R18). Independent scope, folded in at explicit user request — not part of ADR-005. Request spec asserting nav contents and active-state marking across all five admin pages and its absence on login, **plus a system spec exercising real viewport widths (320/375/390px)** — a request spec alone cannot catch layout overflow or collapsed tap targets. | AC-16 – AC-23 | 1 |
 
-Total estimated points: 15 (all tasks ≤ 4 points; no split review required under the ≥ 5-point guardrail)
+Total estimated points: 16 (all tasks ≤ 4 points; no split review required under the ≥ 5-point guardrail)
 
 ---
 
@@ -348,9 +466,11 @@ Total estimated points: 15 (all tasks ≤ 4 points; no split review required und
 | Date | Change | Affected IDs | Rationale |
 |------|--------|-------------|-----------|
 | 2026-07-14 | Initial draft | All | Translates ADR-005 (Decision 1, Decision 3, and the About-specific portions of Decisions 4–6, Implementation Notes 8–10) into implementation-ready spec format. Explicitly documents the SPEC-008 and SPEC-007/PR#38 blocking dependencies per ADR-005 Implementation Note 12. Resolves the ADR's "Handoff to Spec Agent" open items as they apply to About: confirmed the shared 1200×1200 quality-80 variant via a per-slot helper method; confirmed no soft minimum-dimension guard (consistent with SPEC-008); confirmed no per-slot alt-text change (SPEC-007 R20 unchanged); wrote the `confirm_restore_defaults` copy update and the 4 new admin i18n keys; wrote full acceptance criteria including content-type/size rejection request specs and a 375 px mobile-first system spec extension. |
+| 2026-07-21 | Added independent scope: persistent "back to dashboard" navigation link in the shared admin layout header (`app/views/layouts/admin.html.erb`) | R14–R18, E10–E12, AC-16–AC-20, AT18–AT22, T7 | Folded into this spec at explicit user request, to ship alongside the About-slideshow-image-uploads work in the same implementation pass — **not** derived from ADR-005 and unrelated to the slideshow scope above. Addresses a mobile-usability gap: every admin edit page (Home, About, Gallery, Services) was a navigational dead end with no way back to the dashboard except the browser's back button, which is unreliable on Doug's phone per CLAUDE.md's mobile-first mandate. Fixed once at the shared-layout level rather than per-view so all current and future admin pages get it automatically. |
+| 2026-07-27 | **Replaced** the single "back to dashboard" header link with a persistent five-destination admin nav bar (Dashboard / Home / About / Gallery / Services), added active-page marking, shortened `admin.layout.header`, extracted `app/helpers/admin_helper.rb`, and added phone-width system coverage | R14–R18 rewritten, E12 rewritten, E13–E15 added, AC-16–AC-20 rewritten, AC-21–AC-23 added, AT18–AT22 rewritten, AT23–AT24 added, T7 rewritten, Interfaces § rewritten | Manual QA finding: the as-shipped link was technically present and request-spec-verified, but at phone width the header crammed a long title, the link, and the logout button into one non-wrapping flex row — all three wrapped into unreadable two-line fragments and the link was effectively invisible, which is how the user reported it ("I don't see anything"). Two corrections: (1) the header was rebalanced and the nav moved to its own row, and (2) the destination set was widened from dashboard-only to all five sections, since the underlying need was to move between admin pages freely rather than only to retreat to the dashboard. The old R15/AC-17 rule hiding the link on the dashboard was dropped — with a full nav, a stable item count and position across every page matters more than avoiding one self-referential link. The root process gap was that AC-16–AC-20 were all assertable from markup alone; AC-21 and its system spec now pin the rendered geometry at 320/375/390px so a repeat regression fails CI instead of reaching the user, and that guard was verified to fail when the long header title is restored. Review also caught that the first cut used `current_page?`, which matches GET only, so the active marking vanished on every validation-failure re-render and on the service-section sub-pages; replaced with `admin_nav_current?` and covered by AC-22/AC-23. |
 
 ---
 
 ## Open Questions
 
-None. All items from ADR-005's "Handoff to Spec Agent" section that apply to the About slideshow are resolved above (see Implementation Decisions). This spec's only open item is procedural, not a spec ambiguity: implementation cannot start until the two Dependencies listed above land on `main`.
+None. All items from ADR-005's "Handoff to Spec Agent" section that apply to the About slideshow are resolved above (see Implementation Decisions). This spec's only open item is procedural, not a spec ambiguity: implementation of the About-slideshow-image-uploads scope (R1–R13) cannot start until the two Dependencies listed above land on `main`. The Admin Layout addendum (R14–R18, added 2026-07-21) has no such blocker and may be implemented independently at any time — see the Goal section's Independent addendum note.

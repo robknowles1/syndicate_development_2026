@@ -6,7 +6,11 @@ class PagesController < ApplicationController
   end
 
   def about
-    @about_page_content = AboutPageContent.first
+    @about_page_content = AboutPageContent
+      .with_attached_slideshow_image_1
+      .with_attached_slideshow_image_2
+      .with_attached_slideshow_image_3
+      .first
   end
 
   def gallery

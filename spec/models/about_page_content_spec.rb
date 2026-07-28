@@ -91,6 +91,99 @@ RSpec.describe AboutPageContent, type: :model do
     end
   end
 
+  describe "slideshow image attachments (R1, R2)" do
+    it "is valid with no slots attached — presence is not required (AT17, R2)" do
+      # Arrange
+      record = build(:about_page_content)
+
+      # Act
+      result = record.valid?
+
+      # Assert
+      expect(result).to be true
+      expect(record.errors[:slideshow_image_1]).to be_empty
+      expect(record.errors[:slideshow_image_2]).to be_empty
+      expect(record.errors[:slideshow_image_3]).to be_empty
+    end
+
+    it "is valid with a JPEG under 15 MB and pixel dimensions smaller than 400x400 attached (AT17, R12)" do
+      # Arrange
+      record = build(:about_page_content)
+      record.slideshow_image_1.attach(
+        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+        filename: "gallery_photo.jpg",
+        content_type: "image/jpeg"
+      )
+
+      # Act
+      result = record.valid?
+
+      # Assert
+      expect(result).to be true
+      expect(record.errors[:slideshow_image_1]).to be_empty
+    end
+
+    it "rejects an image/svg+xml content type on slideshow_image_2 (AT6, R2, E4)" do
+      # Arrange
+      record = build(:about_page_content)
+      record.slideshow_image_2.attach(
+        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+        filename: "gallery_photo.svg",
+        content_type: "image/svg+xml"
+      )
+
+      # Act
+      record.valid?
+
+      # Assert
+      expect(record.errors[:slideshow_image_2]).to include(I18n.t("activerecord.errors.messages.invalid_content_type"))
+    end
+
+    it "rejects a file exceeding 15 MB on slideshow_image_3 (AT7, R2, E5)" do
+      # Arrange
+      record = build(:about_page_content)
+      record.slideshow_image_3.attach(
+        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+        filename: "gallery_photo.jpg",
+        content_type: "image/jpeg"
+      )
+      allow(record.slideshow_image_3.blob).to receive(:byte_size).and_return(16.megabytes)
+
+      # Act
+      record.valid?
+
+      # Assert
+      expect(record.errors[:slideshow_image_3]).to include(I18n.t("activerecord.errors.messages.file_too_large"))
+    end
+
+    it "leaves the other 2 slots' validity unaffected when one slot is invalid" do
+      # Arrange
+      record = build(:about_page_content)
+      record.slideshow_image_2.attach(
+        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+        filename: "gallery_photo.svg",
+        content_type: "image/svg+xml"
+      )
+
+      # Act
+      record.valid?
+
+      # Assert
+      expect(record.errors[:slideshow_image_1]).to be_empty
+      expect(record.errors[:slideshow_image_3]).to be_empty
+    end
+  end
+
+  describe "#slideshow_display_variant (R3)" do
+    it "processes slot 1 without raising a missing-processor error" do
+      # Arrange
+      record = create(:about_page_content, :with_slideshow_image_1)
+
+      # Act & Assert
+      expect { record.slideshow_display_variant(1).processed }.not_to raise_error
+    end
+  end
+
   describe "published default" do
     it "defaults published to false for a new record" do
       # Arrange / Act

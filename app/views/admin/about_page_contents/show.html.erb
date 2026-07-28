@@ -71,6 +71,13 @@
     </div>
 
     <div>
+      <%= f.label :slideshow_image_1, t("admin.about_page_content.slideshow_image_1_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.file_field :slideshow_image_1, class: "w-full border border-gray-300 rounded px-3 py-2" %>
+      <p class="text-sm text-gray-500 mt-1"><%= t("admin.about_page_content.slideshow_image_hint") %></p>
+    </div>
+
+    <div>
       <%= f.label :slideshow_alt_2, t("admin.about_page_content.slideshow_alt_2_label"),
             class: "block text-sm font-semibold mb-1" %>
       <%= f.text_field :slideshow_alt_2,
@@ -78,10 +85,24 @@
     </div>
 
     <div>
+      <%= f.label :slideshow_image_2, t("admin.about_page_content.slideshow_image_2_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.file_field :slideshow_image_2, class: "w-full border border-gray-300 rounded px-3 py-2" %>
+      <p class="text-sm text-gray-500 mt-1"><%= t("admin.about_page_content.slideshow_image_hint") %></p>
+    </div>
+
+    <div>
       <%= f.label :slideshow_alt_3, t("admin.about_page_content.slideshow_alt_3_label"),
             class: "block text-sm font-semibold mb-1" %>
       <%= f.text_field :slideshow_alt_3,
             class: "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600" %>
+    </div>
+
+    <div>
+      <%= f.label :slideshow_image_3, t("admin.about_page_content.slideshow_image_3_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <%= f.file_field :slideshow_image_3, class: "w-full border border-gray-300 rounded px-3 py-2" %>
+      <p class="text-sm text-gray-500 mt-1"><%= t("admin.about_page_content.slideshow_image_hint") %></p>
     </div>
 
     <%# Published toggle %>

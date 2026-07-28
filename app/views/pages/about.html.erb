@@ -35,9 +35,26 @@
 
 <%# Slideshow Section %>
 <section class="slideshow mt-[70px]">
-  <%= image_tag "gallery/m45a2920.jpg", alt: content&.slideshow_alt_1 || t("pages.about.slideshow_alt_1") %>
-  <%= image_tag "gallery/m45a2927.jpg", alt: content&.slideshow_alt_2 || t("pages.about.slideshow_alt_2") %>
-  <%= image_tag "gallery/m45a2928.jpg", alt: content&.slideshow_alt_3 || t("pages.about.slideshow_alt_3") %>
+  <% slideshow_alt_1 = content&.slideshow_alt_1 || t("pages.about.slideshow_alt_1") %>
+  <% if content&.slideshow_image_1&.attached? %>
+    <%= image_tag content.slideshow_display_variant(1), alt: slideshow_alt_1 %>
+  <% else %>
+    <%= image_tag "gallery/m45a2920.jpg", alt: slideshow_alt_1 %>
+  <% end %>
+
+  <% slideshow_alt_2 = content&.slideshow_alt_2 || t("pages.about.slideshow_alt_2") %>
+  <% if content&.slideshow_image_2&.attached? %>
+    <%= image_tag content.slideshow_display_variant(2), alt: slideshow_alt_2 %>
+  <% else %>
+    <%= image_tag "gallery/m45a2927.jpg", alt: slideshow_alt_2 %>
+  <% end %>
+
+  <% slideshow_alt_3 = content&.slideshow_alt_3 || t("pages.about.slideshow_alt_3") %>
+  <% if content&.slideshow_image_3&.attached? %>
+    <%= image_tag content.slideshow_display_variant(3), alt: slideshow_alt_3 %>
+  <% else %>
+    <%= image_tag "gallery/m45a2928.jpg", alt: slideshow_alt_3 %>
+  <% end %>
 </section>
 
 <%# Shop Info Section %>
