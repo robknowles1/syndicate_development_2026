@@ -42,13 +42,34 @@ env:
     - RAILS_MASTER_KEY
   clear:
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
-    # When you start using multiple servers, you should split out job processing to a dedicated machine.
+    #
+    # Accepted tradeoff: this couples job availability to web availability. Puma's
+    # solid_queue plugin monitors the supervisor fork and, if it dies, issues
+    # Process.kill(:INT, $$) on the Puma master — so a queue failure takes the public
+    # site down with it. That is backwards in principle for a marketing site, where the
+    # site is the product and email is secondary, but a dedicated job host means paying
+    # for a second server to run what is currently only contact-form email. Kamal
+    # restarts the container on exit, so the realistic failure mode is a restart rather
+    # than a sustained outage.
+    #
+    # Move jobs to the `job:` host commented out under servers: (and drop this flag) when
+    # either job volume grows enough to compete with web requests for CPU, or a job
+    # becomes important enough that losing it silently matters.
     SOLID_QUEUE_IN_PUMA: true
+
+    # Worker threads per Solid Queue process (default: 3). Also sizes the `queue` database
+    # pool in config/database.yml, which is set to JOB_THREADS + 2 as Solid Queue requires.
+    # JOB_THREADS: 3
 
     # Set number of processes dedicated to Solid Queue (default: 1)
     # JOB_CONCURRENCY: 3
 
     # Set number of cores available to the application on each server (default: 1).
+    #
+    # Watch the Postgres connection budget when raising either of these: each Puma worker
+    # holds RAILS_MAX_THREADS primary connections and each job process holds JOB_THREADS+2
+    # against the queue database. WEB_CONCURRENCY=2 with JOB_CONCURRENCY=3 already
+    # approaches Postgres's default max_connections of 100 once every pool is saturated.
     # WEB_CONCURRENCY: 2
 
     # Match this to any external database server to configure Active Record correctly

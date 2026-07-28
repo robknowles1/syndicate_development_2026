@@ -1,16 +1,32 @@
+# Every environment that eager loads (production, staging) MUST have a key here, whatever
+# adapter it picks. solid_cable is in the Gemfile, so SolidCable::Record is eager loaded and
+# its class body calls config_for("cable"); a missing environment returns nil, failing with
+# "NoMethodError: undefined method 'connects_to' for nil". config/cache.yml has no such
+# trap — SolidCache::Engine calls .to_h on the result, and nil.to_h is {}.
+
+# Async adapter only works within the same process, so for manually triggering cable updates from a console,
+# and seeing results in the browser, you must do so from the web console (running inside the dev process),
+# not a terminal started via bin/rails console! Add "console" to any action or any ERB template view
+# to make the web console appear.
 development:
   adapter: async
 
 test:
   adapter: test
 
-# The app defines no channels, so staging uses the in-process adapter and needs no
-# Redis or cable database. A staging key must exist regardless: Solid Cable eager-loads
-# its models whenever eager_load is on and raises if the current environment is absent.
+# The app defines no channels, so staging uses the in-process adapter and needs no Redis
+# or cable database. Staging also runs a single primary database, so solid_cable could not
+# connect here even if it were wanted. The key must still be present — see above.
 staging:
   adapter: async
 
+# Solid Cable rather than async: async is per-process and silently drops broadcasts between
+# Puma workers once WEB_CONCURRENCY > 1. Its polling thread is created lazily on first
+# subscribe, so an app with no channels pays nothing for it.
 production:
-  adapter: redis
-  url: <%= ENV.fetch("REDIS_URL") { "redis://localhost:6379/1" } %>
-  channel_prefix: syndicate_development_2026_production
+  adapter: solid_cable
+  connects_to:
+    database:
+      writing: cable
+  polling_interval: 0.1.seconds
+  message_retention: 1.day

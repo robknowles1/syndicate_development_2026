@@ -52,10 +52,22 @@ Rails.application.configure do
   config.active_support.report_deprecations = false
 
   # Replace the default in-process memory cache store with a durable alternative.
-  # config.cache_store = :mem_cache_store
+  #
+  # This must not be left unset. With no cache_store, Rails falls back to
+  # [:file_store, "#{root}/tmp/cache/"], and tmp/cache lives inside the container and is
+  # not one of the `volumes:` in config/deploy.yml — so every deploy would silently wipe
+  # the cache. Anything that depends on the cache surviving a deploy (rate limiting /
+  # login throttling, which counts attempts in Rails.cache) would reset on each release.
+  # Solid Cache keeps this in the `cache` database instead, so it survives deploys.
+  config.cache_store = :solid_cache_store
 
   # Replace the default in-process and non-durable queuing backend for Active Job.
-  # config.active_job.queue_adapter = :resque
+  #
+  # config/deploy.yml sets SOLID_QUEUE_IN_PUMA: true and config/puma.rb runs
+  # `plugin :solid_queue` when it sees that, so the supervisor runs inside Puma on this
+  # single-server deployment. No separate job host is required yet.
+  config.active_job.queue_adapter = :solid_queue
+  config.solid_queue.connects_to = { database: { writing: :queue } }
 
   # Surface delivery failures rather than dropping a customer enquiry silently. The
   # contact form delivers synchronously, so a raised error is visible instead of lost.
