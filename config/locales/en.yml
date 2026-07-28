@@ -217,9 +217,15 @@ en:
         reorder_failed: "Could not save the new photo order. The page will reload."
     layout:
       title: "Admin — Syndicate Development"
-      header: "Syndicate Development Admin"
+      header: "Syndicate Admin"
       logout: "Log Out"
-      dashboard_link: "Back to Dashboard"
+      nav:
+        aria_label: "Admin sections"
+        dashboard: "Dashboard"
+        home: "Home"
+        about: "About"
+        gallery: "Gallery"
+        services: "Services"
 
   activerecord:
     errors:
