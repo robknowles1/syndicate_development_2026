@@ -1,10 +1,10 @@
 require "rails_helper"
 
 RSpec.describe "Admin::ServicesPages", type: :request do
-  let!(:admin) { create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123") }
+  let!(:admin) { create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123") }
 
   def sign_in_admin
-    post admin_login_path, params: { email: admin.email, password: "password123" }
+    post admin_login_path, params: { email: admin.email, password: "securepassword123" }
   end
 
   let!(:section) { create(:service_section, heading: "PRECISION ENGINES", position: 0) }

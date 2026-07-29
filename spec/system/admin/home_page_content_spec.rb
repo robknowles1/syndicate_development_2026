@@ -6,7 +6,7 @@ RSpec.describe "Admin home page content form", type: :system do
   def sign_in_admin(admin)
     visit admin_login_path
     fill_in I18n.t("admin.login.email_label"),    with: admin.email
-    fill_in I18n.t("admin.login.password_label"), with: "password123"
+    fill_in I18n.t("admin.login.password_label"), with: "securepassword123"
     click_button I18n.t("admin.login.submit")
     expect(page).to have_current_path(admin_root_path)
   end
@@ -14,7 +14,7 @@ RSpec.describe "Admin home page content form", type: :system do
   describe "admin form at 375 px viewport (AC-17, R17)" do
     it "renders all form inputs and submit button at mobile viewport without overflow" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       emulate_viewport(width: 375, height: 812)
       sign_in_admin(admin)
 
@@ -42,7 +42,7 @@ RSpec.describe "Admin home page content form", type: :system do
   describe "restore defaults button attributes (AC-23, AT21)" do
     it "restore button has data-turbo-confirm, py-3 class, and targets restore_defaults path (AT21)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
 
       # Act
@@ -59,7 +59,7 @@ RSpec.describe "Admin home page content form", type: :system do
   describe "saving content updates the public home page (E2, R2)" do
     it "published content appears on the public home page after saving" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       visit admin_home_page_content_path
 

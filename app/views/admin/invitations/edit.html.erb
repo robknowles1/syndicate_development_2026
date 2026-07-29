@@ -1,0 +1,11 @@
+<div class="max-w-md mx-auto mt-8 md:mt-16 bg-white rounded-lg shadow p-5 md:p-8">
+  <h1 class="text-2xl font-bold mb-2 text-center"><%= t("admin.invitation.heading") %></h1>
+  <p class="text-sm text-gray-600 mb-6 text-center">
+    <%= t("admin.invitation.intro", email: @admin_user.email) %>
+  </p>
+
+  <%= render "admin/shared/password_fields",
+        admin_user: @admin_user,
+        url: admin_invitation_update_path,
+        submit_label: t("admin.invitation.submit") %>
+</div>

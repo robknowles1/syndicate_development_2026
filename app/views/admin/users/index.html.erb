@@ -1,0 +1,38 @@
+<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+  <h1 class="text-2xl font-bold"><%= t("admin.users.heading") %></h1>
+  <%= link_to t("admin.users.invite_button"), new_admin_user_path,
+        class: "bg-red-600 text-white font-bold py-3 px-4 rounded hover:bg-red-700" %>
+</div>
+
+<ul class="space-y-3">
+  <% @admin_users.each do |admin_user| %>
+    <li class="bg-white rounded-lg shadow p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+          <p class="font-semibold break-words"><%= admin_user.email %></p>
+          <p class="text-xs text-gray-500 mt-1">
+            <% if admin_user.invitation_pending? %>
+              <span class="inline-block bg-yellow-100 text-yellow-800 rounded px-2 py-1 font-semibold">
+                <%= t("admin.users.status_pending") %>
+              </span>
+            <% else %>
+              <span class="inline-block bg-green-100 text-green-800 rounded px-2 py-1 font-semibold">
+                <%= t("admin.users.status_active") %>
+              </span>
+            <% end %>
+            <% if admin_user == current_admin %>
+              <span class="ml-1"><%= t("admin.users.you") %></span>
+            <% end %>
+          </p>
+        </div>
+
+        <% unless admin_user == current_admin %>
+          <%= button_to t("admin.users.remove"), admin_user_path(admin_user),
+                method: :delete,
+                form: { data: { turbo_confirm: t("admin.users.confirm_remove", email: admin_user.email) } },
+                class: "text-sm text-red-600 hover:text-red-800 font-bold py-3 px-4 bg-transparent border border-red-300 rounded cursor-pointer" %>
+        <% end %>
+      </div>
+    </li>
+  <% end %>
+</ul>

@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Admin::HomePageContents", type: :request do
   def sign_in_admin(admin)
-    post admin_login_path, params: { email: admin.email, password: "password123" }
+    post admin_login_path, params: { email: admin.email, password: "securepassword123" }
   end
 
   describe "authentication guard" do
@@ -39,7 +39,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
   describe "GET /admin/home_page_content (AT7, AT8, AT9, AC-7, AC-8, AC-9)" do
     it "returns HTTP 200 with all expected form field names (AT7, R12, AC-7)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
 
       # Act
@@ -56,7 +56,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "pre-fills form with existing hero_tagline value (AT8, AC-8)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:home_page_content, hero_tagline: "Test Tagline")
 
@@ -69,7 +69,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "renders without error when no HomePageContent row exists (AC-9)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       # No HomePageContent row
 
@@ -80,7 +80,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "pre-fills the form with i18n originals when no HomePageContent row exists" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       # No HomePageContent row
 
@@ -95,7 +95,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "renders the hero_tagline_hint text permanently (R17)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
 
       # Act
@@ -107,7 +107,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "renders the restore defaults button targeting restore_defaults path with turbo-confirm (AT21, R21, AC-23)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
 
       # Act
@@ -123,7 +123,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
   describe "PATCH /admin/home_page_content — happy path (AT9, AT12, AT13, R13)" do
     it "creates the record and redirects with flash on first save (AT9, R13, AC-10, AC-13)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       valid_params = {
         home_page_content: {
@@ -147,7 +147,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "accepts exactly 50-character hero_tagline (AT12, R6, E3)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       tagline_50 = "A" * 50
       valid_params = {
@@ -170,7 +170,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "sets published: false when unchecked param is sent (AC-14)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:home_page_content, published: true)
       params_with_false = {
@@ -194,7 +194,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
   describe "PATCH /admin/home_page_content — validation failures (AT10, AT11, AT13, AT14, R14)" do
     it "returns HTTP 422 on blank hero_tagline (AT10, R6, AC-11)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:home_page_content, hero_tagline: "Original tagline")
       blank_tagline_params = {
@@ -217,7 +217,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "returns HTTP 422 on 51-character hero_tagline (AT11, R6, E4, AC-12)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       long_tagline_params = {
         home_page_content: {
@@ -239,7 +239,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "returns HTTP 422 on blank mission_heading (AT13, R7)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       blank_heading_params = {
         home_page_content: {
@@ -260,7 +260,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "returns HTTP 422 on blank mission_body (AT14, R8, E7)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       blank_body_params = {
         home_page_content: {
@@ -283,7 +283,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
   describe "GET /admin dashboard includes home page content link (AT15, R16, AC-15)" do
     it "returns HTTP 200 and includes href for admin_home_page_content_path (AT15)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
 
       # Act
@@ -298,7 +298,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
   describe "PATCH /admin/home_page_content/restore_defaults (AT18, AT19, AT20, R19, R20)" do
     it "creates a new row from i18n when no row exists (AT18, E8, AC-20)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       # No HomePageContent row
 
@@ -319,7 +319,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "overwrites content but leaves published unchanged on existing published row (AT19, R20, AC-21)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:home_page_content, hero_tagline: "My Custom Line", published: true)
 
@@ -337,7 +337,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
     it "only ever has one HomePageContent row after restore (singleton contract, R10)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:home_page_content)
 

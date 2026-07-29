@@ -109,12 +109,62 @@ en:
       password_label: "Password"
       submit: "Log In"
       invalid_credentials: "Invalid email or password."
+      too_many_attempts: "Too many login attempts. Please wait a few minutes and try again."
+      forgot_password: "Forgot your password?"
+    password_fields:
+      password_label: "New Password"
+      confirmation_label: "Confirm New Password"
+      password_hint: "At least %{count} characters."
+    password_reset:
+      heading: "Reset Your Password"
+      intro: "Enter your email address and we'll send you a link to set a new password."
+      email_label: "Email"
+      submit: "Send Reset Link"
+      back_to_login: "Back to login"
+      sent: "If that email address has an admin account, a reset link is on its way."
+      too_many_requests: "Too many reset requests. Please wait a few minutes and try again."
+      invalid_token: "That password reset link has expired or already been used. Request a new one."
+      set_heading: "Choose a New Password"
+      set_submit: "Save New Password"
+      updated: "Your password has been updated."
+    invitation:
+      heading: "Set Up Your Admin Account"
+      intro: "You've been invited as an admin for %{email}. Choose a password to finish setting up."
+      submit: "Create My Account"
+      accepted: "Welcome! Your admin account is ready."
+      invalid_token: "That invitation link has expired or already been used. Ask an admin to send a new one."
+    users:
+      heading: "Admin Users"
+      invite_button: "Invite Admin"
+      invite_heading: "Invite an Admin"
+      invite_intro: "They'll receive an email with a link to choose their own password. The link expires in 7 days."
+      email_label: "Email Address"
+      invite_submit: "Send Invitation"
+      back: "Back to admin users"
+      invited: "Invitation sent to %{email}."
+      invitation_delivery_failed: "We could not send that invitation email. Nothing was saved — please check the address and try again."
+      removed: "Removed %{email}."
+      remove: "Remove"
+      confirm_remove: "Remove %{email} as an admin? They will lose access immediately."
+      cannot_remove_self: "You cannot remove your own account."
+      status_pending: "Invitation pending"
+      status_active: "Active"
+      you: "(you)"
+    account:
+      heading: "Change Your Password"
+      current_password_label: "Current Password"
+      new_password_label: "New Password"
+      submit: "Update Password"
+      updated: "Your password has been updated."
+      current_password_incorrect: "is incorrect"
     dashboard:
       heading: "Admin Dashboard"
       services_link: "Manage Services Page"
       home_page_link: "Edit Home Page Content"
       about_page_link: "Edit About Page Content"
       gallery_link: "Manage Gallery Photos"
+      users_link: "Manage Admin Users"
+      account_link: "Change My Password"
     home_page_content:
       heading: "Home Page Content"
       hero_tagline_label: "Hero Tagline"
@@ -239,6 +289,21 @@ en:
       messages:
         invalid_content_type: "must be a JPEG, PNG, or WEBP image"
         file_too_large: "must be smaller than 15 MB"
+
+  admin_mailer:
+    invitation:
+      subject: "You've been invited as an admin — Syndicate Development"
+      heading: "You've been invited as an admin"
+      body: "You've been given admin access to the Syndicate Development website. Use the link below to choose your password and finish setting up your account."
+      cta: "Set up my account"
+      expiry_notice: "This link expires in 7 days."
+    password_reset:
+      subject: "Reset your admin password — Syndicate Development"
+      heading: "Reset your password"
+      body: "Someone asked to reset the password for your Syndicate Development admin account. Use the link below to choose a new one."
+      cta: "Choose a new password"
+      expiry_notice: "This link expires in 2 hours."
+      ignore_notice: "If you didn't request this, you can ignore this email — your password will not change."
 
   mailer:
     contact_email:

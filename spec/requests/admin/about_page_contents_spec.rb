@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Admin::AboutPageContents", type: :request do
   def sign_in_admin(admin)
-    post admin_login_path, params: { email: admin.email, password: "password123" }
+    post admin_login_path, params: { email: admin.email, password: "securepassword123" }
   end
 
   def valid_about_page_content_params(overrides = {})
@@ -55,7 +55,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
   describe "GET /admin/about_page_content (AT10, AT11, AT12)" do
     it "returns HTTP 200 with all expected form field names (AT10, R10, AC-8)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
 
       # Act
@@ -78,7 +78,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "pre-fills form with existing shop_heading value (AT11, R10, AC-9)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:about_page_content, shop_heading: "Custom Shop Name")
 
@@ -91,7 +91,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "renders without error when no AboutPageContent row exists (AT12, R10, AC-10)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       # No AboutPageContent row
 
@@ -102,7 +102,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "pre-fills the form with i18n originals when no AboutPageContent row exists" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       # No AboutPageContent row
 
@@ -118,7 +118,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "renders the shop_phone_number_hint text permanently (R10)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
 
       # Act
@@ -130,7 +130,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "renders the restore defaults button targeting restore_defaults path with turbo-confirm (AT27, R19, AC-27)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
 
       # Act
@@ -146,7 +146,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
   describe "PATCH /admin/about_page_content — happy path (AT13, AT20, R11)" do
     it "creates the record and redirects with flash on first save (AT13, R11, AC-11, AC-17)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       params = { about_page_content: valid_about_page_content_params(published: "true") }
 
@@ -162,7 +162,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "sets published: false when unchecked param is sent (AT20, AC-18)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:about_page_content, published: true)
       params = { about_page_content: valid_about_page_content_params(published: "false") }
@@ -178,7 +178,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
   describe "PATCH /admin/about_page_content — validation failures (AT14, AT15, AT16, AT17, AT18, AT19)" do
     it "returns HTTP 422 on blank shop_heading and leaves the field unchanged (AT14, R6, AC-12)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:about_page_content, shop_heading: "Original Shop Heading")
       params = { about_page_content: valid_about_page_content_params(shop_heading: "") }
@@ -194,7 +194,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "returns HTTP 422 on shop_phone_number containing letters (AT15, R7, E4, AC-13)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       params = { about_page_content: valid_about_page_content_params(shop_phone_number: "call-us-now") }
 
@@ -208,7 +208,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "returns HTTP 422 on blank shop_phone_number (AT16, R6, E5, AC-14)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       params = { about_page_content: valid_about_page_content_params(shop_phone_number: "") }
 
@@ -221,7 +221,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "returns HTTP 422 on shop_phone_number of formatting punctuation only (AT17, R7, E6)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       params = { about_page_content: valid_about_page_content_params(shop_phone_number: "----") }
 
@@ -234,7 +234,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "returns HTTP 422 on blank bio_body (AT18, R6, E9, AC-15)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       params = { about_page_content: valid_about_page_content_params(bio_body: "") }
 
@@ -247,7 +247,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "returns HTTP 422 on blank slideshow_alt_1 (AT19, R6, E11, AC-16)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       params = { about_page_content: valid_about_page_content_params(slideshow_alt_1: "") }
 
@@ -262,7 +262,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
   describe "GET /admin/about_page_content — slideshow image file inputs (AT10, R9)" do
     it "includes 3 file inputs named for slideshow_image_1/2/3 (AT10, AC-10)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
 
       # Act
@@ -278,7 +278,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
   describe "PATCH /admin/about_page_content — slideshow image uploads (AT5, AT6, AT7, AT12)" do
     it "attaches a valid JPEG to slideshow_image_2 and redirects with flash (AT5, R1, R9, AC-5)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       file = fixture_file_upload("gallery_photo.jpg", "image/jpeg")
       params = { about_page_content: valid_about_page_content_params(slideshow_image_2: file) }
@@ -294,7 +294,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "rejects an image/svg+xml file for slideshow_image_2 with HTTP 422 and no attachment (AT6, R2, E4, AC-6)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       file = fixture_file_upload("gallery_photo.svg", "image/svg+xml")
       params = { about_page_content: valid_about_page_content_params(slideshow_image_2: file) }
@@ -310,7 +310,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "rejects a slideshow_image_3 file exceeding 15 MB with HTTP 422 (AT7, R2, E5, AC-7)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       file = fixture_file_upload("gallery_photo_oversized.jpg", "image/jpeg")
       params = { about_page_content: valid_about_page_content_params(slideshow_image_3: file) }
@@ -325,7 +325,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "replaces rather than accumulates the blob when slideshow_image_1 is already attached (AT12, R8, E8, AC-12)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       about_page_content = create(:about_page_content, :with_slideshow_image_1)
       new_file = fixture_file_upload("gallery_photo.jpg", "image/jpeg")
@@ -343,7 +343,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
   describe "GET /admin dashboard includes about page content link (AT21, R14, AC-19)" do
     it "returns HTTP 200 and includes href for admin_about_page_content_path (AT21)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
 
       # Act
@@ -368,7 +368,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
   describe "PATCH /admin/about_page_content/restore_defaults (AT24, AT25, R17, R18)" do
     it "creates a new row from i18n when no row exists (AT24, E10, AC-24)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       # No AboutPageContent row
 
@@ -391,7 +391,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "overwrites content but leaves published unchanged on existing published row (AT25, R18, AC-25)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:about_page_content, shop_heading: "My Custom Shop", published: true)
 
@@ -409,7 +409,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "only ever has one AboutPageContent row after restore (singleton contract, R8)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:about_page_content)
 
@@ -422,7 +422,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "purges all 3 slideshow attachments and resets text while leaving published unchanged (AT8, R7, AC-8)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:about_page_content, :published, :with_slideshow_image_1, :with_slideshow_image_2, :with_slideshow_image_3)
 
@@ -442,7 +442,7 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
 
     it "completes normally without raising when zero slots are attached (AT9, R7, E6, E7, AC-9)" do
       # Arrange
-      admin = create(:admin_user, email: "admin@example.com", password: "password123", password_confirmation: "password123")
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
       create(:about_page_content)
 
