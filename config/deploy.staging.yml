@@ -24,14 +24,14 @@ env:
     - RAILS_MASTER_KEY
     - RESEND_API_KEY
     - ADMIN_SEED_PASSWORD
-    # Two names for one password. config/database.yml's staging block reads
-    # STAGING_DATABASE_PASSWORD on feature/spec-010-email-delivery but
-    # SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD on
-    # feature/spec-011-admin-auth. Those branches disagree and neither is merged,
-    # so both names are injected with the same value and staging boots whichever
-    # one lands first.
+    # config/database.yml's staging block reads STAGING_DATABASE_PASSWORD.
+    #
+    # This used to inject SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD alongside
+    # it, hedging a disagreement between two then-unmerged branches over which
+    # name staging read. PR #47 merged and feature/spec-011-admin-auth now reads
+    # STAGING_DATABASE_PASSWORD too, so the hedge is dropped. That other name is
+    # production-only now — see config/deploy.yml and .kamal/secrets.
     - STAGING_DATABASE_PASSWORD
-    - SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD
   clear:
     # Overrides the RAILS_ENV=production baked into the Dockerfile. Staging runs
     # a SINGLE primary database: production's multi-database block points cache,
@@ -71,6 +71,33 @@ accessories:
     # separate. This value is what STAGING_DATABASE_HOST above must match.
     service: syndicate_development_2026-db-staging
     host: 15.204.81.231
+
+    # Distinct HOST port from production's "127.0.0.1:5432:5432" in
+    # config/deploy.yml. The `service:` above keeps the container names apart,
+    # but a published host port is not namespaced by destination — if production
+    # is ever deployed to this same box, whichever accessory starts second fails
+    # to bind 5432. Only the host side moves; the container still listens on
+    # 5432, so STAGING_DATABASE_HOST resolving to the service name is unaffected.
+    #
+    # Dropping the mapping entirely would be the smaller surface — the app never
+    # uses it, since it reaches the accessory by service name over the shared
+    # `kamal` Docker network — but Kamal deep-merges this file over the base and
+    # validates `port` as a string, so a null here fails with
+    # "accessories/db/port: should be a string". An inherited key can be
+    # overridden, not removed, so a distinct port is the way to break the clash.
+    #
+    # Loopback ONLY, as in production: ufw is inactive on this box, so publishing
+    # on 0.0.0.0 would put staging Postgres on the public internet.
+    #
+    # What the mapping buys is host-side access for debugging. From a
+    # workstation, tunnel and connect:
+    #   ssh -L 5433:127.0.0.1:5433 ubuntu@15.204.81.231
+    #   psql -h 127.0.0.1 -p 5433 -U syndicate_development_2026 \
+    #        -d syndicate_development_2026_staging
+    # Or skip the tunnel entirely and go through Kamal:
+    #   bin/kamal accessory exec db -d staging --interactive --reuse \
+    #     "psql -U syndicate_development_2026 syndicate_development_2026_staging"
+    port: "127.0.0.1:5433:5432"
     env:
       clear:
         POSTGRES_USER: syndicate_development_2026

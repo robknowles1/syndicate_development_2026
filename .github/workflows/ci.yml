@@ -166,15 +166,29 @@ jobs:
 
   # Auto-deploys main to the OVH staging box once every other job is green.
   #
-  # ── EXPECTED TO FAIL UNTIL feature/spec-010-email-delivery MERGES ──
+  # This job is expected to SUCCEED. A red build here is a real failure — read
+  # the logs, do not wave it through.
   #
-  # config/deploy.staging.yml sets RAILS_ENV=staging, but neither
-  # config/environments/staging.rb nor the `staging:` key in config/database.yml
-  # exists on main yet — both live only on the unmerged
-  # feature/spec-010-email-delivery branch. Until that lands, the image builds
-  # and ships but the container cannot boot, and Kamal fails the deploy while
-  # waiting for the health check. This is expected, not a broken pipeline.
-  # Delete this notice once that branch is merged.
+  # It previously carried a notice saying the opposite: that the deploy would
+  # always fail because config/deploy.staging.yml sets RAILS_ENV=staging while
+  # neither config/environments/staging.rb nor the `staging:` key in
+  # config/database.yml existed on main. Both landed with PR #47
+  # (feature/spec-010-email-delivery), so the container boots and that notice is
+  # no longer true.
+  #
+  # What remains is configuration, not code. All six repository secrets used
+  # below must be set under Settings > Secrets and variables > Actions:
+  #
+  #   DEPLOY_SSH_PRIVATE_KEY     deploy key for ubuntu@15.204.81.231
+  #   RAILS_MASTER_KEY           decrypts config/credentials.yml.enc
+  #   KAMAL_REGISTRY_PASSWORD    ghcr.io token with write:packages
+  #   RESEND_API_KEY             outbound mail
+  #   ADMIN_SEED_PASSWORD        seeds the first admin, 12+ characters
+  #   STAGING_DATABASE_PASSWORD  staging Postgres
+  #
+  # A missing secret does NOT fail fast: the .kamal/secrets* files resolve an
+  # unset variable to an empty string, so the deploy runs on and breaks further
+  # in — typically as a registry auth error, or a credentials failure at boot.
   deploy_staging:
     runs-on: ubuntu-latest
     needs: [ scan_ruby, scan_js, lint, test, system-test ]
@@ -246,8 +260,19 @@ jobs:
       #   3. Update BOTH lines below — the known_hosts line and the SHA256 in
       #      the guard. They are two encodings of one key and must agree.
       #   4. Commit the change on its own, so the rotation is reviewable.
-      # Longer form, including re-establishing access to a rebuilt box, is in
-      # docs/deployment/ovh-server-access.md.
+      #   5. If it WAS a rebuild, the client side is gone too: a fresh box has
+      #      no authorized_keys, so once the pin is updated the deploy gets past
+      #      it and then fails to authenticate instead. From the OVH console,
+      #      append the public half of DEPLOY_SSH_PRIVATE_KEY to
+      #      ~ubuntu/.ssh/authorized_keys (mode 600, owned by ubuntu) before
+      #      re-running. A rebuild also wipes Docker state, so the next deploy
+      #      re-provisions the db accessory from scratch — staging comes back
+      #      with an EMPTY database, not the one it had.
+      #
+      # Everything needed to rotate the pin is in the five steps above; they
+      # depend on no other file. A longer walkthrough of server access arrives as
+      # docs/deployment/ovh-server-access.md when PR #51 merges — supplementary
+      # background, not a prerequisite, and not on this branch yet.
       - name: Pin staging host key
         run: |
           mkdir -p ~/.ssh
