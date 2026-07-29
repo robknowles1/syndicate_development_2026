@@ -163,3 +163,71 @@ jobs:
           name: screenshots
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
+
+  # Auto-deploys main to the OVH staging box once every other job is green.
+  #
+  # ── EXPECTED TO FAIL UNTIL feature/spec-010-email-delivery MERGES ──
+  #
+  # config/deploy.staging.yml sets RAILS_ENV=staging, but neither
+  # config/environments/staging.rb nor the `staging:` key in config/database.yml
+  # exists on main yet — both live only on the unmerged
+  # feature/spec-010-email-delivery branch. Until that lands, the image builds
+  # and ships but the container cannot boot, and Kamal fails the deploy while
+  # waiting for the health check. This is expected, not a broken pipeline.
+  # Delete this notice once that branch is merged.
+  deploy_staging:
+    runs-on: ubuntu-latest
+    needs: [ scan_ruby, scan_js, lint, test, system-test ]
+
+    # Push-to-main only. `on.push.branches` already limits push events to main,
+    # and pull_request events run with github.ref = refs/pull/N/merge, so a PR
+    # targeting main fails both halves of this condition and never deploys.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    # Serialise deploys. Two Kamal runs against one host race over the same
+    # container names and proxy config. cancel-in-progress MUST stay false:
+    # killing a deploy mid-flight can strand the box between releases, which is
+    # worse than making the next merge wait.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Loads the deploy key for ubuntu@15.204.81.231 into an agent for Kamal's
+      # SSH connections. No ssh-keyscan step: net-ssh defaults to
+      # :accept_new_or_local_tunnel, so an unknown host key is accepted rather
+      # than refused, and a keyscan of the same unauthenticated host would add
+      # no assurance. That leaves this trusting the host key on every run. To
+      # harden, add a KNOWN_HOSTS secret pinning the server's public key and
+      # write it to ~/.ssh/known_hosts before this step — net-ssh still rejects
+      # a *mismatched* key for a host it already knows.
+      - name: Add SSH deploy key
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+      # RAILS_MASTER_KEY is required here specifically: config/master.key is
+      # gitignored and absent on the runner, so .kamal/secrets-common falls back
+      # to this variable. ADMIN_SEED_PASSWORD must be 12+ characters or
+      # db/seeds.rb aborts under bin/docker-entrypoint and the container
+      # restart-loops. STAGING_DATABASE_PASSWORD is fanned out to the three
+      # names staging needs by .kamal/secrets.staging.
+      - name: Deploy to staging with Kamal
+        env:
+          RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
+          KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+          STAGING_DATABASE_PASSWORD: ${{ secrets.STAGING_DATABASE_PASSWORD }}
+        run: bin/kamal deploy -d staging
