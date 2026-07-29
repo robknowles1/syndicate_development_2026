@@ -9,7 +9,7 @@ module Admin
 
       # Require the current password even though the admin is already signed in: it
       # stops an unattended logged-in session from being turned into a permanent one.
-      unless @admin_user.authenticate(params.dig(:admin_user, :current_password))
+      unless @admin_user.authenticate(submitted_admin_user_params[:current_password])
         @admin_user.errors.add(:current_password, I18n.t("admin.account.current_password_incorrect"))
         return render :edit, status: :unprocessable_entity
       end
@@ -27,7 +27,7 @@ module Admin
     private
 
     def password_params
-      params.require(:admin_user).permit(:password, :password_confirmation)
+      submitted_admin_user_params.permit(:password, :password_confirmation)
     end
   end
 end

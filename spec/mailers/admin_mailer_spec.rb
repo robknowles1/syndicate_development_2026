@@ -14,9 +14,9 @@ RSpec.describe AdminMailer, type: :mailer do
       expect(mail.subject).to eq(I18n.t("admin_mailer.invitation.subject"))
 
       # decoded, not encoded: quoted-printable soft-wraps long tokens across lines
-      token = mail.text_part.decoded[%r{/admin/invitation/([^/\s"]+)/edit}, 1]
+      token = mail.text_part.decoded[%r{/admin/invitation/claim\?token=([^\s"&]+)}, 1]
       expect(token).to be_present
-      expect(AdminUser.find_by_token_for(:invitation, token)).to eq(admin)
+      expect(AdminUser.find_by_token_for(:invitation, CGI.unescape(token))).to eq(admin)
     end
 
     it "builds absolute links from default_url_options" do
@@ -44,9 +44,9 @@ RSpec.describe AdminMailer, type: :mailer do
       expect(mail.to).to eq([ "doug@example.com" ])
       expect(mail.subject).to eq(I18n.t("admin_mailer.password_reset.subject"))
 
-      token = mail.text_part.decoded[%r{/admin/password_reset/([^/\s"]+)/edit}, 1]
+      token = mail.text_part.decoded[%r{/admin/password_reset/claim\?token=([^\s"&]+)}, 1]
       expect(token).to be_present
-      expect(AdminUser.find_by_token_for(:password_reset, token)).to eq(admin)
+      expect(AdminUser.find_by_token_for(:password_reset, CGI.unescape(token))).to eq(admin)
     end
 
     it "sends from the configured address" do

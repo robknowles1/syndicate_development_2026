@@ -7,7 +7,14 @@ RSpec.describe "Admin auth flows", type: :system do
     driven_by(:selenium_chrome_headless)
     ActionMailer::Base.delivery_method = :test
     ActionMailer::Base.deliveries.clear
+    # The reset mail is enqueued rather than delivered inline, and the request runs in the
+    # server thread, so nothing here can wrap the enqueue in perform_enqueued_jobs.
+    ActiveJob::Base.queue_adapter = :inline
   end
+
+  # queue_adapter= is global state; left set, it would perform jobs inline for every later
+  # example and turn an assertion about enqueueing into an ordering-dependent failure.
+  after { ActiveJob::Base.queue_adapter = :test }
 
   # Returns the path only. The emailed link is absolute against the test host
   # (example.com), and visiting that would send Capybara to the real internet.
@@ -42,7 +49,7 @@ RSpec.describe "Admin auth flows", type: :system do
     expect(ActionMailer::Base.deliveries.last.to).to eq([ "newcolleague@example.com" ])
 
     # Act — the invitee opens the emailed link in a fresh session
-    invite_path = path_from_last_email(%r{https?://[^\s]+/admin/invitation/[^\s]+/edit})
+    invite_path = path_from_last_email(%r{https?://\S+/admin/invitation/claim\?token=\S+})
     Capybara.reset_sessions!
     visit invite_path
     fill_in I18n.t("admin.password_fields.password_label"), with: "invitee-chosen-password"
@@ -68,7 +75,7 @@ RSpec.describe "Admin auth flows", type: :system do
     expect(page).to have_content(I18n.t("admin.password_reset.sent"))
 
     # Act — follow the emailed link and choose a new password
-    reset_path = path_from_last_email(%r{https?://[^\s]+/admin/password_reset/[^\s]+/edit})
+    reset_path = path_from_last_email(%r{https?://\S+/admin/password_reset/claim\?token=\S+})
     visit reset_path
     fill_in I18n.t("admin.password_fields.password_label"), with: "a-freshly-chosen-one"
     fill_in I18n.t("admin.password_fields.confirmation_label"), with: "a-freshly-chosen-one"

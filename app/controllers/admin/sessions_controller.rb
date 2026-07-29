@@ -2,17 +2,24 @@ module Admin
   class SessionsController < BaseController
     skip_before_action :require_admin
 
-    # Keyed on the address as well as the IP, because on the IP alone anyone can lock a
-    # known admin out by failing ten logins from a shared address.
-    #
-    # The residual this leaves: N addresses each get their own allowance against one
-    # account, so distributed guessing is capped per source rather than per account. An
-    # address-only limit would close that and hand the same attacker a lockout instead —
-    # worse, because the reset link they would fall back on issues a password they still
-    # could not use. Against a 12-character minimum at bcrypt cost, what the per-IP limit
-    # below permits is not a number of guesses that gets anyone anywhere.
+    # Keyed on the address as well as the IP, so exhausting the allowance from one source
+    # denies that source rather than every admin behind it. This is the tightest of the
+    # three and the one a mistyped password meets first; it clears in three minutes.
     rate_limit to: 10, within: 3.minutes, only: :create, name: "login_per_account",
       by: -> { [ request.remote_ip, params[:email].to_s.strip.downcase ].join("|") },
+      with: -> { redirect_to admin_login_path, alert: I18n.t("admin.login.too_many_attempts") }
+
+    # The bound that holds when remote_ip is worthless. Both limits keyed on it are reset
+    # by a header the caller writes, and a composite of the two is reset by the same one
+    # header, so the account needs an allowance that nothing in the request can vary
+    # except the choice of which account to attack.
+    #
+    # 20 in 15 minutes is far past retyping a password and caps a distributed attack at 80
+    # guesses an hour against a 12-character minimum. It is also a lockout anyone knowing
+    # the address can hold open, which is why the window is short and why the reset link —
+    # which signs the admin in without passing through here — is the way out.
+    rate_limit to: 20, within: 15.minutes, only: :create, name: "login_per_email",
+      by: -> { params[:email].to_s.strip.downcase },
       with: -> { redirect_to admin_login_path, alert: I18n.t("admin.login.too_many_attempts") }
 
     rate_limit to: 50, within: 3.minutes, only: :create, name: "login_per_ip",

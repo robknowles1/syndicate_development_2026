@@ -131,6 +131,40 @@ RSpec.describe "Admin::Accounts", type: :request do
       expect(admin.reload.authenticate("securepassword123")).to be_truthy
     end
 
+    it "rejects an all-whitespace password" do
+      # Arrange — the length minimum is satisfiable with no entropy at all
+      admin = create(:admin_user)
+      whitespace = " " * 14
+      sign_in(admin)
+
+      # Act
+      patch admin_account_path, params: {
+        admin_user: {
+          current_password: "securepassword123",
+          password: whitespace,
+          password_confirmation: whitespace
+        }
+      }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(admin.reload.authenticate(whitespace)).to be_falsey
+      expect(admin.authenticate("securepassword123")).to be_truthy
+    end
+
+    it "answers a scalar where the payload should be nested instead of raising" do
+      # Arrange — dig and permit both assume a nested hash and blow up on anything else
+      admin = create(:admin_user)
+      sign_in(admin)
+
+      # Act
+      patch admin_account_path, params: { admin_user: "not-a-hash" }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(admin.reload.authenticate("securepassword123")).to be_truthy
+    end
+
     it "invalidates any outstanding password reset link" do
       # Arrange
       admin = create(:admin_user)

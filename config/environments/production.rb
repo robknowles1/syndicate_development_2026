@@ -38,6 +38,25 @@ Rails.application.configure do
   # Skip http-to-https redirect for the default health check endpoint.
   config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
+  # kamal-proxy reaches the app over the container network and appends the connecting
+  # address to X-Forwarded-For, so the hop it comes in over is what belongs here. Naming
+  # the set pins that topology rather than inheriting whatever Rails defaults to. Every
+  # range a container network can be allocated from is listed: one that is missing makes
+  # the proxy itself look like a client and collapses every caller onto one rate-limit
+  # bucket.
+  #
+  # This narrows who may speak for the client; it does not make remote_ip trustworthy.
+  # Anything that reaches the app without passing through the proxy still writes the
+  # header freely, which is why no limit here may rest on remote_ip alone.
+  config.action_dispatch.trusted_proxies = [
+    IPAddr.new("127.0.0.0/8"),
+    IPAddr.new("::1/128"),
+    IPAddr.new("10.0.0.0/8"),
+    IPAddr.new("172.16.0.0/12"),
+    IPAddr.new("192.168.0.0/16"),
+    IPAddr.new("fc00::/7")
+  ].freeze
+
   # Log to STDOUT with the current request id as a default log tag.
   config.log_tags = [ :request_id ]
   config.logger   = ActiveSupport::TaggedLogging.logger(STDOUT)

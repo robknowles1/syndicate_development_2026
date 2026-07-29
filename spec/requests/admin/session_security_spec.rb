@@ -176,7 +176,7 @@ RSpec.describe "Admin session security", type: :request do
       other_client = separate_signed_in_client(admin)
 
       # Act
-      get admin_claim_password_reset_path(admin.generate_token_for(:password_reset))
+      get admin_claim_password_reset_path(token: admin.generate_token_for(:password_reset))
       follow_redirect!
       patch admin_password_reset_update_path, params: {
         admin_user: { password: "a-brand-new-password", password_confirmation: "a-brand-new-password" }
@@ -307,6 +307,104 @@ RSpec.describe "Admin session security", type: :request do
 
       # Assert
       expect(attempts).to be <= 11
+    end
+  end
+
+  describe "login rate limiting against a forged client address" do
+    def guess_until_throttled(email:, forwarded_for:)
+      attempts = 0
+      30.times do |index|
+        post admin_login_path,
+          params: { email: email, password: "guess-#{index}" },
+          headers: { "HTTP_X_FORWARDED_FOR" => forwarded_for.call(index) }
+        attempts += 1
+        break if flash[:alert] == I18n.t("admin.login.too_many_attempts")
+      end
+      attempts
+    end
+
+    it "throttles when every attempt claims a different client address" do
+      # Arrange — remote_ip is read off X-Forwarded-For, which the caller writes. A limit
+      # keyed on it grants a fresh allowance per forged value, and both IP-derived limits
+      # fall to the same single header.
+      create(:admin_user, email: "doug@example.com")
+
+      # Act
+      attempts = guess_until_throttled(email: "doug@example.com", forwarded_for: ->(index) { "203.0.#{index}.7" })
+
+      # Assert
+      expect(flash[:alert]).to eq(I18n.t("admin.login.too_many_attempts"))
+      expect(attempts).to be <= 21
+    end
+
+    it "throttles when the forged header ends in a private address" do
+      # Arrange — a trailing private hop is discarded as a trusted proxy, which promotes
+      # the attacker's own leading entry to remote_ip
+      create(:admin_user, email: "doug@example.com")
+
+      # Act
+      attempts = guess_until_throttled(
+        email: "doug@example.com",
+        forwarded_for: ->(index) { "203.0.#{index}.7, 10.0.0.5" }
+      )
+
+      # Assert
+      expect(flash[:alert]).to eq(I18n.t("admin.login.too_many_attempts"))
+      expect(attempts).to be <= 21
+    end
+
+    it "counts a forged address against the account regardless of the case typed" do
+      # Arrange — the account the guesses are aimed at is the one thing the attacker
+      # cannot vary, so the key has to normalize it the same way the lookup does
+      create(:admin_user, email: "doug@example.com")
+
+      # Act
+      11.times do |index|
+        post admin_login_path,
+          params: { email: "doug@example.com", password: "guess-#{index}" },
+          headers: { "HTTP_X_FORWARDED_FOR" => "203.0.#{index}.7" }
+      end
+      11.times do |index|
+        post admin_login_path,
+          params: { email: "DOUG@EXAMPLE.COM", password: "guess-#{index}" },
+          headers: { "HTTP_X_FORWARDED_FOR" => "198.51.#{index}.4" }
+      end
+
+      # Assert
+      expect(flash[:alert]).to eq(I18n.t("admin.login.too_many_attempts"))
+    end
+
+    it "leaves the reset link usable while an account is throttled" do
+      # Arrange — an account-wide limit is a lockout anyone who knows the address can
+      # trigger, so the path that does not pass through it has to stay open
+      admin = create(:admin_user, email: "doug@example.com")
+      guess_until_throttled(email: "doug@example.com", forwarded_for: ->(index) { "203.0.#{index}.7" })
+
+      # Act
+      get admin_claim_password_reset_path(token: admin.generate_token_for(:password_reset))
+      follow_redirect!
+      patch admin_password_reset_update_path, params: {
+        admin_user: { password: "a-brand-new-password", password_confirmation: "a-brand-new-password" }
+      }
+
+      # Assert
+      expect(response).to redirect_to(admin_root_path)
+    end
+  end
+
+  describe "revoking an admin returned to pending" do
+    it "stops honouring the cookie of an admin whose invitation was reopened" do
+      # Arrange — this rotates neither the password salt nor the session token, so the
+      # active? check is the only thing between a deactivated account and its live cookie
+      admin = create(:admin_user)
+      sign_in(admin)
+
+      # Act
+      admin.update!(invited_at: Time.current, invitation_accepted_at: nil)
+      get admin_root_path
+
+      # Assert
+      expect(response).to redirect_to(admin_login_path)
     end
   end
 

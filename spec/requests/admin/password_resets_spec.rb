@@ -1,12 +1,14 @@
 require "rails_helper"
 
 RSpec.describe "Admin::PasswordResets", type: :request do
+  include ActiveJob::TestHelper
+
   before { ActionMailer::Base.deliveries.clear }
 
   # The emailed link only stashes the token and redirects; the form lives at a tokenless
   # URL, so every spec that reaches the form has to follow that redirect.
   def claim_reset(token)
-    get admin_claim_password_reset_path(token)
+    get admin_claim_password_reset_path(token: token)
     follow_redirect!
   end
 
@@ -16,7 +18,7 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       admin = create(:admin_user, email: "known@example.com")
 
       # Act
-      post admin_password_reset_path, params: { email: admin.email }
+      perform_enqueued_jobs { post admin_password_reset_path, params: { email: admin.email } }
 
       # Assert
       expect(ActionMailer::Base.deliveries.size).to eq(1)
@@ -28,7 +30,7 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       create(:admin_user, email: "known@example.com")
 
       # Act
-      post admin_password_reset_path, params: { email: "stranger@example.com" }
+      perform_enqueued_jobs { post admin_password_reset_path, params: { email: "stranger@example.com" } }
 
       # Assert — the response must not reveal whether the account exists
       expect(response).to redirect_to(admin_login_path)
@@ -41,7 +43,7 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       admin = create(:admin_user, email: "known@example.com")
 
       # Act
-      post admin_password_reset_path, params: { email: "KNOWN@Example.COM" }
+      perform_enqueued_jobs { post admin_password_reset_path, params: { email: "KNOWN@Example.COM" } }
 
       # Assert
       expect(ActionMailer::Base.deliveries.size).to eq(1)
@@ -53,7 +55,7 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       admin = create(:admin_user, :pending_invitation, email: "pending@example.com")
 
       # Act
-      post admin_password_reset_path, params: { email: admin.email }
+      perform_enqueued_jobs { post admin_password_reset_path, params: { email: admin.email } }
 
       # Assert
       expect(ActionMailer::Base.deliveries).to be_empty
@@ -63,7 +65,7 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       # Arrange — a 500 here would mark the address as one that has an account
       create(:admin_user, email: "known@example.com")
       mailer = double(:mail)
-      allow(mailer).to receive(:deliver_now).and_raise(Net::SMTPServerBusy, "mailbox unavailable")
+      allow(mailer).to receive(:deliver_later).and_raise(Net::SMTPServerBusy, "mailbox unavailable")
       allow(AdminMailer).to receive(:password_reset).and_return(mailer)
 
       # Act
@@ -72,6 +74,19 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       # Assert
       expect(response).to redirect_to(admin_login_path)
       expect(flash[:notice]).to eq(I18n.t("admin.password_reset.sent"))
+    end
+
+    it "does not spend the delivery on the request that asks for it" do
+      # Arrange — delivering inline costs an SMTP round trip for addresses that have an
+      # account and nothing for those that do not, which times the two apart
+      create(:admin_user, email: "known@example.com")
+
+      # Act
+      post admin_password_reset_path, params: { email: "known@example.com" }
+
+      # Assert
+      expect(ActionMailer::Base.deliveries).to be_empty
+      expect(enqueued_jobs.size).to eq(1)
     end
   end
 
@@ -82,7 +97,7 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       token = admin.generate_token_for(:password_reset)
 
       # Act
-      get admin_claim_password_reset_path(token)
+      get admin_claim_password_reset_path(token: token)
 
       # Assert
       expect(response).to redirect_to(admin_edit_password_reset_path)
@@ -90,6 +105,33 @@ RSpec.describe "Admin::PasswordResets", type: :request do
 
       follow_redirect!
       expect(response.body).not_to include(token)
+    end
+
+    it "keeps the token out of the path written to the log" do
+      # Arrange — filter_parameters redacts the query string but never a path segment, and
+      # this one request carries a credential good for full admin takeover
+      admin = create(:admin_user)
+      token = admin.generate_token_for(:password_reset)
+
+      # Act
+      get admin_claim_password_reset_path(token: token)
+
+      # Assert
+      expect(request.filtered_path).not_to include(token)
+    end
+
+    it "discards a signed-in session rather than stashing the token into it" do
+      # Arrange — this is a GET, so an admin can be walked onto it from a link; carrying
+      # the claim into their session hands them the other account on submit
+      victim = create(:admin_user, email: "victim@example.com")
+      attacker = create(:admin_user, email: "attacker@example.com")
+      post admin_login_path, params: { email: victim.email, password: "securepassword123" }
+
+      # Act
+      get admin_claim_password_reset_path(token: attacker.generate_token_for(:password_reset))
+
+      # Assert
+      expect(session[:admin_user_id]).to be_nil
     end
 
     it "refuses to render the form without a claimed token" do
@@ -107,7 +149,7 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       oversized_token = "a" * 5_000
 
       # Act
-      get admin_claim_password_reset_path(oversized_token)
+      get admin_claim_password_reset_path(token: oversized_token)
 
       # Assert
       expect(response).to redirect_to(new_admin_password_reset_path)
@@ -249,6 +291,36 @@ RSpec.describe "Admin::PasswordResets", type: :request do
       # Assert
       expect(response).to redirect_to(new_admin_password_reset_path)
       expect(admin.reload.authenticate("a-brand-new-password")).to be_falsey
+    end
+
+    it "rejects an all-whitespace password" do
+      # Arrange — the length minimum is satisfiable with no entropy at all
+      admin = create(:admin_user)
+      whitespace = "\t\n" * 7
+      claim_reset(admin.generate_token_for(:password_reset))
+
+      # Act
+      patch admin_password_reset_update_path, params: {
+        admin_user: { password: whitespace, password_confirmation: whitespace }
+      }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(admin.reload.authenticate(whitespace)).to be_falsey
+      expect(admin.authenticate("securepassword123")).to be_truthy
+    end
+
+    it "answers a scalar where the payload should be nested instead of raising" do
+      # Arrange — permit and dig both assume a nested hash and blow up on anything else
+      admin = create(:admin_user)
+      claim_reset(admin.generate_token_for(:password_reset))
+
+      # Act
+      patch admin_password_reset_update_path, params: { admin_user: "not-a-hash" }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(admin.reload.authenticate("securepassword123")).to be_truthy
     end
   end
 

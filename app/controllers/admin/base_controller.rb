@@ -64,5 +64,20 @@ module Admin
 
       redirect_to admin_login_path, notice: notice
     end
+
+    # Claiming a token is an unauthenticated GET, so a signed-in admin can be walked onto
+    # one for an account that is not theirs. Dropping the session first means the one
+    # holding the claim is never also an authenticated session for somebody else.
+    def discard_signed_in_session
+      reset_session if session[:admin_user_id].present?
+    end
+
+    # params[:admin_user] is whatever the client sent. A scalar there answers #dig with a
+    # TypeError and #permit with a NoMethodError, so narrow to the nested case before
+    # anything reads out of it.
+    def submitted_admin_user_params
+      submitted = params[:admin_user]
+      submitted.is_a?(ActionController::Parameters) ? submitted : ActionController::Parameters.new
+    end
   end
 end

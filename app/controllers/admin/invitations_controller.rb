@@ -12,6 +12,7 @@ module Admin
     def claim
       return reject_claimed_token unless admin_from_invitation_token(params[:token])
 
+      discard_signed_in_session
       session[:invitation_token] = params[:token]
       redirect_to admin_edit_invitation_path
     end
@@ -51,7 +52,7 @@ module Admin
     end
 
     def invitation_params
-      params.require(:admin_user).permit(:password, :password_confirmation)
+      submitted_admin_user_params.permit(:password, :password_confirmation)
     end
   end
 end

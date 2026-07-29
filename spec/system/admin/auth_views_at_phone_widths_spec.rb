@@ -69,7 +69,7 @@ RSpec.describe "Admin auth views at phone widths", type: :system do
       emulate_viewport(width: width)
 
       # Act
-      visit admin_claim_password_reset_path(admin.generate_token_for(:password_reset))
+      visit admin_claim_password_reset_path(token: admin.generate_token_for(:password_reset))
 
       # Assert
       expect(page).to have_content(I18n.t("admin.password_reset.set_heading"))
@@ -82,7 +82,7 @@ RSpec.describe "Admin auth views at phone widths", type: :system do
       emulate_viewport(width: width)
 
       # Act
-      visit admin_claim_invitation_path(admin.generate_token_for(:invitation))
+      visit admin_claim_invitation_path(token: admin.generate_token_for(:invitation))
 
       # Assert
       expect(page).to have_content(I18n.t("admin.invitation.heading"))

@@ -11,7 +11,7 @@ RSpec.describe "Admin::Invitations", type: :request do
   # The emailed link only stashes the token and redirects; the form lives at a tokenless
   # URL, so every spec that reaches the form has to follow that redirect.
   def claim_invitation(token)
-    get admin_claim_invitation_path(token)
+    get admin_claim_invitation_path(token: token)
     follow_redirect!
   end
 
@@ -34,7 +34,7 @@ RSpec.describe "Admin::Invitations", type: :request do
       token = admin.generate_token_for(:invitation)
 
       # Act
-      get admin_claim_invitation_path(token)
+      get admin_claim_invitation_path(token: token)
 
       # Assert
       expect(response).to redirect_to(admin_edit_invitation_path)
@@ -46,7 +46,7 @@ RSpec.describe "Admin::Invitations", type: :request do
 
     it "rejects a garbage token" do
       # Act
-      get admin_claim_invitation_path("not-a-real-token")
+      get admin_claim_invitation_path(token: "not-a-real-token")
 
       # Assert
       expect(response).to redirect_to(admin_login_path)
@@ -60,7 +60,7 @@ RSpec.describe "Admin::Invitations", type: :request do
       admin.accept_invitation(password: "brandnewpassword", password_confirmation: "brandnewpassword")
 
       # Act
-      get admin_claim_invitation_path(token)
+      get admin_claim_invitation_path(token: token)
 
       # Assert
       expect(response).to redirect_to(admin_login_path)
@@ -73,7 +73,7 @@ RSpec.describe "Admin::Invitations", type: :request do
 
       # Act
       travel 8.days do
-        get admin_claim_invitation_path(token)
+        get admin_claim_invitation_path(token: token)
       end
 
       # Assert
@@ -87,11 +87,64 @@ RSpec.describe "Admin::Invitations", type: :request do
       oversized_token = "a" * 5_000
 
       # Act
-      get admin_claim_invitation_path(oversized_token)
+      get admin_claim_invitation_path(token: oversized_token)
 
       # Assert
       expect(response).to redirect_to(admin_login_path)
       expect(session[:invitation_token]).to be_nil
+    end
+
+    it "refuses a token minted for an admin who was never invited" do
+      # Arrange — the token resolves on its own, so only the pending check separates it
+      # from a password reset that never asks for the current password
+      admin = create(:admin_user, email: "established@example.com")
+
+      # Act
+      get admin_claim_invitation_path(token: admin.generate_token_for(:invitation))
+
+      # Assert
+      expect(response).to redirect_to(admin_login_path)
+      expect(flash[:alert]).to eq(I18n.t("admin.invitation.invalid_token"))
+    end
+
+    it "does not let a token minted for an established admin set a password" do
+      # Arrange
+      admin = create(:admin_user, email: "established@example.com")
+
+      # Act
+      get admin_claim_invitation_path(token: admin.generate_token_for(:invitation))
+      patch admin_invitation_update_path, params: {
+        admin_user: { password: "attacker-chosen-pw", password_confirmation: "attacker-chosen-pw" }
+      }
+
+      # Assert
+      expect(admin.reload.authenticate("attacker-chosen-pw")).to be_falsey
+      expect(admin.authenticate("securepassword123")).to be_truthy
+    end
+
+    it "keeps the token out of the path written to the log" do
+      # Arrange — filter_parameters redacts the query string but never a path segment
+      admin = invite!
+      token = admin.generate_token_for(:invitation)
+
+      # Act
+      get admin_claim_invitation_path(token: token)
+
+      # Assert
+      expect(request.filtered_path).not_to include(token)
+    end
+
+    it "discards a signed-in session rather than stashing the token into it" do
+      # Arrange
+      victim = create(:admin_user, email: "victim@example.com")
+      invited = invite!
+      post admin_login_path, params: { email: victim.email, password: "securepassword123" }
+
+      # Act
+      get admin_claim_invitation_path(token: invited.generate_token_for(:invitation))
+
+      # Assert
+      expect(session[:admin_user_id]).to be_nil
     end
 
     it "refuses to render the form without a claimed token" do
@@ -222,6 +275,35 @@ RSpec.describe "Admin::Invitations", type: :request do
 
       # Assert
       expect(response).to redirect_to(admin_login_path)
+      expect(admin.reload.invitation_pending?).to be(true)
+    end
+
+    it "rejects an all-whitespace password" do
+      # Arrange — the length minimum is satisfiable with no entropy at all
+      admin = invite!
+      whitespace = " " * 14
+      claim_invitation(admin.generate_token_for(:invitation))
+
+      # Act
+      patch admin_invitation_update_path, params: {
+        admin_user: { password: whitespace, password_confirmation: whitespace }
+      }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(admin.reload.invitation_pending?).to be(true)
+    end
+
+    it "answers a scalar where the payload should be nested instead of raising" do
+      # Arrange — permit assumes a nested hash and blows up on anything else
+      admin = invite!
+      claim_invitation(admin.generate_token_for(:invitation))
+
+      # Act
+      patch admin_invitation_update_path, params: { admin_user: "not-a-hash" }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
       expect(admin.reload.invitation_pending?).to be(true)
     end
   end

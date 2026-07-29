@@ -33,6 +33,7 @@ module Admin
     def claim
       return reject_claimed_token unless AdminUser.find_by_token_for(:password_reset, params[:token])
 
+      discard_signed_in_session
       session[:password_reset_token] = params[:token]
       redirect_to admin_edit_password_reset_path
     end
@@ -53,10 +54,15 @@ module Admin
 
     private
 
+    # Enqueued rather than delivered inline: an SMTP round trip on the request path is
+    # spent only for addresses that have an account, and the couple of hundred milliseconds
+    # that costs is itself the answer the identical response text withholds. Its duration
+    # varies with the upstream server, so no fixed delay on the miss path can match it —
+    # the work has to leave the request instead.
     def deliver_reset_link(admin)
-      AdminMailer.password_reset(admin).deliver_now
+      AdminMailer.password_reset(admin).deliver_later
     rescue StandardError => error
-      # Letting this raise turns a delivery outage into a 500 for known addresses only,
+      # Letting this raise turns an enqueue failure into a 500 for known addresses only,
       # which distinguishes them from unknown ones the response text is careful not to.
       Rails.error.report(error, handled: true)
     end
@@ -74,7 +80,7 @@ module Admin
     end
 
     def password_params
-      params.require(:admin_user).permit(:password, :password_confirmation)
+      submitted_admin_user_params.permit(:password, :password_confirmation)
     end
   end
 end

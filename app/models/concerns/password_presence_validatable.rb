@@ -9,8 +9,11 @@ module PasswordPresenceValidatable
   # intact. The length validation is then skipped too, because `password` reads back nil on
   # a freshly loaded record. Both together let a blank submission report success while the
   # old password still works, so record the attempt and reject it.
+  #
+  # blank? rather than empty?, because whitespace clears the length minimum while carrying
+  # no secret at all.
   def password=(unencrypted_password)
-    @password_assigned_blank = unencrypted_password.is_a?(String) && unencrypted_password.empty?
+    @password_assigned_blank = unencrypted_password.is_a?(String) && unencrypted_password.blank?
     @password_assigned = true
     super
   end

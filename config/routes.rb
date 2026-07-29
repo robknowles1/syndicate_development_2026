@@ -22,16 +22,20 @@ Rails.application.routes.draw do
     delete "logout", to: "sessions#destroy", as: :logout
 
     # Unauthenticated by necessity: the whole point is that the admin cannot sign in.
-    # The token in the path is the credential, so the emailed #claim URL is the only place
-    # it appears. It is moved into the session there and the form itself is tokenless,
-    # keeping the credential out of later log lines, form actions, and Referer headers.
+    # The token is the credential, so the emailed #claim URL is the only place it appears.
+    # It is moved into the session there and the form itself is tokenless, keeping the
+    # credential out of later log lines, form actions, and Referer headers.
+    #
+    # A query parameter rather than a path segment because config.filter_parameters
+    # redacts the query string of the logged request path and never a path segment, and
+    # this one request is the only one that carries the token.
     resource :password_reset, only: [ :new, :create ]
-    get "password_reset/:token/edit", to: "password_resets#claim", as: :claim_password_reset
+    get "password_reset/claim", to: "password_resets#claim", as: :claim_password_reset
     get "password_reset/edit", to: "password_resets#edit", as: :edit_password_reset
     patch "password_reset", to: "password_resets#update", as: :password_reset_update
 
     # Also unauthenticated: an invited admin has no working password yet.
-    get "invitation/:token/edit", to: "invitations#claim", as: :claim_invitation
+    get "invitation/claim", to: "invitations#claim", as: :claim_invitation
     get "invitation/edit", to: "invitations#edit", as: :edit_invitation
     patch "invitation", to: "invitations#update", as: :invitation_update
 

@@ -18,6 +18,17 @@ Rails.application.configure do
   config.force_ssl = true
   config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
+  # Same proxy topology as production — see the note there on what this does and does not
+  # buy. Staging must match, or a header-handling bug shows up first in production.
+  config.action_dispatch.trusted_proxies = [
+    IPAddr.new("127.0.0.0/8"),
+    IPAddr.new("::1/128"),
+    IPAddr.new("10.0.0.0/8"),
+    IPAddr.new("172.16.0.0/12"),
+    IPAddr.new("192.168.0.0/16"),
+    IPAddr.new("fc00::/7")
+  ].freeze
+
   # Differs from production: staging logs at debug, since diagnosing a failed deploy
   # matters more here than log volume does.
   config.log_tags = [ :request_id ]
