@@ -4,6 +4,12 @@ development:
 test:
   adapter: test
 
+# The app defines no channels, so staging uses the in-process adapter and needs no
+# Redis or cable database. A staging key must exist regardless: Solid Cable eager-loads
+# its models whenever eager_load is on and raises if the current environment is absent.
+staging:
+  adapter: async
+
 production:
   adapter: redis
   url: <%= ENV.fetch("REDIS_URL") { "redis://localhost:6379/1" } %>
