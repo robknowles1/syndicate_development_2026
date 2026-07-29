@@ -26,10 +26,11 @@ Rails.application.configure do
 
   # REQUIRES A TERMINATING PROXY IN FRONT OF THE APP. `assume_ssl` makes Rails
   # treat every request as HTTPS on the strength of the proxy's headers. Deploy
-  # without one (the `proxy:` block in config/deploy.yml is still commented out)
-  # and plaintext requests are read as secure: `force_ssl` stops redirecting, and
-  # the admin session cookie is marked `Secure` over HTTP, so browsers refuse to
-  # send it back and logins silently fail to persist. Enable the proxy first.
+  # without one and plaintext requests are read as secure: `force_ssl` stops
+  # redirecting, and the admin session cookie is marked `Secure` over HTTP, so
+  # browsers refuse to send it back and logins silently fail to persist. The
+  # `proxy:` block in config/deploy.yml is what supplies it; these must stay in
+  # step, so do not disable the proxy while this is on.
   config.assume_ssl = true
 
   # Marks the admin session cookie `Secure` and sends Strict-Transport-Security.
