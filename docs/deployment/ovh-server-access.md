@@ -80,16 +80,21 @@ If this box is rebuilt, or a second one is added, the same sequence applies.
 
 ## Current state
 
-Docker is **not installed**, and `ubuntu` is **not** in the `docker` group. Kamal
-installs Docker on first deploy, but the group membership matters: Kamal connects as
-`ubuntu` and must run `docker` without `sudo`.
+Docker is **not installed**, and `ubuntu` is **not** in the `docker` group.
 
-```bash
-ssh -i ~/.ssh/id_ed25519 ubuntu@15.204.81.231 "sudo usermod -aG docker ubuntu"
-```
+**Do not install Docker by hand, and do not create the group manually.** Both are
+handled by `kamal server bootstrap`, which `kamal deploy` invokes automatically: it
+tests `docker -v`, and on failure installs Docker, runs `sudo -n usermod -aG docker
+"$USER"`, then refreshes the session. Passwordless sudo is already in place, so it
+needs nothing from an operator.
 
-Group membership only takes effect on a new session, so reconnect afterwards and
-confirm with `docker ps`.
+The order matters, and getting it wrong is quiet rather than loud. That entire block
+runs **only when `docker -v` fails**. Pre-install Docker yourself and Kamal skips the
+whole thing — including the group membership — and every subsequent command fails
+against the Docker socket instead.
+
+Running `usermod -aG docker ubuntu` before the group exists fails outright, so there is
+nothing useful to do here ahead of the first deploy.
 
 ---
 
