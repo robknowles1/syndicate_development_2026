@@ -204,14 +204,66 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # Pins the staging server's SSH host key. MUST stay ahead of the ssh-agent
+      # step so net-ssh has a known entry before the first connection.
+      #
+      # Kamal leaves net-ssh's `verify_host_key` unset, which net-ssh 7.3.3 maps
+      # to :accept_new_or_local_tunnel — a verifier its own source comments as
+      # "(insecure)" (transport/session.rb:303-322). That verifier accepts
+      # whatever key an *unknown* host offers, and every GitHub runner is fresh,
+      # so every deploy was a first contact and the trust was never carried
+      # forward. Anything answering on 15.204.81.231:22 got RAILS_MASTER_KEY and
+      # every other secret in the deploy step below. With the entry present the
+      # host is no longer unknown, and a mismatched key raises HostKeyMismatch
+      # (verifiers/accept_new.rb rescues only HostKeyUnknown) — the deploy stops
+      # instead of handing the secrets over.
+      #
+      # The value is committed, not stored in a secret, because it is a PUBLIC
+      # key: the server presents it to every client that connects. Keeping it
+      # visible means the expected value shows up in code review and in `git
+      # log` when it changes, and means the pin cannot be silently absent — an
+      # unset secret would write an empty file and drop back to accept-new
+      # without failing anything.
+      #
+      # Verified 2026-07-28, two independent ways that agree:
+      #   ssh-keyscan over the network, and `ssh-keygen -lf
+      #   /etc/ssh/ssh_host_ed25519_key.pub` read on the box over an
+      #   already-authenticated session.
+      #
+      # ── IF A DEPLOY FAILS WITH "fingerprint ... does not match" ─────────────
+      # Either the server was rebuilt (its host key is generated at first boot,
+      # so a rebuild changes it) or the connection is being intercepted. Do NOT
+      # delete or loosen this to make the red build go away — that restores the
+      # exact hole this closes. Rotate deliberately:
+      #   1. Get the new key from the server over a channel that is NOT this
+      #      deploy path — the OVH console, or an SSH session whose fingerprint
+      #      you confirmed there:
+      #        ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+      #   2. Confirm it matches what the network reports, from your workstation:
+      #        ssh-keyscan -t ed25519 15.204.81.231 | ssh-keygen -lf -
+      #      Both must print the same SHA256. If they disagree, stop: that is
+      #      the interception case, not a rebuild.
+      #   3. Update BOTH lines below — the known_hosts line and the SHA256 in
+      #      the guard. They are two encodings of one key and must agree.
+      #   4. Commit the change on its own, so the rotation is reviewable.
+      # Longer form, including re-establishing access to a rebuilt box, is in
+      # docs/deployment/ovh-server-access.md.
+      - name: Pin staging host key
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo '15.204.81.231 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO7d8CnD/k4Jd9hcsDTuPzFPYEk986iWyKwNlxtGUrtK' >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          # Fail here, not mid-deploy, if the line above is ever mistyped. A
+          # corrupt key does not error — net-ssh skips the unparseable entry,
+          # finds no keys for the host, and quietly reverts to accept-new. This
+          # turns that silent downgrade into a red step.
+          ssh-keygen -lF 15.204.81.231 -f ~/.ssh/known_hosts \
+            | grep -q 'SHA256:nuYrtS7SlRAtC7Eoa0XsIZvM+EQC9bDCn/McENOBIPo'
+
       # Loads the deploy key for ubuntu@15.204.81.231 into an agent for Kamal's
-      # SSH connections. No ssh-keyscan step: net-ssh defaults to
-      # :accept_new_or_local_tunnel, so an unknown host key is accepted rather
-      # than refused, and a keyscan of the same unauthenticated host would add
-      # no assurance. That leaves this trusting the host key on every run. To
-      # harden, add a KNOWN_HOSTS secret pinning the server's public key and
-      # write it to ~/.ssh/known_hosts before this step — net-ssh still rejects
-      # a *mismatched* key for a host it already knows.
+      # SSH connections. The host side of that handshake is pinned by the step
+      # above; this supplies only the client credential.
       - name: Add SSH deploy key
         uses: webfactory/ssh-agent@v0.10.0
         with:
