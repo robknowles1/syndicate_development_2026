@@ -1,0 +1,81 @@
+# Staging destination — overlays config/deploy.yml.
+#
+#   bin/kamal deploy -d staging
+#
+# Kamal deep-merges this file over the base: hashes merge key by key, arrays are
+# REPLACED wholesale. So `env.secret` and `volumes` below are complete lists, not
+# additions to the base ones.
+#
+# Secrets for this destination come from .kamal/secrets-common plus
+# .kamal/secrets.staging. Note that .kamal/secrets (the base file) is NOT read
+# when a destination is given — anything shared must live in -common.
+
+# OVH box: 2 vCPU, 3.7 GB RAM, 38 GB disk, Ubuntu 26.04, x86_64.
+servers:
+  web:
+    - 15.204.81.231
+
+proxy:
+  ssl: true
+  host: staging.syndicate-development.com
+
+env:
+  secret:
+    - RAILS_MASTER_KEY
+    - RESEND_API_KEY
+    - ADMIN_SEED_PASSWORD
+    # Two names for one password. config/database.yml's staging block reads
+    # STAGING_DATABASE_PASSWORD on feature/spec-010-email-delivery but
+    # SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD on
+    # feature/spec-011-admin-auth. Those branches disagree and neither is merged,
+    # so both names are injected with the same value and staging boots whichever
+    # one lands first.
+    - STAGING_DATABASE_PASSWORD
+    - SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD
+  clear:
+    # Overrides the RAILS_ENV=production baked into the Dockerfile. Staging runs
+    # a SINGLE primary database: production's multi-database block points cache,
+    # queue and cable at db/cache_migrate, db/queue_migrate and db/cable_migrate,
+    # none of which exist in this repo, so `db:prepare` against them fails.
+    RAILS_ENV: staging
+
+    # Must match proxy.host. Any other Host header gets a 403 from host
+    # authorization, and mailer links (password reset, invitations) are built
+    # from this value.
+    APP_HOST: staging.syndicate-development.com
+
+    # Staging logs at debug — diagnosing a failed deploy matters more here than
+    # log volume does.
+    RAILS_LOG_LEVEL: debug
+
+    WEB_CONCURRENCY: 2
+    RAILS_MAX_THREADS: 5
+
+    # The accessory container's name, resolved by Docker's embedded DNS on the
+    # shared `kamal` network. Not localhost — the database is a separate
+    # container.
+    STAGING_DATABASE_HOST: syndicate_development_2026-db-staging
+    STAGING_DATABASE_NAME: syndicate_development_2026_staging
+    STAGING_DATABASE_USER: syndicate_development_2026
+
+# Distinct volume name from production so the two tiers can never share Active
+# Storage uploads if they ever land on the same host.
+volumes:
+  - "syndicate_development_2026_staging_storage:/rails/storage"
+
+accessories:
+  db:
+    # Kamal names accessory containers "<service>-<name>" and does NOT append the
+    # destination, so production and staging would both claim
+    # "syndicate_development_2026-db". Naming this one explicitly keeps them
+    # separate. This value is what STAGING_DATABASE_HOST above must match.
+    service: syndicate_development_2026-db-staging
+    host: 15.204.81.231
+    env:
+      clear:
+        POSTGRES_USER: syndicate_development_2026
+        POSTGRES_DB: syndicate_development_2026_staging
+      secret:
+        - POSTGRES_PASSWORD
+    volumes:
+      - "syndicate_development_2026_staging_pgdata:/var/lib/postgresql/data"

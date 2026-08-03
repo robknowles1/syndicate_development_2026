@@ -35,7 +35,20 @@ port ENV.fetch("PORT", 3000)
 plugin :tmp_restart
 
 # Run the Solid Queue supervisor inside of Puma for single-server deployments.
-plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]
+#
+# Compared against the string "true" rather than tested for bare presence. Kamal
+# writes `KEY=` into the container environment for a variable it knows about but
+# has no value for, and a destination can override an inherited key but never
+# remove one — so under a presence test the values "", "false" and "no" would all
+# start a supervisor, because every string is truthy in Ruby. An explicit
+# comparison makes the flag switchable off and makes any unexpected value fail
+# in the safe direction: no supervisor, jobs left queued, rather than a
+# supervisor dying against a database with no solid_queue_* tables and taking
+# the Puma master down with it.
+#
+# Which hosts set this is decided in config/deploy.yml via the `solid_queue` env
+# tag, and spec/config/solid_queue_supervisor_spec.rb holds the two in agreement.
+plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"] == "true"
 
 # Specify the PID file. Defaults to tmp/pids/server.pid in development.
 # In other environments, only set the PID file if requested.
