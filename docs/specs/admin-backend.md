@@ -57,7 +57,9 @@ Add a password-protected admin backend at `/admin` so that Doug Haskett (the sho
 
 14. Given the admin edits a service section's bullet list, they can add a new item, edit the text of an existing item, and mark an existing item for removal — all within the same form submit. The minimum number of bullet items per section is one; submitting a section with zero items is rejected with a validation error.
 
-15. Given the seeded admin user created by `db/seeds.rb`, when `bin/rails db:seed` is run on a fresh database, then an `AdminUser` record exists with email `doug@syndicate-development.com` and a bcrypt-hashed password, and no plain-text password is stored anywhere in the codebase or version control.
+15. Given the seeded admin users created by `db/seeds.rb`, when `bin/rails db:seed` is run on a fresh database, then two `AdminUser` records exist — `robknowles105@gmail.com` (developer) and `haskettd@live.com` (shop owner) — each with a bcrypt-hashed password taken from `ADMIN_SEED_PASSWORD`, and no plain-text password is stored anywhere in the codebase or version control. The two accounts carry equal privileges; there are no roles.
+
+16. Given `ADMIN_SEED_PASSWORD` is absent, blank, shorter than `AdminUser::MINIMUM_PASSWORD_LENGTH`, or longer than the 72 bytes bcrypt hashes, when `bin/rails db:seed` is run, then seeding raises before writing any record and the message names `ADMIN_SEED_PASSWORD` and the specific problem. Seeding must never complete successfully leaving zero admin accounts.
 
 ---
 
