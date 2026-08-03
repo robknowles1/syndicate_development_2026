@@ -28,15 +28,27 @@ env:
     #
     # This used to inject SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD alongside
     # it, hedging a disagreement between two then-unmerged branches over which
-    # name staging read. PR #47 merged and feature/spec-011-admin-auth now reads
-    # STAGING_DATABASE_PASSWORD too, so the hedge is dropped. That other name is
+    # name staging read. Both have since merged (#47 and #48) and both read
+    # STAGING_DATABASE_PASSWORD, so the hedge is dropped. That other name is
     # production-only now — see config/deploy.yml and .kamal/secrets.
     - STAGING_DATABASE_PASSWORD
   clear:
-    # Overrides the RAILS_ENV=production baked into the Dockerfile. Staging runs
-    # a SINGLE primary database: production's multi-database block points cache,
-    # queue and cable at db/cache_migrate, db/queue_migrate and db/cable_migrate,
-    # none of which exist in this repo, so `db:prepare` against them fails.
+    # Overrides the RAILS_ENV=production baked into the Dockerfile, which selects
+    # the `staging:` block in config/database.yml — a SINGLE primary database.
+    #
+    # Production's block declares three more connections (cache, queue, cable)
+    # backed by db/cache_schema.rb and friends. Staging uses none of them:
+    # config/environments/staging.rb leaves cache_store and the Active Job
+    # adapter at their defaults, and config/cable.yml uses the async adapter, so
+    # the extra databases would be created and then sit empty.
+    #
+    # This is also why staging must not receive SOLID_QUEUE_IN_PUMA. There are no
+    # solid_queue_* tables here for a supervisor to poll, and Puma's solid_queue
+    # plugin signals the Puma master when the supervisor dies — so inheriting
+    # that flag would take staging's web tier down, not just its jobs. The flag
+    # is scoped to the production host by an env tag in config/deploy.yml
+    # precisely so this file does not have to opt out of it; a destination can
+    # override an inherited env.clear key but cannot remove one.
     RAILS_ENV: staging
 
     # Must match proxy.host. Any other Host header gets a 403 from host

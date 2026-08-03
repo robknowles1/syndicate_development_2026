@@ -253,13 +253,17 @@ jobs:
       # (activerecord/lib/active_record/tasks/database_tasks.rb) seeds only the
       # databases that same run CREATED, so the one chance to seed is spent.
       #
-      # ── The 12-byte minimum is OUR rule, not the app's ──────────────────────
-      # Nothing in this repository enforces a minimum password length today.
-      # app/models/admin_user.rb is has_secure_password plus email validations,
-      # on this branch and on main. The 12 comes from an unmerged branch
-      # (feature/spec-011-admin-auth), so this step is currently the ONLY place
-      # it is enforced. Do not reword this to say the app rejects short
-      # passwords until that branch lands.
+      # ── The 12-byte minimum mirrors the app's rule ──────────────────────────
+      # app/models/admin_user.rb sets MINIMUM_PASSWORD_LENGTH = 12 and validates
+      # password length against it (PR #48). Keep the 12 below in step with that
+      # constant; they are two encodings of one rule.
+      #
+      # Checking it here anyway is not redundant. The model validation runs when
+      # a record is saved, and db/seeds.rb uses the non-bang find_or_create_by,
+      # which returns the invalid record without raising — so a short value
+      # fails validation and still leaves the deploy green with no admin
+      # account. This step is what turns that into a red build, before any
+      # secret is loaded or the server is touched.
       #
       # ── The 72-byte maximum IS enforced, and fails identically ──────────────
       # has_secure_password adds a :password_too_long validation above 72 bytes,
