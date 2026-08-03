@@ -183,15 +183,31 @@ jobs:
   #   RAILS_MASTER_KEY           decrypts config/credentials.yml.enc
   #   KAMAL_REGISTRY_PASSWORD    ghcr.io token with write:packages
   #   RESEND_API_KEY             outbound mail
-  #   ADMIN_SEED_PASSWORD        seeds the first admin, 12+ characters
+  #   ADMIN_SEED_PASSWORD        seeds the first admin — see the pre-flight step
   #   STAGING_DATABASE_PASSWORD  staging Postgres
   #
-  # A missing secret does NOT fail fast: the .kamal/secrets* files resolve an
-  # unset variable to an empty string, so the deploy runs on and breaks further
-  # in — typically as a registry auth error, or a credentials failure at boot.
+  # A blank secret is never rejected at the point it is supplied:
+  # `${{ secrets.X }}` renders as an empty string when the secret is not set,
+  # and the .kamal/secrets* files resolve an unset variable the same way, so an
+  # empty value travels into the deploy and surfaces — if it surfaces at all —
+  # much further in. The "Verify deploy secrets are usable" step below is what
+  # stops that. It runs FIRST, before checkout, and the comment on it records
+  # what each blank value actually did while nothing was checking.
   deploy_staging:
     runs-on: ubuntu-latest
     needs: [ scan_ruby, scan_js, lint, test, system-test ]
+
+    # A Kamal deploy to this box takes roughly 10-15 minutes. 30 leaves headroom
+    # for a slow build without letting a wedged run — an SSH connection that
+    # never times out, a registry push that stalls — sit on the concurrency
+    # group below for the 6-hour default and block every later merge behind it.
+    timeout-minutes: 30
+
+    # This job authenticates to ghcr.io with KAMAL_REGISTRY_PASSWORD, a PAT, so
+    # it needs nothing from GITHUB_TOKEN beyond reading this repository for the
+    # checkout. Narrowing it here does not affect the other jobs.
+    permissions:
+      contents: read
 
     # Push-to-main only. `on.push.branches` already limits push events to main,
     # and pull_request events run with github.ref = refs/pull/N/merge, so a PR
@@ -207,6 +223,115 @@ jobs:
       cancel-in-progress: false
 
     steps:
+      # PRE-FLIGHT. Refuses to deploy when a required secret is unset, empty, or
+      # — for ADMIN_SEED_PASSWORD — the wrong length. Deliberately the FIRST
+      # step: it needs no checkout and no Ruby, so a misconfigured repository
+      # fails in seconds without loading an SSH key or touching the server.
+      #
+      # It exists because ONE of these values has no failure signature at all.
+      #
+      # ── The silent one: ADMIN_SEED_PASSWORD ─────────────────────────────────
+      # An unset secret arrives here as "", and Kamal writes `KEY=` into the
+      # container environment rather than omitting the key — so the variable is
+      # PRESENT and EMPTY, which is the one case every guard in the chain lets
+      # through:
+      #
+      #   db/seeds.rb   ENV.fetch("ADMIN_SEED_PASSWORD") { raise ... } does NOT
+      #                 raise. fetch runs its block only when the key is ABSENT.
+      #                 It returns "".
+      #   AdminUser     has_secure_password's password= writer no-ops on a blank
+      #                 value, so password_digest stays nil.
+      #   validation    the record is therefore invalid, "Password can't be
+      #                 blank".
+      #   seeds.rb      find_or_create_by is the NON-bang form: it returns the
+      #                 unsaved record and raises nothing.
+      #
+      # So `db:prepare` exits 0, bin/docker-entrypoint runs on, Puma boots, /up
+      # answers 200, kamal-proxy sees a healthy container, and this job goes
+      # GREEN with no admin account on staging and nothing in the logs about it.
+      # Re-running the deploy does not repair it either: prepare_all
+      # (activerecord/lib/active_record/tasks/database_tasks.rb) seeds only the
+      # databases that same run CREATED, so the one chance to seed is spent.
+      #
+      # ── The 12-byte minimum is OUR rule, not the app's ──────────────────────
+      # Nothing in this repository enforces a minimum password length today.
+      # app/models/admin_user.rb is has_secure_password plus email validations,
+      # on this branch and on main. The 12 comes from an unmerged branch
+      # (feature/spec-011-admin-auth), so this step is currently the ONLY place
+      # it is enforced. Do not reword this to say the app rejects short
+      # passwords until that branch lands.
+      #
+      # ── The 72-byte maximum IS enforced, and fails identically ──────────────
+      # has_secure_password adds a :password_too_long validation above 72 bytes,
+      # bcrypt's input limit. An over-long value takes the exact same silent
+      # path as an empty one, so it is capped here too.
+      #
+      # ── The other five ─────────────────────────────────────────────────────
+      # Those do fail on their own, but late and unhelpfully — a registry auth
+      # error, or a container that never becomes healthy with the cause four
+      # layers down. Naming the secret here is cheaper than the log dive.
+      #
+      # No secret value is ever printed, nor any prefix, nor any length — only
+      # names. LC_ALL=C makes ${#var} count bytes, so both thresholds are
+      # measured in the same unit bcrypt and this comment use.
+      - name: Verify deploy secrets are usable
+        env:
+          LC_ALL: C
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
+          KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+          STAGING_DATABASE_PASSWORD: ${{ secrets.STAGING_DATABASE_PASSWORD }}
+        run: |
+          fail=0
+
+          # The explicit `return 0` is defensive, not load-bearing today: an `if`
+          # whose condition is false and which has no else already returns 0, so
+          # this function exits clean on a secret that is correctly set. What it
+          # pins is the exit STATUS. Append a trailing test or `&&` list here
+          # later and, without this line, require_present would return non-zero
+          # for a secret that is perfectly FINE — and `bash -e` would abort the
+          # step at the call site, on the good path.
+          require_present() {
+            if [ -z "${!1}" ]; then
+              echo "::error::$1 is unset or empty. Set it under Settings > Secrets and variables > Actions."
+              fail=1
+            fi
+            return 0
+          }
+
+          for secret_name in \
+            DEPLOY_SSH_PRIVATE_KEY \
+            RAILS_MASTER_KEY \
+            KAMAL_REGISTRY_PASSWORD \
+            RESEND_API_KEY \
+            ADMIN_SEED_PASSWORD \
+            STAGING_DATABASE_PASSWORD
+          do
+            require_present "$secret_name"
+          done
+
+          # Length is checked only when a value is present; an empty value is
+          # already reported above and would otherwise produce two errors for
+          # one cause.
+          if [ -n "$ADMIN_SEED_PASSWORD" ]; then
+            if [ "${#ADMIN_SEED_PASSWORD}" -lt 12 ]; then
+              echo "::error::ADMIN_SEED_PASSWORD is shorter than 12 bytes. Seeding would create no admin account and still exit 0."
+              fail=1
+            elif [ "${#ADMIN_SEED_PASSWORD}" -gt 72 ]; then
+              echo "::error::ADMIN_SEED_PASSWORD is longer than 72 bytes, which bcrypt rejects. Seeding would create no admin account and still exit 0."
+              fail=1
+            fi
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Pre-flight failed. Fix the secrets named above and re-run this job; no values were printed."
+            exit 1
+          fi
+
+          echo "All six deploy secrets are present, and ADMIN_SEED_PASSWORD is within 12-72 bytes."
+
       - name: Checkout code
         uses: actions/checkout@v7
 
@@ -296,10 +421,17 @@ jobs:
 
       # RAILS_MASTER_KEY is required here specifically: config/master.key is
       # gitignored and absent on the runner, so .kamal/secrets-common falls back
-      # to this variable. ADMIN_SEED_PASSWORD must be 12+ characters or
-      # db/seeds.rb aborts under bin/docker-entrypoint and the container
-      # restart-loops. STAGING_DATABASE_PASSWORD is fanned out to the three
-      # names staging needs by .kamal/secrets.staging.
+      # to this variable.
+      #
+      # ADMIN_SEED_PASSWORD does NOT abort anything when it is missing or short.
+      # It seeds silently and leaves staging with no admin account — which is
+      # exactly why the pre-flight step at the top of this job exists, and why
+      # by the time execution reaches here the value has already been proven
+      # present and 12-72 bytes.
+      #
+      # STAGING_DATABASE_PASSWORD is fanned out by .kamal/secrets.staging to the
+      # two names staging needs: itself, read by config/database.yml, and
+      # POSTGRES_PASSWORD, read by the accessory's initdb.
       - name: Deploy to staging with Kamal
         env:
           RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
