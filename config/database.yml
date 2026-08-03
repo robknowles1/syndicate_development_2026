@@ -84,10 +84,13 @@ test:
 # Read https://guides.rubyonrails.org/configuring.html#configuring-a-database
 # for a full overview on how database connection configuration can be specified.
 #
-# Staging deliberately runs a single primary database. The production block below
-# declares cache/queue/cable databases whose schema files (db/queue_schema.rb and
-# friends) are not in this repo, so `db:prepare` against them fails. Until Solid
-# Queue/Cache/Cable are actually set up, staging stays on one database that works.
+# Staging deliberately runs a single primary database. That is a simplification, not a
+# workaround: staging does not run Solid Cache, Queue or Cable — config/environments/
+# staging.rb leaves cache_store and the job adapter at their defaults and config/cable.yml
+# uses the async adapter — so none of the extra connections production declares below would
+# be used. The schema files those connections load (db/cache_schema.rb and friends) are in
+# the repo, so staging can be upgraded to mirror production whenever rehearsing that setup
+# becomes worthwhile.
 staging:
   <<: *default
   database: <%= ENV.fetch("STAGING_DATABASE_NAME", "syndicate_development_2026_staging") %>
@@ -101,6 +104,18 @@ production:
     database: syndicate_development_2026_production
     username: syndicate_development_2026
     password: <%= ENV["SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD"] %>
+  # The three databases below are created and loaded by `bin/rails db:prepare` from
+  # db/cache_schema.rb, db/queue_schema.rb and db/cable_schema.rb, which Rails resolves
+  # by convention from the connection name (<name>_schema.rb).
+  #
+  # The `migrations_paths` directories below are intentionally absent from the repo.
+  # Rails treats an empty/missing migrations path as "no migrations", which is correct:
+  # these schemas are owned by the solid_* gems and are replaced wholesale on upgrade
+  # via `bin/rails generate solid_queue:install` (and friends), not evolved by hand.
+  #
+  # Development and test deliberately stay on a single primary database: development
+  # uses :memory_store and the :async job adapter, so it needs no cache or queue
+  # database and no running worker.
   cache:
     <<: *primary_production
     database: syndicate_development_2026_production_cache
@@ -109,6 +124,12 @@ production:
     <<: *primary_production
     database: syndicate_development_2026_production_queue
     migrations_paths: db/queue_migrate
+    # Solid Queue requires at least `threads` + 2 connections per worker process. This
+    # must NOT inherit RAILS_MAX_THREADS from *default: that knob sizes Puma's web pool
+    # and config/puma.rb already defaults it to 3, so an operator reconciling the two
+    # would silently starve the workers. JOB_THREADS drives both this pool and `threads:`
+    # in config/queue.yml, so the two cannot drift apart.
+    max_connections: <%= ENV.fetch("JOB_THREADS", 3).to_i + 2 %>
   cable:
     <<: *primary_production
     database: syndicate_development_2026_production_cable
