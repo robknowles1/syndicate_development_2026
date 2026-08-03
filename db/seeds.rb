@@ -2,6 +2,26 @@
 # development, test). The code here should be idempotent so that it can be executed at any point in every environment.
 # The data can then be loaded with the bin/rails db:seed command (or created alongside the database with db:setup).
 
+# Validated before anything is written: db:prepare seeds only the databases it created in
+# that same run, so a deploy that seeds badly is not repaired by redeploying, and a partial
+# seed would have to be finished by hand. The bounds are read from the model rather than
+# restated so the seed cannot drift from the validations that will judge the record.
+minimum_password_length = AdminUser::MINIMUM_PASSWORD_LENGTH
+maximum_password_bytes = ActiveModel::SecurePassword::MAX_PASSWORD_LENGTH_ALLOWED
+admin_seed_password = ENV["ADMIN_SEED_PASSWORD"]
+
+# Deliberately not ENV.fetch: its default block fires only when the key is absent, and Kamal
+# writes `ADMIN_SEED_PASSWORD=` into the container when the secret resolves to nothing.
+if admin_seed_password.nil?
+  raise "ADMIN_SEED_PASSWORD is not set. Seeding needs it to create the admin accounts."
+elsif admin_seed_password.blank?
+  raise "ADMIN_SEED_PASSWORD is set but blank. Check that the secret resolves to a value."
+elsif admin_seed_password.length < minimum_password_length
+  raise "ADMIN_SEED_PASSWORD is too short: #{admin_seed_password.length} characters, minimum #{minimum_password_length}."
+elsif admin_seed_password.bytesize > maximum_password_bytes
+  raise "ADMIN_SEED_PASSWORD is too long: #{admin_seed_password.bytesize} bytes, maximum #{maximum_password_bytes}."
+end
+
 # --- Home Page Content ---
 home_content = HomePageContent.first_or_initialize
 if home_content.new_record?
@@ -34,11 +54,14 @@ if about_content.new_record?
   about_content.save!
 end
 
-# --- Admin User ---
-admin_password = ENV.fetch("ADMIN_SEED_PASSWORD") { raise "Set ADMIN_SEED_PASSWORD env var before seeding" }
-AdminUser.find_or_create_by(email: "doug@syndicate-development.com") do |u|
-  u.password = admin_password
-  u.password_confirmation = admin_password
+# --- Admin Users ---
+# The block runs only on create, so re-seeding never resets the password of an admin who
+# has since changed it.
+[ "robknowles105@gmail.com", "haskettd@live.com" ].each do |admin_email|
+  AdminUser.find_or_create_by!(email: admin_email) do |admin_user|
+    admin_user.password = admin_seed_password
+    admin_user.password_confirmation = admin_seed_password
+  end
 end
 
 # --- Site Settings ---
