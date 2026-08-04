@@ -109,6 +109,18 @@ The primary admin user (Doug) manages the site from his phone. Every layout deci
 
 ## Code Conventions
 
+### Comments — write self-documenting code instead
+
+**Default to no comment.** A comment is a failure to express something in the code; reach for a clearer name, a smaller method, or a named constant first. This applies to configuration — YAML, Dockerfiles, CI workflows — as much as to Ruby.
+
+Write one only when it **warns against an edit that looks like an improvement**. That is the single thing a document cannot do, because whoever makes that edit is tidying a line, not consulting a runbook.
+
+Everything else — how a library behaves, what a variable is for, procedures, thresholds and their rationale — goes in a doc, a spec, or the commit message, and is linked from at most one line. A comment restating it is a second copy that drifts out of sync.
+
+Volume is itself a cost: context wrapped around a dangerous line makes that line less likely to be read. A false comment is worse than none, so verify against the source before writing one.
+
+Full rules in `.claude/standards/practices/coding-style.md` § 2.4.
+
 ### Internationalisation (i18n)
 All user-facing strings must use Rails I18n — no hardcoded strings in views, controllers, or mailers.
 

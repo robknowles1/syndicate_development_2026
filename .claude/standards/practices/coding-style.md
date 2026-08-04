@@ -89,3 +89,23 @@ If removing the comment would not confuse a competent reader who has read the sp
 - Commented-out code. Delete it. Version control is the archive.
 
 **Test files follow the same rule, with one exception:** the AAA structure comments (`# Arrange`, `# Act`, `# Assert`) required by `practices/testing.md` § 3.1 are mandated. Everything above still applies to any other comments in test files.
+
+### 2.4.1 The default is no comment
+
+Prefer self-documenting code. A comment is a failure to express something in the code itself, and is justified only when the code genuinely cannot carry it. Before writing one, try a clearer name, a smaller method, or an explicit constant.
+
+**The test is not "would this help someone?" — nearly anything would.** The test is:
+
+> **Does this warn against an edit that looks like an improvement?**
+
+That is the one thing a doc cannot do, because the person making that edit has no reason to go looking for a doc. They are tidying a line. A comment sited exactly where they are about to act is the only thing that reaches them.
+
+Everything else — how a library behaves, what a variable is for, a procedure, a recovery step, a threshold and its rationale — belongs in a doc, a spec, or the commit message. A reader who wants background will find it there. A comment restating it is a second copy that drifts.
+
+**Volume is itself a cost.** Ten lines of context around one dangerous line make the dangerous line *less* likely to be read, not more. Every comment competes for attention with every other comment in the file. A file that is mostly commentary trains readers to skim all of it, including the part that matters.
+
+**A false comment is worse than none.** Verify the claim before writing it, and against the source rather than from memory. A confident, plausible, wrong comment survives review precisely because it sounds authoritative.
+
+**This applies to configuration as much as to code** — YAML, Dockerfiles, CI workflows, `.env.example`. Config attracts explanation because its behaviour is often non-obvious, which makes the discipline more important there, not less. If a config file needs paragraphs to be usable, write the doc and link it once.
+
+If genuine reference material is worth keeping, write a separate document and point to it from one line. Do not inline it.
