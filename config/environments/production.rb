@@ -26,10 +26,11 @@ Rails.application.configure do
 
   # REQUIRES A TERMINATING PROXY IN FRONT OF THE APP. `assume_ssl` makes Rails
   # treat every request as HTTPS on the strength of the proxy's headers. Deploy
-  # without one (the `proxy:` block in config/deploy.yml is still commented out)
-  # and plaintext requests are read as secure: `force_ssl` stops redirecting, and
-  # the admin session cookie is marked `Secure` over HTTP, so browsers refuse to
-  # send it back and logins silently fail to persist. Enable the proxy first.
+  # without one and plaintext requests are read as secure: `force_ssl` stops
+  # redirecting, and the admin session cookie is marked `Secure` over HTTP, so
+  # browsers refuse to send it back and logins silently fail to persist. The
+  # `proxy:` block in config/deploy.yml is what supplies it; these must stay in
+  # step, so do not disable the proxy while this is on.
   config.assume_ssl = true
 
   # Marks the admin session cookie `Secure` and sends Strict-Transport-Security.
@@ -82,9 +83,20 @@ Rails.application.configure do
 
   # Replace the default in-process and non-durable queuing backend for Active Job.
   #
-  # config/deploy.yml sets SOLID_QUEUE_IN_PUMA: true and config/puma.rb runs
-  # `plugin :solid_queue` when it sees that, so the supervisor runs inside Puma on this
-  # single-server deployment. No separate job host is required yet.
+  # This setting is half of a pair, and the halves live in different files. Setting it
+  # means every `deliver_later` in this environment is written to the `queue` database
+  # instead of being run in-process — so something must be running a Solid Queue
+  # supervisor, or those jobs are accepted and never executed. There is no error and no
+  # failed deploy; admin password-reset emails would simply never arrive.
+  #
+  # The other half is config/deploy.yml, which tags the production web host `solid_queue`
+  # so that host — and only that host — receives SOLID_QUEUE_IN_PUMA=true, which
+  # config/puma.rb turns into `plugin :solid_queue`. The supervisor therefore runs inside
+  # Puma on this single-server deployment and no separate job host is required yet.
+  #
+  # Staging deliberately has neither half: config/environments/staging.rb does not set
+  # this adapter, and staging runs a single primary database with no solid_queue_*
+  # tables. spec/config/solid_queue_supervisor_spec.rb fails if the halves disagree.
   config.active_job.queue_adapter = :solid_queue
   config.solid_queue.connects_to = { database: { writing: :queue } }
 

@@ -1,140 +1,85 @@
-# Name of your application. Used to uniquely configure containers.
+# Kamal base config plus the PRODUCTION destination; config/deploy.staging.yml
+# overlays it. Runbook: docs/deployment/ovh-server-access.md.
+
 service: syndicate_development_2026
 
-# Name of the container image (use your-user/app-name on external registries).
-image: syndicate_development_2026
+image: robknowles1/syndicate_development_2026
 
-# Deploy to these servers.
+# The `: solid_queue` suffix is an env TAG, not a stray colon in the hostname.
+# Removing it silently stops the Solid Queue supervisor from ever starting.
 servers:
   web:
-    - 192.168.0.1
-  # job:
-  #   hosts:
-  #     - 192.168.0.1
-  #   cmd: bin/jobs
+    - <%= ENV.fetch("KAMAL_PRODUCTION_HOST", "production-not-provisioned.invalid") %>: solid_queue
 
-# Enable SSL auto certification via Let's Encrypt and allow for multiple apps on a single web server.
-# If used with Cloudflare, set encryption mode in SSL/TLS setting to "Full" to enable CF-to-app encryption.
-#
-# Using an SSL proxy like this requires turning on config.assume_ssl and config.force_ssl in production.rb!
-#
-# Don't use this when deploying to multiple web servers (then you have to terminate SSL at your load balancer).
-#
-# proxy:
-#   ssl: true
-#   host: app.example.com
+# Do not remove this block, and do not add `forward_headers: true`. It is the
+# other half of `config.assume_ssl` in config/environments/production.rb: without
+# a terminating proxy admin login silently fails to persist, and forwarding
+# X-Forwarded-* under `ssl: true` lets a client spoof them.
+proxy:
+  ssl: true
+  host: www.syndicate-development.com
 
-# Where you keep your container images.
 registry:
-  # Alternatives: hub.docker.com / registry.digitalocean.com / ghcr.io / ...
-  server: localhost:5555
+  server: ghcr.io
+  username: robknowles1
+  password:
+    - KAMAL_REGISTRY_PASSWORD
 
-  # Needed for authenticated registries.
-  # username: your-user
-
-  # Always use an access token rather than real password when possible.
-  # password:
-  #   - KAMAL_REGISTRY_PASSWORD
-
-# Inject ENV variables into containers (secrets come from .kamal/secrets).
 env:
   secret:
     - RAILS_MASTER_KEY
+    - RESEND_API_KEY
+    - ADMIN_SEED_PASSWORD
+    - SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD
+  # Nothing added here can be kept off staging: `clear:` deep-merges into every
+  # destination, and a destination can override an inherited key but never remove
+  # it. SOLID_QUEUE_IN_PUMA is absent for that reason and must stay absent — it
+  # is scoped to the production host by the tag below.
   clear:
-    # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
-    #
-    # Accepted tradeoff: this couples job availability to web availability. Puma's
-    # solid_queue plugin monitors the supervisor fork and, if it dies, issues
-    # Process.kill(:INT, $$) on the Puma master — so a queue failure takes the public
-    # site down with it. That is backwards in principle for a marketing site, where the
-    # site is the product and email is secondary, but a dedicated job host means paying
-    # for a second server to run what is currently only contact-form email. Kamal
-    # restarts the container on exit, so the realistic failure mode is a restart rather
-    # than a sustained outage.
-    #
-    # Move jobs to the `job:` host commented out under servers: (and drop this flag) when
-    # either job volume grows enough to compete with web requests for CPU, or a job
-    # becomes important enough that losing it silently matters.
-    SOLID_QUEUE_IN_PUMA: true
+    APP_HOST: www.syndicate-development.com
 
-    # Worker threads per Solid Queue process (default: 3). Also sizes the `queue` database
-    # pool in config/database.yml, which is set to JOB_THREADS + 2 as Solid Queue requires.
-    # JOB_THREADS: 3
+    RAILS_LOG_LEVEL: info
 
-    # Set number of processes dedicated to Solid Queue (default: 1)
-    # JOB_CONCURRENCY: 3
+    WEB_CONCURRENCY: 2
+    RAILS_MAX_THREADS: 5
 
-    # Set number of cores available to the application on each server (default: 1).
-    #
-    # Watch the Postgres connection budget when raising either of these: each Puma worker
-    # holds RAILS_MAX_THREADS primary connections and each job process holds JOB_THREADS+2
-    # against the queue database. WEB_CONCURRENCY=2 with JOB_CONCURRENCY=3 already
-    # approaches Postgres's default max_connections of 100 once every pool is saturated.
-    # WEB_CONCURRENCY: 2
+  tags:
+    solid_queue:
+      clear:
+        SOLID_QUEUE_IN_PUMA: "true"
 
-    # Match this to any external database server to configure Active Record correctly
-    # Use syndicate_development_2026-db for a db accessory server on same machine via local kamal docker network.
-    # DB_HOST: 192.168.0.2
-
-    # Log everything from Rails
-    # RAILS_LOG_LEVEL: debug
-
-# Aliases are triggered with "bin/kamal <alias>". You can overwrite arguments on invocation:
-# "bin/kamal logs -r job" will tail logs from the first server in the job section.
 aliases:
   console: app exec --interactive --reuse "bin/rails console"
   shell: app exec --interactive --reuse "bash"
   logs: app logs -f
   dbc: app exec --interactive --reuse "bin/rails dbconsole --include-password"
 
-# Use a persistent storage volume for sqlite database files and local Active Storage files.
-# Recommended to change this to a mounted volume path that is backed up off server.
 volumes:
   - "syndicate_development_2026_storage:/rails/storage"
 
-# Bridge fingerprinted assets, like JS and CSS, between versions to avoid
-# hitting 404 on in-flight requests. Combines all files from new and old
-# version inside the asset_path.
 asset_path: /rails/public/assets
 
-# Configure the image builder.
 builder:
   arch: amd64
 
-  # # Build image via remote server (useful for faster amd64 builds on arm64 computers)
-  # remote: ssh://docker@docker-builder-server
-  #
-  # # Pass arguments and secrets to the Docker build process
-  # args:
-  #   RUBY_VERSION: ruby-4.0.1
-  # secrets:
-  #   - GITHUB_TOKEN
-  #   - RAILS_MASTER_KEY
+ssh:
+  user: ubuntu
 
-# Use a different ssh user than root
-# ssh:
-#   user: app
+accessories:
+  db:
+    image: postgres:16
+    host: <%= ENV.fetch("KAMAL_PRODUCTION_HOST", "production-not-provisioned.invalid") %>
 
-# Use accessory services (secrets come from .kamal/secrets).
-# accessories:
-#   db:
-#     image: mysql:8.0
-#     host: 192.168.0.2
-#     # Change to 3306 to expose port to the world instead of just local network.
-#     port: "127.0.0.1:3306:3306"
-#     env:
-#       clear:
-#         MYSQL_ROOT_HOST: '%'
-#       secret:
-#         - MYSQL_ROOT_PASSWORD
-#     files:
-#       - config/mysql/production.cnf:/etc/mysql/my.cnf
-#       - db/production.sql:/docker-entrypoint-initdb.d/setup.sql
-#     directories:
-#       - data:/var/lib/mysql
-#   redis:
-#     image: valkey/valkey:8
-#     host: 192.168.0.2
-#     port: 6379
-#     directories:
-#       - data:/data
+    # Loopback ONLY. ufw is inactive on the box, so widening this to 0.0.0.0
+    # publishes Postgres straight to the internet. The app does not use this
+    # mapping — it reaches the container by name on the `kamal` network.
+    port: "127.0.0.1:5432:5432"
+    env:
+      clear:
+        POSTGRES_USER: syndicate_development_2026
+        POSTGRES_DB: syndicate_development_2026_production
+      secret:
+        - POSTGRES_PASSWORD
+
+    volumes:
+      - "syndicate_development_2026_pgdata:/var/lib/postgresql/data"

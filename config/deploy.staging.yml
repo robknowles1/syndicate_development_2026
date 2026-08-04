@@ -1,0 +1,61 @@
+# Staging destination — overlays config/deploy.yml. Runbook:
+# docs/deployment/ovh-server-access.md.
+#
+# Arrays are REPLACED, not merged, so `env.secret` and `volumes` below are
+# complete lists: trimming one to what looks like the staging-only difference
+# silently drops the rest.
+
+servers:
+  web:
+    - 15.204.81.231
+
+proxy:
+  ssl: true
+  host: staging.syndicate-development.com
+
+env:
+  secret:
+    - RAILS_MASTER_KEY
+    - RESEND_API_KEY
+    - ADMIN_SEED_PASSWORD
+    - STAGING_DATABASE_PASSWORD
+  clear:
+    RAILS_ENV: staging
+
+    APP_HOST: staging.syndicate-development.com
+
+    RAILS_LOG_LEVEL: debug
+
+    WEB_CONCURRENCY: 2
+    RAILS_MAX_THREADS: 5
+
+    # Not localhost: this is the accessory container's name on the shared `kamal`
+    # network, and it must match `accessories.db.service` below.
+    STAGING_DATABASE_HOST: syndicate_development_2026-db-staging
+    STAGING_DATABASE_NAME: syndicate_development_2026_staging
+    STAGING_DATABASE_USER: syndicate_development_2026
+
+volumes:
+  - "syndicate_development_2026_staging_storage:/rails/storage"
+
+accessories:
+  db:
+    # Not redundant with the base file: Kamal derives accessory names as
+    # "<service>-<name>" with no destination suffix, so without this line staging
+    # and production both claim "syndicate_development_2026-db".
+    service: syndicate_development_2026-db-staging
+    host: 15.204.81.231
+
+    # Loopback ONLY — ufw is inactive, so 0.0.0.0 publishes staging Postgres to
+    # the internet. The host port differs from production's 5432 because
+    # published ports are not namespaced per destination; only the host side
+    # moves, the container still listens on 5432.
+    port: "127.0.0.1:5433:5432"
+    env:
+      clear:
+        POSTGRES_USER: syndicate_development_2026
+        POSTGRES_DB: syndicate_development_2026_staging
+      secret:
+        - POSTGRES_PASSWORD
+    volumes:
+      - "syndicate_development_2026_staging_pgdata:/var/lib/postgresql/data"
