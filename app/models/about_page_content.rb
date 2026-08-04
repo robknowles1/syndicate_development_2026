@@ -14,6 +14,6 @@ class AboutPageContent < ApplicationRecord
   validates_image_attachment :slideshow_image_1, :slideshow_image_2, :slideshow_image_3
 
   def slideshow_display_variant(slot_number)
-    public_send("slideshow_image_#{slot_number}").variant(resize_to_limit: [ 1200, 1200 ], saver: { quality: 80 })
+    public_send("slideshow_image_#{slot_number}").variant(resize_to_limit: [ 1200, 1200 ], saver: { quality: 80, keep: :icc })
   end
 end

@@ -45,5 +45,15 @@ FactoryBot.define do
         )
       end
     end
+
+    trait :with_camera_metadata_slideshow_image_1 do
+      after(:build) do |content|
+        content.slideshow_image_1.attach(
+          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo_with_metadata.jpg")),
+          filename: "gallery_photo_with_metadata.jpg",
+          content_type: "image/jpeg"
+        )
+      end
+    end
   end
 end

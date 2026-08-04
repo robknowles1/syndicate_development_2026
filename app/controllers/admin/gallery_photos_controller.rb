@@ -8,6 +8,7 @@ module Admin
 
       if @gallery_photo.save
         @gallery_photo.display_variant.processed
+        @gallery_photo.thumbnail_variant.processed
         flash[:notice] = I18n.t("admin.gallery_photos.flash.uploaded")
         redirect_to admin_gallery_photos_path
       else

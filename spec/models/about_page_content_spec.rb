@@ -182,6 +182,19 @@ RSpec.describe AboutPageContent, type: :model do
       # Act & Assert
       expect { record.slideshow_display_variant(1).processed }.not_to raise_error
     end
+
+    it "drops camera metadata but keeps the ICC colour profile, matching SPEC-008's saver options" do
+      # Arrange
+      record = create(:about_page_content, :with_camera_metadata_slideshow_image_1)
+
+      # Act
+      variant = record.slideshow_display_variant(1)
+      fields = Vips::Image.new_from_buffer(variant.processed.image.download, "").get_fields
+
+      # Assert
+      expect(fields).to include("icc-profile-data")
+      expect(fields.grep(/\A(exif-|xmp-|iptc-)/)).to be_empty
+    end
   end
 
   describe "published default" do
