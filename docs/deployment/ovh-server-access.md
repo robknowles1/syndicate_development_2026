@@ -163,6 +163,10 @@ if they are missing. Each traces to a specific review finding.
   Production lists `www.syndicate-development.com` and the apex; staging lists
   `staging.syndicate-development.com`. DNS must match one of these, and `APP_HOST` must
   match `proxy.host` in the Kamal config.
+- **`CONTACT_RECIPIENT_EMAIL` needs no value on either tier.**
+  `config/mail_settings.rb` returns the developer address for every non-production
+  environment regardless of what is set, and falls back to the shop address in
+  production. Setting it outside production has no effect.
 
 ---
 
@@ -183,6 +187,13 @@ shared between destinations therefore has to live in `secrets-common`.
 
 All three files are committed. None of them holds a value: every line reads from the
 deploying shell's environment. Never paste a real credential into one.
+
+Each destination file fans its one exported database password out to two names, because
+two different consumers read it: `POSTGRES_PASSWORD` is read by the `postgres:16` image's
+initdb when the accessory first boots, and the tier-specific name
+(`STAGING_DATABASE_PASSWORD`, `SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD`) by the
+matching block in `config/database.yml`. Both lines are required; they are not a
+duplicate to be deduplicated.
 
 ### Verify the values are present before deploying
 
@@ -289,6 +300,14 @@ To deploy the same thing by hand:
 bin/kamal deploy -d staging
 ```
 
+### Production is not provisioned via Kamal yet
+
+`config/deploy.yml` defaults the production host to the RFC 2606 placeholder
+`production-not-provisioned.invalid`, overridable with `KAMAL_PRODUCTION_HOST`. That name
+does not resolve, so `kamal config` still renders while an accidental `bin/kamal deploy`
+with no destination fails immediately at DNS rather than deploying production onto the
+staging box. Replace it — or export the variable — when production is provisioned.
+
 ### First deploy on a fresh box
 
 Use `setup`, not `deploy`:
@@ -344,9 +363,20 @@ which is what `STAGING_DATABASE_HOST` must match — not over the published host
 
 The published port is bound to **loopback only**, on both tiers. `ufw` is inactive on
 this box, so publishing on `0.0.0.0` would put Postgres directly on the public internet.
-Staging publishes on host port **5433** rather than 5432: container names are namespaced
-per destination but published host ports are not, so if production is ever deployed to
-this same box, whichever accessory started second would fail to bind.
+
+Neither accessory container names nor published host ports are namespaced by
+destination, and the two are kept apart differently. Kamal derives an accessory's
+container name as `<service>-<name>` and appends nothing for the destination, so
+`config/deploy.staging.yml` sets `service: syndicate_development_2026-db-staging`
+explicitly — without that line staging and production would both claim
+`syndicate_development_2026-db`. Host ports cannot be disambiguated that way at all,
+which is why staging publishes on **5433** rather than 5432: if production is ever
+deployed to this same box, whichever accessory started second would fail to bind. Only
+the host side moves — the container still listens on 5432, so `STAGING_DATABASE_HOST`
+resolving to the service name is unaffected. The mapping cannot simply be dropped
+either: Kamal validates `port` as a string, so a null fails with
+`accessories/db/port: should be a string`, and an inherited key can be overridden but
+not removed.
 
 What the mapping buys is host-side access for debugging. Tunnel from a workstation:
 
@@ -367,6 +397,17 @@ bin/kamal accessory exec db -d staging --interactive --reuse \
 create the databases it needs without a separate `CREATEDB` grant. Data lives in a named
 Docker volume rather than a bind mount: a bind mount is created on the host owned by the
 SSH user, and initdb — running as uid 999 inside the image — cannot write to it.
+
+### Connection budget
+
+`RAILS_MAX_THREADS` sets both Puma's thread count and the Active Record pool —
+`config/database.yml` reads the same variable — so `WEB_CONCURRENCY` × `RAILS_MAX_THREADS`
+is the ceiling on connections from the web tier. At 2 × 5 that is 10, against Postgres'
+default limit of 100. Raising either knob spends that budget, as does each Solid Queue
+process: `config/queue.yml` runs `JOB_THREADS` (default 3) worker threads across
+`JOB_CONCURRENCY` (default 1) processes, and `config/database.yml` sizes the `queue` pool
+at `JOB_THREADS + 2`, as Solid Queue requires. Both tiers are sized for the 2 vCPU /
+3.7 GB OVH box.
 
 ---
 

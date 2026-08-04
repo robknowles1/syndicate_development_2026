@@ -1,190 +1,85 @@
-# Kamal base configuration — shared settings plus the PRODUCTION destination.
-#
-# config/deploy.staging.yml overlays this file, so a change made here also
-# reaches staging unless staging overrides it. Deploy staging with:
-#
-#   bin/kamal deploy -d staging
-#
-# PRODUCTION IS NOT PROVISIONED VIA KAMAL YET. The production host below is a
-# deliberate RFC 2606 `.invalid` placeholder, so that `kamal config` renders
-# while an accidental `kamal deploy` (no destination) fails immediately at DNS
-# resolution instead of deploying production onto the staging box. Set
-# KAMAL_PRODUCTION_HOST, or replace the default, when production is provisioned.
+# Kamal base config plus the PRODUCTION destination; config/deploy.staging.yml
+# overlays it. Runbook: docs/deployment/ovh-server-access.md.
 
-# Name of your application. Used to uniquely configure containers.
 service: syndicate_development_2026
 
-# Name of the container image. GitHub Container Registry requires the owner
-# prefix: the image resolves to ghcr.io/robknowles1/syndicate_development_2026.
 image: robknowles1/syndicate_development_2026
 
-# Deploy to these servers.
-#
-# The `: solid_queue` suffix is an env TAG, not part of the hostname. It attaches
-# the `env.tags.solid_queue` block below to this host and only this host, which
-# is how production gets SOLID_QUEUE_IN_PUMA without staging inheriting it. Keep
-# the tag on whichever host is meant to run the Solid Queue supervisor; a host
-# listed without it does not run one.
+# The `: solid_queue` suffix is an env TAG, not a stray colon in the hostname.
+# Removing it silently stops the Solid Queue supervisor from ever starting.
 servers:
   web:
     - <%= ENV.fetch("KAMAL_PRODUCTION_HOST", "production-not-provisioned.invalid") %>: solid_queue
 
-# Terminating proxy. THIS BLOCK IS LOAD-BEARING, NOT OPTIONAL. It is the other
-# half of `config.assume_ssl` in config/environments/production.rb — deploying
-# without it makes admin login silently fail to persist. Do not disable one
-# while the other is on; the failure chain is documented there.
-#
-# `ssl: true` makes kamal-proxy obtain a Let's Encrypt certificate for `host`.
-# That requires `host` to already resolve to this server and port 443 to be
-# reachable, so DNS must be pointed BEFORE the first deploy.
-#
-# Do not add `forward_headers: true`. With `ssl: true` kamal-proxy stops
-# forwarding X-Forwarded-* precisely so a client cannot spoof them, and
-# `assume_ssl` already tells Rails the connection is secure without those
-# headers.
+# Do not remove this block, and do not add `forward_headers: true`. It is the
+# other half of `config.assume_ssl` in config/environments/production.rb: without
+# a terminating proxy admin login silently fails to persist, and forwarding
+# X-Forwarded-* under `ssl: true` lets a client spoof them.
 proxy:
   ssl: true
   host: www.syndicate-development.com
 
-# Where you keep your container images.
 registry:
   server: ghcr.io
   username: robknowles1
-
-  # Supplied at deploy time from the environment via .kamal/secrets-common.
-  # Never commit the token.
   password:
     - KAMAL_REGISTRY_PASSWORD
 
-# Inject ENV variables into containers (secrets come from .kamal/secrets*).
-#
-# `clear:` DEEP-MERGES INTO EVERY DESTINATION. A key set here reaches staging as
-# well, and a destination can override an inherited key but never remove one — so
-# anything that must not apply everywhere belongs under `tags:` below, not here.
 env:
   secret:
     - RAILS_MASTER_KEY
     - RESEND_API_KEY
     - ADMIN_SEED_PASSWORD
     - SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD
+  # Nothing added here can be kept off staging: `clear:` deep-merges into every
+  # destination, and a destination can override an inherited key but never remove
+  # it. SOLID_QUEUE_IN_PUMA is absent for that reason and must stay absent — it
+  # is scoped to the production host by the tag below.
   clear:
-    # Canonical hostname. Feeds mailer link generation and Host-header
-    # authorization — a Host not listed there is rejected with 403.
     APP_HOST: www.syndicate-development.com
 
     RAILS_LOG_LEVEL: info
 
-    # Sized for the 2 vCPU / 3.7 GB OVH box. RAILS_MAX_THREADS sets both Puma's
-    # thread count and the Active Record pool (config/database.yml reads the same
-    # variable), so 2 workers x 5 threads caps this tier at 10 connections
-    # against Postgres' default limit of 100. Raising either knob spends that
-    # budget, as does each Solid Queue process below (JOB_THREADS + 2).
     WEB_CONCURRENCY: 2
     RAILS_MAX_THREADS: 5
 
-    # Worker threads per Solid Queue process (default: 3). Also sizes the `queue`
-    # database pool in config/database.yml, which is set to JOB_THREADS + 2 as
-    # Solid Queue requires.
-    # JOB_THREADS: 3
-
-    # Number of processes dedicated to Solid Queue (default: 1).
-    # JOB_CONCURRENCY: 3
-
-    # SOLID_QUEUE_IN_PUMA IS DELIBERATELY ABSENT FROM THIS BLOCK, AND MUST STAY
-    # ABSENT. The deep merge above would hand it to staging, which has no
-    # solid_queue_* tables — the supervisor would die on boot and Puma's
-    # solid_queue plugin would take staging's whole web tier down with it. It is
-    # scoped to the production host by the `solid_queue` tag below instead.
-
-    # CONTACT_RECIPIENT_EMAIL is not set here and does not need to be.
-    # config/mail_settings.rb returns the developer address for every
-    # non-production environment regardless of this variable, and falls back to
-    # the shop address in production — so the default already routes both tiers
-    # correctly, and setting it outside production has no effect.
-
-  # Per-host env, applied only to hosts carrying the matching tag under
-  # `servers:`. Unlike `clear:` above, tags do NOT reach a destination that
-  # declares its own host list: Kamal deep-merges hashes but replaces arrays
-  # wholesale, so a destination's `servers.web` list drops the base's tagged
-  # hosts. A new destination therefore starts with the supervisor OFF and has to
-  # opt in by tagging a host, which is the safe direction to fail. That is what
-  # makes this the right home for a flag production needs and staging must not
-  # have.
   tags:
-    # Runs the Solid Queue supervisor inside this host's Puma process. Required
-    # in production, where config/environments/production.rb sets
-    # `queue_adapter = :solid_queue` and every `deliver_later` would otherwise be
-    # enqueued and never run — no error, no failed deploy, no email.
-    #
-    # This couples job availability to web availability. The tradeoff, and the
-    # way out of it (add a `job:` role and move this tag to it), are in
-    # docs/deployment/ovh-server-access.md.
     solid_queue:
       clear:
-        # config/puma.rb tests `== "true"`, so this value is load-bearing rather
-        # than merely present. Any other value leaves the supervisor off.
         SOLID_QUEUE_IN_PUMA: "true"
 
-# Aliases are triggered with "bin/kamal <alias>". You can overwrite arguments on invocation:
-# "bin/kamal logs -r job" will tail logs from the first server in the job section.
 aliases:
   console: app exec --interactive --reuse "bin/rails console"
   shell: app exec --interactive --reuse "bash"
   logs: app logs -f
   dbc: app exec --interactive --reuse "bin/rails dbconsole --include-password"
 
-# Named Docker volume for Active Storage uploads (config.active_storage.service
-# is :local). Named rather than a host bind mount so Docker owns the permissions
-# and the data survives redeploys.
 volumes:
   - "syndicate_development_2026_storage:/rails/storage"
 
-# Bridge fingerprinted assets, like JS and CSS, between versions to avoid
-# hitting 404 on in-flight requests. Combines all files from new and old
-# version inside the asset_path.
 asset_path: /rails/public/assets
 
-# Configure the image builder. Both this workstation and the OVH box are x86_64,
-# so amd64 builds natively — no QEMU emulation.
 builder:
   arch: amd64
 
-# Root SSH login is disabled on the OVH Ubuntu image (PermitRootLogin no), and
-# Kamal defaults to root. Without this every command fails with a bare
-# "Permission denied" that looks like a bad key.
 ssh:
   user: ubuntu
 
-# Postgres runs as a Kamal accessory on the same box.
-#
-# Accessories are NOT redeployed with the app: `kamal deploy` leaves a running
-# accessory alone and never creates a missing one. Only `kamal setup` boots them.
-# Boot or reboot one on its own with `kamal accessory boot db` — and read
-# docs/deployment/ovh-server-access.md first, because that command reports
-# success even when the container immediately exits.
 accessories:
   db:
     image: postgres:16
     host: <%= ENV.fetch("KAMAL_PRODUCTION_HOST", "production-not-provisioned.invalid") %>
 
-    # Bound to loopback ONLY. ufw is inactive on the box, so publishing on
-    # 0.0.0.0 would put Postgres directly on the public internet. Loopback still
-    # allows psql/pg_dump from the host over an SSH tunnel; the app itself does
-    # not use this mapping — it reaches the container by name on the `kamal`
-    # Docker network.
+    # Loopback ONLY. ufw is inactive on the box, so widening this to 0.0.0.0
+    # publishes Postgres straight to the internet. The app does not use this
+    # mapping — it reaches the container by name on the `kamal` network.
     port: "127.0.0.1:5432:5432"
     env:
       clear:
-        # POSTGRES_USER is created by initdb as a superuser, which is what lets
-        # `db:prepare` create the databases it needs without a separate CREATEDB
-        # grant. POSTGRES_DB pre-creates the primary database on first boot.
         POSTGRES_USER: syndicate_development_2026
         POSTGRES_DB: syndicate_development_2026_production
       secret:
         - POSTGRES_PASSWORD
 
-    # Named volume, not a `directories:` bind mount. A bind mount is created on
-    # the host owned by the SSH user, and initdb (running as uid 999 inside the
-    # image) cannot write to it. A named volume inherits the image's ownership.
     volumes:
       - "syndicate_development_2026_pgdata:/var/lib/postgresql/data"

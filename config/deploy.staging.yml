@@ -1,16 +1,10 @@
-# Staging destination — overlays config/deploy.yml.
+# Staging destination — overlays config/deploy.yml. Runbook:
+# docs/deployment/ovh-server-access.md.
 #
-#   bin/kamal deploy -d staging
-#
-# Kamal deep-merges this file over the base: hashes merge key by key, arrays are
-# REPLACED wholesale. So `env.secret` and `volumes` below are complete lists, not
-# additions to the base ones.
-#
-# Secrets for this destination come from .kamal/secrets-common plus
-# .kamal/secrets.staging. Note that .kamal/secrets (the base file) is NOT read
-# when a destination is given — anything shared must live in -common.
+# Arrays are REPLACED, not merged, so `env.secret` and `volumes` below are
+# complete lists: trimming one to what looks like the staging-only difference
+# silently drops the rest.
 
-# OVH box: 2 vCPU, 3.7 GB RAM, 38 GB disk, Ubuntu 26.04, x86_64.
 servers:
   web:
     - 15.204.81.231
@@ -24,71 +18,38 @@ env:
     - RAILS_MASTER_KEY
     - RESEND_API_KEY
     - ADMIN_SEED_PASSWORD
-    # config/database.yml's staging block reads this name. .kamal/secrets.staging
-    # also fans the same value out to POSTGRES_PASSWORD for the accessory.
     - STAGING_DATABASE_PASSWORD
   clear:
-    # Overrides the RAILS_ENV=production baked into the Dockerfile, which selects
-    # the `staging:` block in config/database.yml — a SINGLE primary database.
-    # Production's block declares three more connections (cache, queue, cable);
-    # staging uses none of them.
-    #
-    # That is also why staging must never receive SOLID_QUEUE_IN_PUMA: with no
-    # solid_queue_* tables the supervisor dies on boot, and Puma's solid_queue
-    # plugin signals the Puma master when it does — taking staging's web tier
-    # down, not just its jobs. config/deploy.yml scopes that flag to the
-    # production host by tag precisely so this file does not have to opt out; a
-    # destination can override an inherited env.clear key but cannot remove one.
     RAILS_ENV: staging
 
-    # Must match proxy.host above. Any other Host header gets a 403 from host
-    # authorization, and mailer links (password reset, invitations) are built
-    # from this value.
     APP_HOST: staging.syndicate-development.com
 
-    # Staging logs at debug — diagnosing a failed deploy matters more here than
-    # log volume does.
     RAILS_LOG_LEVEL: debug
 
     WEB_CONCURRENCY: 2
     RAILS_MAX_THREADS: 5
 
-    # The accessory container's name, resolved by Docker's embedded DNS on the
-    # shared `kamal` network. Not localhost — the database is a separate
-    # container. Must match `accessories.db.service` below.
+    # Not localhost: this is the accessory container's name on the shared `kamal`
+    # network, and it must match `accessories.db.service` below.
     STAGING_DATABASE_HOST: syndicate_development_2026-db-staging
     STAGING_DATABASE_NAME: syndicate_development_2026_staging
     STAGING_DATABASE_USER: syndicate_development_2026
 
-# Distinct volume name from production so the two tiers can never share Active
-# Storage uploads if they ever land on the same host.
 volumes:
   - "syndicate_development_2026_staging_storage:/rails/storage"
 
 accessories:
   db:
-    # Kamal names accessory containers "<service>-<name>" and does NOT append the
-    # destination, so production and staging would both claim
-    # "syndicate_development_2026-db". Naming this one explicitly keeps them
-    # separate. This value is what STAGING_DATABASE_HOST above must match.
+    # Not redundant with the base file: Kamal derives accessory names as
+    # "<service>-<name>" with no destination suffix, so without this line staging
+    # and production both claim "syndicate_development_2026-db".
     service: syndicate_development_2026-db-staging
     host: 15.204.81.231
 
-    # Distinct HOST port from production's "127.0.0.1:5432:5432" in
-    # config/deploy.yml. The `service:` above keeps the container names apart,
-    # but a published host port is not namespaced by destination — if production
-    # is ever deployed to this same box, whichever accessory starts second fails
-    # to bind 5432. Only the host side moves; the container still listens on
-    # 5432, so STAGING_DATABASE_HOST resolving to the service name is unaffected.
-    #
-    # Dropping the mapping entirely is not available as an option: Kamal
-    # validates `port` as a string, so a null here fails with
-    # "accessories/db/port: should be a string", and an inherited key can be
-    # overridden but not removed.
-    #
-    # Loopback ONLY, as in production: ufw is inactive on this box, so publishing
-    # on 0.0.0.0 would put staging Postgres on the public internet. Reaching it
-    # for debugging is covered in docs/deployment/ovh-server-access.md.
+    # Loopback ONLY — ufw is inactive, so 0.0.0.0 publishes staging Postgres to
+    # the internet. The host port differs from production's 5432 because
+    # published ports are not namespaced per destination; only the host side
+    # moves, the container still listens on 5432.
     port: "127.0.0.1:5433:5432"
     env:
       clear:
