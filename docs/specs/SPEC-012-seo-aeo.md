@@ -28,6 +28,7 @@ This is scoped for one implementation pass, not an exhaustive SEO audit. Where a
 - **No rich text / markdown in FAQ answers.** Plain text only, matching `bio_body`'s plain-textarea precedent (SPEC-007).
 - **No per-page Open Graph image.** One site-wide default image, reused on every page (R40).
 - **No FAQ item in the persistent 5-item admin nav bar.** A sixth item was previously declined for mobile-width reasons (SPEC-009). FAQs and Business Hours follow the existing `Users`/`Account` precedent instead — dashboard-only entry points, not persistent-nav items (R9, R20).
+- **No standalone `/faq` page, route, or controller, and no sitemap entry for one.** The FAQ has no URL of its own — it is always a section of the Home page (R6), the same as everything else on that page, editable through the admin CRUD already specced (Part A) and with no separate visibility control.
 - **No favicon change to the admin layout.** Admin is not a public/crawled surface; the browser's default tab icon is left as-is there.
 - **No `priceRange` on the `LocalBusiness` schema.** No basis exists for stating one without guessing.
 - **No sitemap ping to Google/Bing on deploy**, no `lastmod`/`changefreq`/`priority` in sitemap entries — Google has stated these are largely ignored; omitting them avoids fabricating a freshness signal this app doesn't track.
@@ -127,6 +128,19 @@ New table `business_hours` (singleton — one row, read/written via `first_or_in
 | `created_at` / `updated_at` | datetime | |
 
 `BusinessHours::DAYS = %w[monday tuesday wednesday thursday friday saturday sunday].freeze` — the one ordered list the admin form, the public hours list, and the schema builder all iterate, so no second copy of the day order can drift (R12).
+
+### FAQ Seed Content
+
+This is the single, authoritative copy of the six question/answer pairs `db/seeds.rb` must create (R59) — normative content, not illustrative. It does not appear anywhere else in this document. Positions are 0-indexed in the order listed.
+
+| Position | Question | Answer |
+|----------|----------|--------|
+| 0 | What suspension work does Syndicate Development offer? | We handle full suspension service for motocross and supercross bikes — revalving and re-springing tuned to your weight and riding style, fork and shock rebuilds, linkage and bearing service, and setup for track day or race day. Whether you're running stock components or a full custom suspension package, we tune it to how you actually ride. |
+| 1 | Do you build complete race engines? | Yes. We do full engine builds and rebuilds for motocross and supercross bikes, including top-end and bottom-end service, porting and head work, valve train upgrades, and engine blueprinting and balancing. Every build is set up and verified on our in-house dyno before it goes back to you. |
+| 2 | Can you tune my bike's ECU? | We do fuel injection mapping, ignition timing, and custom ECU tuning for fuel-injected motocross and supercross bikes, including launch and traction control setup and custom maps for aftermarket exhausts and air kits. All tuning is dyno-verified, not guesswork. |
+| 3 | How long does a typical job take? | Turnaround depends on the scope of the work — a suspension service or ECU tune is usually quicker than a full engine build. Give us a call or send a message with what you need done and we'll give you a realistic timeline before you drop the bike off. |
+| 4 | Do you work on stock or trail bikes, or only race bikes? | Both. While we specialize in custom performance work for motocross and supercross machines, we also handle regular servicing for stock and trail bikes — from routine maintenance to the same suspension and engine work we do for race bikes. |
+| 5 | Do customers travel from outside Pocatello for work here? | Yes — riders travel from across Idaho and northern Utah for suspension, engine, and ECU work, including from Idaho Falls, Boise, and the Salt Lake area. If you're coming from out of town, give us a call ahead of time so we can plan your build or service around your trip. |
 
 ### New Helper
 
@@ -230,6 +244,10 @@ R9: Neither `Admin::FaqsController` nor `Admin::BusinessHoursController` (Part B
 R10: All admin-facing UI strings in `app/views/admin/faqs/` and `Admin::FaqsController` are rendered via `t()` under `admin.faqs`. No hardcoded English strings.
 
 R11: The admin FAQ list, new, and edit forms follow CLAUDE.md's mobile-first rules: no horizontal scroll at any viewport width including 375 px; text inputs and the answer textarea carry `w-full`; the save button carries at minimum `py-3`; each card's Move Up/Down/Edit/Delete controls wrap (`flex flex-wrap gap-2`) rather than overflow, matching the established `services_pages` pattern.
+
+R59 *(added out of sequence — see Change Log)*: `db/seeds.rb` creates exactly the 6 `Faq` rows listed in Interfaces → FAQ Seed Content, at positions 0–5 in that exact order, using the `question`/`answer` text **verbatim — not paraphrased or regenerated at implementation time** (mirrors R25's identical requirement for per-page title/description copy).
+
+R60 *(added out of sequence — see Change Log)*: The seed is **create-if-absent, keyed on `question` text** — `Faq.find_or_create_by!(question: <literal question>) { |faq| faq.answer = <literal answer>; faq.position = <0..5> }` for each of the 6 rows in Interfaces → FAQ Seed Content, in order. `answer` and `position` are set only inside the block, which ActiveRecord executes solely on create — never when an existing row with that `question` is found. This is deliberately **not** an upsert: running `db/seeds.rb` a second time must not raise, must not create duplicate rows, and — critically — must not overwrite an `answer` an admin has since reworded through `PATCH /admin/faqs/:id`, since a matched existing row's `answer` is never touched by a re-run. Keyed on `question` rather than `position`, because `position` changes under ordinary use (Move Up/Down, R4) and a `position`-keyed seed could either miss an already-seeded row that's been reordered or silently touch the wrong one.
 
 ### Part B — Business Hours
 
@@ -405,6 +423,10 @@ E3: `move_up` is called on the `Faq` already at the lowest position (no lower ne
 
 E4: An `Faq` question or answer contains characters that are special in JSON or HTML (`"`, `<`, `&`, an embedded `</script>`-like string). Both the visible `<details>` rendering (auto-escaped by ERB) and the `FAQPage` script (`json_escape`, R32) render it safely; neither breaks page structure.
 
+E26 *(added out of sequence — see Change Log)*: `db/seeds.rb` runs a second time with no admin edits made in between. `Faq.count` is still 6 (R60); no duplicate rows exist for any of the 6 questions; the run does not raise.
+
+E27 *(added out of sequence — see Change Log)*: `db/seeds.rb` runs once (creating the 6 rows), an admin then edits one row's `answer` via `PATCH /admin/faqs/:id`, and `db/seeds.rb` runs a third time. That row's `answer` still equals the admin's edited text, not the original seed text (R60) — a reseed never reverts a deliberate edit. *Accepted limitation, documented rather than solved:* if an admin instead **deletes** a seeded row entirely, a subsequent reseed recreates it (the `question`-based lookup finds nothing and creates a fresh row) — the same resurrection behavior this codebase's existing `ServiceSection` seed already exhibits for a deleted section (`db/seeds.rb`'s `find_by(heading:...) || ... else create`). Solving deletion-survival was not asked for here and would need a tombstone or a seed-version flag; not introduced for a single seed step.
+
 E5: `BusinessHours` has a row where `monday_opens_at` is set but `monday_closes_at` is blank. Invalid (R14); update rejected at 422.
 
 E6: `BusinessHours` has a row where every day is blank (the seeded state). `opening_hours_specification` returns `nil` (R16); `local_business_schema` omits `openingHoursSpecification` entirely (R17); the About page's visible hours block is omitted entirely (R19).
@@ -480,6 +502,12 @@ AC-12: `GET /admin` includes `href`s matching both `admin_faqs_path` and `admin_
 AC-13: No hardcoded English strings in `app/views/admin/faqs/` or `Admin::FaqsController`.
 
 AC-14: The admin FAQ index/new/edit views render without horizontal scroll at 375 px; text inputs and the answer textarea carry `w-full`; the save button carries `py-3`.
+
+AC-61 *(added out of sequence — see Change Log)*: Given a clean database, when `db/seeds.rb` runs, then exactly 6 `Faq` rows exist at positions 0–5, in that order, with `question`/`answer` matching Interfaces → FAQ Seed Content verbatim.
+
+AC-62 *(added out of sequence — see Change Log)*: Given `db/seeds.rb` has already run once with no admin edits since, when `db/seeds.rb` runs again, then `Faq.count` is still 6 and no duplicate rows exist.
+
+AC-63 *(added out of sequence — see Change Log)*: Given `db/seeds.rb` has run once and an admin has since edited one seeded `Faq`'s `answer` via `PATCH /admin/faqs/:id`, when `db/seeds.rb` runs again, then that row's `answer` still equals the admin's edited text (not the original seed text) and `Faq.count` is still 6.
 
 ### Business Hours
 
@@ -660,6 +688,24 @@ Given admin is authenticated
 When `GET /admin`
 Then the response includes `href`s for `admin_faqs_path` and `admin_business_hours_path`, and neither appears inside the persistent nav `<ul>`
 Covers: R9, AC-12
+
+AT52 *(added out of sequence — see Change Log)*
+Given a clean database
+When `db/seeds.rb` runs
+Then exactly 6 `Faq` rows exist at positions 0–5, in that order, with `question`/`answer` matching Interfaces → FAQ Seed Content verbatim
+Covers: R59, AC-61
+
+AT53 *(added out of sequence — see Change Log)*
+Given `db/seeds.rb` has already run once
+When `db/seeds.rb` runs again with no admin edits in between
+Then `Faq.count` is still 6 and no duplicate rows exist for any of the 6 questions
+Covers: R60, AC-62, E26
+
+AT54 *(added out of sequence — see Change Log)*
+Given `db/seeds.rb` has run once and an admin has since edited one seeded `Faq`'s `answer`
+When `db/seeds.rb` runs a third time
+Then that row's `answer` still equals the admin's edited text, not the original seed text, and `Faq.count` is still 6
+Covers: R60, AC-63, E27
 
 AT13
 Given zero prior `BusinessHours` rows
@@ -902,6 +948,7 @@ Covers: R47, AC-60
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-08-04 | `Faq` is purely database-backed — no `published` flag, no i18n fallback, no restore-defaults action | Mirrors `ServiceSection` (ADR-001), not `AboutPageContent`/`HomePageContent` (ADR-004). FAQ has no pre-existing "original" copy to restore to, and every record is fully validated before it can ever be seen — the "never blank" guarantee ADR-004's pattern exists to provide is already satisfied by ordinary presence validation on create. |
+| 2026-08-04, amended | The FAQ seed is **create-if-absent, keyed on `question` text** (R60) — explicitly not an upsert | An upsert would overwrite an admin's reworded `answer` on every reseed, defeating the point of making FAQ admin-editable at all. Keyed on `question` rather than `position` because position changes under ordinary Move Up/Down use; keyed on `question` rather than a synthetic ID/slug because no such field exists on `Faq` and inventing one for this alone would be scope creep. Accepted, documented limitation: if an admin *deletes* a seeded row entirely, a reseed recreates it — the same resurrection behavior this codebase's existing `ServiceSection` seed already exhibits for a deleted section, not a new gap introduced here (E27). |
 | 2026-08-04 | `BusinessHours` uses blank-columns-as-signal instead of a `published` flag | The brief's own requirement — "omit `openingHours` entirely while blank" — is already exactly what per-day column presence gives for free. A separate flag would let hours be "published" while still blank, an extra state with no useful meaning. |
 | 2026-08-04 | FAQ and Business Hours are dashboard-only links, not persistent-nav items | SPEC-009 already declined a 6th persistent nav item for mobile-width reasons and established the precedent (`Users`, `Account`) of dashboard-only entry points for secondary admin surfaces. Two new resources following the same precedent is more consistent than reopening that constraint. |
 | 2026-08-04 | `LocalBusiness` schema uses `@type: "MotorcycleRepair"` | Schema.org's closest valid subtype for this business (`LocalBusiness > AutomotiveBusiness > MotorcycleRepair`), verified against schema.org's own type hierarchy during spec authoring. Every property used remains valid on plain `LocalBusiness` too, so this is reversible in one line if it ever proves to hurt rich-result eligibility. |
@@ -932,7 +979,7 @@ Covers: R47, AC-60
 
 | Task | Description | ACs covered | Points |
 |------|-------------|-------------|--------|
-| T1 | `Faq` model + migration + validations (R1–R3); `Admin::FaqsController` (index/new/create/edit/update/destroy/move_up/move_down, R4); admin views mirroring `services_pages` stacked-card pattern (R5, R11); dashboard links (R9); i18n keys (R10). | AC-1–AC-7, AC-12–AC-14 | 5 |
+| T1 | `Faq` model + migration + validations (R1–R3); `Admin::FaqsController` (index/new/create/edit/update/destroy/move_up/move_down, R4); admin views mirroring `services_pages` stacked-card pattern (R5, R11); dashboard links (R9); i18n keys (R10); `db/seeds.rb` creates the 6 literal `Faq` rows verbatim, create-if-absent keyed on `question` (R59–R60). | AC-1–AC-7, AC-12–AC-14, AC-61–AC-63 | 6 |
 | T2 | `BusinessHours` model + migration + validations (R12–R14); `db/seeds.rb` blank-seed (R15); `Admin::BusinessHoursController` show/update (R18, R20); admin form; i18n keys. | AC-15–AC-21, AC-58 | 3 |
 | T3 | Home page: `@faqs` assignment, FAQ `<details>` section + `FAQPage` JSON-LD (R6–R8); About page: visible hours list (R19). | AC-8–AC-11, AC-22, AC-23 | 3 |
 | T4 | `structured_data_helper.rb`: `local_business_schema` + `BusinessHours#opening_hours_specification` (R16, R17, R26–R32); wire into layout `<head>`; fixed constants module. | AC-24, AC-25, AC-30–AC-34 | 5 |
@@ -942,7 +989,11 @@ Covers: R47, AC-60
 | T8 | Contact form: honeypot field + rejection (R51, R53); signed timing token + rejection (R54); two `rate_limit` declarations (R48–R50); `fake_success_response` (R52); check ordering (R55); `deliver_now` retained note (R56). | AC-48–AC-55 | 5 |
 | T9 | Update `spec/requests/contacts_spec.rb` (`valid_params` default token, new spam-rejection scenarios, R57) and `spec/system/contact_form_spec.rb` (pre-submit wait, R58); full model/request/system test coverage for T1–T7 (FAQ, BusinessHours, schema, sitemap/robots, OG, footer, favicon, mobile-first 375px checks). | AC-56, AC-57 (+ regression coverage for all above) | 5 |
 
-Total estimated points: 34. T4 and T8 sit closest to the 5-point split-review guardrail; both were reviewed and kept as single tasks — T4 has no natural mid-point split (the helper's two methods are read by the same layout change in the same PR), and T8's five sub-mechanisms (honeypot, timing, two rate limits, shared response) are small individually but must land together for the check ordering (R55) to be testable at all.
+Total estimated points: 35. Four tasks sit at or above the 5-point split-review guardrail (T1, T4, T8, T9); each was reviewed and kept as a single task rather than split:
+- **T1 (6)** — the seed addition (R59–R60) is a small, mechanical literal-array-plus-loop attached to the model it seeds; splitting it into its own task would review the six literal strings in isolation from the model/validation code that gives them meaning, which is less useful, not more.
+- **T4 (5)** — no natural mid-point split; the helper's two methods (`local_business_schema`, `opening_hours_specification`) are consumed by the same single layout change in the same PR.
+- **T8 (5)** — its five sub-mechanisms (honeypot, timing, two rate limits, shared fake-success response) are small individually but must land together for the check ordering (R55) to be testable at all; a partial landing would leave the contact form's spam defenses incomplete mid-review.
+- **T9 (5)** — pure test coverage for T1–T8's combined surface; splitting it would mean either duplicating setup across multiple test-only PRs or reviewing tests without the code they exercise having fully landed.
 
 ---
 
@@ -951,6 +1002,8 @@ Total estimated points: 34. T4 and T8 sit closest to the 5-point split-review gu
 | Date | Change | Affected IDs | Rationale |
 |------|--------|-------------|-----------|
 | 2026-08-04 | Initial draft | All | Translates the user's SEO/AEO scope decisions (FAQ, per-page metadata, structured data, sitemap/robots, OG tags, footer, favicon, blank-seeded opening hours) plus mid-authoring additions — expanded `areaServed` geo terms (Idaho Falls, Boise, Idaho, Utah, confirmed genuine per the user's "customers travel because he's one of the best in the region"), the explicit exclusion of any shipping/mail-in claim, and contact form spam protection (honeypot, timing check, rate limiting) — into one implementation-ready spec, per explicit instruction to favor a single one-pass document over an exhaustive multi-spec decomposition. |
+| 2026-08-04 | FAQ seed item 1 corrected: removed a misplaced "dyno-verified" that had welded two separate Services-page bullets together, leaving it modifying a clause neither bullet actually makes | Interfaces → FAQ Seed Content (position 0) | User review of the seeded copy. Straight text deletion, no other wording change; items 2 and 3's own "dyno-verified" (engine/ECU work) were already correct and untouched. |
+| 2026-08-04 | FAQ seed content promoted from an informal Open Questions note to normative content: moved into Interfaces → FAQ Seed Content (single authoritative copy), with new rules pinning it verbatim (R59) and specifying an idempotent, non-clobbering seed mechanism (R60) — create-if-absent keyed on `question` text, explicitly not an upsert, so a reseed never overwrites an admin's reworded answer. Added E26–E27, AC-61–AC-63, AT52–AT54 (added out of sequence, physically positioned near the other Part A / FAQ items) | R59, R60; E26, E27; AC-61–AC-63; AT52–AT54; T1 (bumped 5→6 points) | User review flagged that nothing in the spec previously stopped an implementer from paraphrasing or regenerating the seed copy — the six answers lived only in an Open Questions aside, unreferenced by any R#/AC#, which is exactly the section a developer reads as unresolved. |
 
 ---
 
@@ -958,27 +1011,9 @@ Total estimated points: 34. T4 and T8 sit closest to the 5-point split-review gu
 
 None blocking implementation. Two items were explicitly resolved with the user during spec authoring rather than left open:
 
-1. **Whether the shop takes customers who travel from outside Pocatello** — confirmed yes; reflected in `areaServed` (R30) and FAQ item 6 (seed content below).
+1. **Whether the shop takes customers who travel from outside Pocatello** — confirmed yes; reflected in `areaServed` (R30) and FAQ item 6 (Interfaces → FAQ Seed Content).
 2. **Whether the shop ships parts / offers remote service** — confirmed no; explicitly excluded (Non-Goals), with a note against re-adding it by assumption later.
 
-One item is worth flagging for Doug specifically, not the developer: the FAQ is seeded with real, considered answers (not placeholders) so the admin never sees blank content, but seed content is still a starting draft in Doug's own voice, editable from the moment this ships. He should read all 6 before this reaches production, particularly the travel/out-of-state answer.
+**FAQ seed content lives in Interfaces → FAQ Seed Content** (normative, required verbatim by R59) — not reproduced here, so there is exactly one copy of that text in this document.
 
-**FAQ seed content** (for `db/seeds.rb`, `position` 0–5):
-
-1. Q: "What suspension work does Syndicate Development offer?"
-   A: "We handle full suspension service for motocross and supercross bikes — revalving and re-springing tuned to your weight and riding style, fork and shock rebuilds, linkage and bearing service, and setup for track day or race day. Whether you're running stock components or a full custom suspension package, we tune it to how you actually ride."
-
-2. Q: "Do you build complete race engines?"
-   A: "Yes. We do full engine builds and rebuilds for motocross and supercross bikes, including top-end and bottom-end service, porting and head work, valve train upgrades, and engine blueprinting and balancing. Every build is set up and verified on our in-house dyno before it goes back to you."
-
-3. Q: "Can you tune my bike's ECU?"
-   A: "We do fuel injection mapping, ignition timing, and custom ECU tuning for fuel-injected motocross and supercross bikes, including launch and traction control setup and custom maps for aftermarket exhausts and air kits. All tuning is dyno-verified, not guesswork."
-
-4. Q: "How long does a typical job take?"
-   A: "Turnaround depends on the scope of the work — a suspension service or ECU tune is usually quicker than a full engine build. Give us a call or send a message with what you need done and we'll give you a realistic timeline before you drop the bike off."
-
-5. Q: "Do you work on stock or trail bikes, or only race bikes?"
-   A: "Both. While we specialize in custom performance work for motocross and supercross machines, we also handle regular servicing for stock and trail bikes — from routine maintenance to the same suspension and engine work we do for race bikes."
-
-6. Q: "Do customers travel from outside Pocatello for work here?"
-   A: "Yes — riders travel from across Idaho and northern Utah for suspension, engine, and ECU work, including from Idaho Falls, Boise, and the Salt Lake area. If you're coming from out of town, give us a call ahead of time so we can plan your build or service around your trip."
+One item is worth flagging for Doug specifically, not the developer: the FAQ is seeded with real, considered answers (not placeholders) so the admin never sees blank content, but seed content is still a starting draft in Doug's own voice, editable from the moment this ships. He should read all 6 before this reaches production, particularly item 6 (position 5), whose claim about customers traveling from the Salt Lake area was inferred rather than confirmed line-by-line during spec authoring. If any answer needs correcting, the FAQ is already admin-editable, and R60 guarantees an edit like that survives a reseed.
