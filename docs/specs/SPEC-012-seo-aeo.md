@@ -247,7 +247,13 @@ R11: The admin FAQ list, new, and edit forms follow CLAUDE.md's mobile-first rul
 
 R59 *(added out of sequence — see Change Log)*: `db/seeds.rb` creates exactly the 6 `Faq` rows listed in Interfaces → FAQ Seed Content, at positions 0–5 in that exact order, using the `question`/`answer` text **verbatim — not paraphrased or regenerated at implementation time** (mirrors R25's identical requirement for per-page title/description copy).
 
-R60 *(added out of sequence — see Change Log)*: The seed is **create-if-absent, keyed on `question` text** — `Faq.find_or_create_by!(question: <literal question>) { |faq| faq.answer = <literal answer>; faq.position = <0..5> }` for each of the 6 rows in Interfaces → FAQ Seed Content, in order. `answer` and `position` are set only inside the block, which ActiveRecord executes solely on create — never when an existing row with that `question` is found. This is deliberately **not** an upsert: running `db/seeds.rb` a second time must not raise, must not create duplicate rows, and — critically — must not overwrite an `answer` an admin has since reworded through `PATCH /admin/faqs/:id`, since a matched existing row's `answer` is never touched by a re-run. Keyed on `question` rather than `position`, because `position` changes under ordinary use (Move Up/Down, R4) and a `position`-keyed seed could either miss an already-seeded row that's been reordered or silently touch the wrong one.
+R60 *(added out of sequence — see Change Log; mechanism corrected, see Change Log)*: The seed is a **table-empty guard**, not a per-row lookup — `db/seeds.rb` creates all 6 rows from Interfaces → FAQ Seed Content **only when `Faq.count.zero?`**, e.g. `Faq.create!(question:, answer:, position:) for each (question, answer) in Interfaces → FAQ Seed Content, with position 0-5, all inside an if Faq.count.zero? guard`. If **any** `Faq` row already exists, for any reason, the seed does nothing at all — no create, no update, no per-row lookup.
+
+*Implementation Decision, replaces an earlier per-row `find_or_create_by!(question:)` design (see Change Log):* that mechanism broke the moment an admin reworded a *question* — the very field it matched on. A reworded question no longer matches its original seed row, so a reseed would create a 7th, duplicate FAQ rather than recognizing the edited row as the same one. Rewording a question is not an edge case for an admin-editable FAQ; it is the ordinary use of one (E28). A table-empty guard closes the entire class of problem rather than patching one instance of it: it makes no assumption about which fields are stable, because it inspects nothing about individual rows — only whether the table has been touched at all. The seed's purpose is that the admin is not blank on first boot; once any `Faq` row exists, Doug owns the collection, and the seed has no further business touching it — whether he has edited a question, edited an answer, reordered rows, deleted some, or added his own.
+
+This also removes a subtler defect the old mechanism had: deleting 3 of the 6 seeded rows and reseeding **used to silently restore exactly those 3** (the lookup found no match for the missing questions and recreated them) — partial resurrection nobody asked for. Under the table-empty guard, any surviving row blocks the seed entirely, so a partial deletion stays exactly as deleted (E29).
+
+**One consequence, stated plainly rather than left to be discovered:** if Doug deletes *every* `Faq` row, a later reseed restores all 6, verbatim, because an empty table is indistinguishable from a fresh install — there is no way for the seed to tell "never seeded" apart from "seeded, then fully cleared" (E30). This is an accepted trade-off, not an oversight: it is strictly better than the old mechanism's partial-resurrection behavior, and it requires a far less likely admin action (clearing the entire starter set) than the bug it replaces (rewording one question).
 
 ### Part B — Business Hours
 
@@ -423,9 +429,15 @@ E3: `move_up` is called on the `Faq` already at the lowest position (no lower ne
 
 E4: An `Faq` question or answer contains characters that are special in JSON or HTML (`"`, `<`, `&`, an embedded `</script>`-like string). Both the visible `<details>` rendering (auto-escaped by ERB) and the `FAQPage` script (`json_escape`, R32) render it safely; neither breaks page structure.
 
-E26 *(added out of sequence — see Change Log)*: `db/seeds.rb` runs a second time with no admin edits made in between. `Faq.count` is still 6 (R60); no duplicate rows exist for any of the 6 questions; the run does not raise.
+E26 *(added out of sequence — see Change Log)*: `db/seeds.rb` runs a second time with no admin edits made in between. `Faq.count` is non-zero, so the guard (R60) skips entirely; still exactly 6 rows, no duplicates, the run does not raise.
 
-E27 *(added out of sequence — see Change Log)*: `db/seeds.rb` runs once (creating the 6 rows), an admin then edits one row's `answer` via `PATCH /admin/faqs/:id`, and `db/seeds.rb` runs a third time. That row's `answer` still equals the admin's edited text, not the original seed text (R60) — a reseed never reverts a deliberate edit. *Accepted limitation, documented rather than solved:* if an admin instead **deletes** a seeded row entirely, a subsequent reseed recreates it (the `question`-based lookup finds nothing and creates a fresh row) — the same resurrection behavior this codebase's existing `ServiceSection` seed already exhibits for a deleted section (`db/seeds.rb`'s `find_by(heading:...) || ... else create`). Solving deletion-survival was not asked for here and would need a tombstone or a seed-version flag; not introduced for a single seed step.
+E27 *(added out of sequence — see Change Log)*: `db/seeds.rb` runs once (creating the 6 rows), an admin then edits one row's `answer` via `PATCH /admin/faqs/:id`, and `db/seeds.rb` runs again. That row's `answer` still equals the admin's edited text, not the original seed text — the guard (R60) never touches an existing row's fields, so a reseed never reverts a deliberate edit. `Faq.count` is unchanged.
+
+E28 *(added out of sequence — see Change Log)*: **The defect this correction fixes.** `db/seeds.rb` runs once (creating the 6 rows), an admin rewords one row's *question* — not its answer — via `PATCH /admin/faqs/:id` (e.g. "Can you tune my bike's ECU?" → "Do you do ECU tuning?"), and `db/seeds.rb` runs again. The guard (R60) sees `Faq.count` non-zero and does nothing: the reworded question is untouched, and — critically — no 7th row is created. `Faq.count` is still 6, not 7.
+
+E29 *(added out of sequence — see Change Log)*: An admin deletes 3 of the 6 seeded `Faq` rows (`Faq.count` is now 3, not 0), then `db/seeds.rb` runs again. The guard (R60) sees `Faq.count` non-zero and does nothing — `Faq.count` is still 3 afterward; none of the 3 deleted rows are recreated. This is a deliberate behavior change from the mechanism R60 replaced, which used to silently restore exactly the deleted rows.
+
+E30 *(added out of sequence — see Change Log)*: An admin deletes **all 6** seeded `Faq` rows (`Faq.count` is 0), then `db/seeds.rb` runs again. The guard (R60) sees `Faq.count.zero?` and recreates all 6 rows, verbatim, from Interfaces → FAQ Seed Content — indistinguishable from a fresh install that has never been seeded. Documented, accepted trade-off (R60), not a defect: recorded here so it is discovered by reading the spec, not by a confused deploy.
 
 E5: `BusinessHours` has a row where `monday_opens_at` is set but `monday_closes_at` is blank. Invalid (R14); update rejected at 422.
 
@@ -508,6 +520,12 @@ AC-61 *(added out of sequence — see Change Log)*: Given a clean database, when
 AC-62 *(added out of sequence — see Change Log)*: Given `db/seeds.rb` has already run once with no admin edits since, when `db/seeds.rb` runs again, then `Faq.count` is still 6 and no duplicate rows exist.
 
 AC-63 *(added out of sequence — see Change Log)*: Given `db/seeds.rb` has run once and an admin has since edited one seeded `Faq`'s `answer` via `PATCH /admin/faqs/:id`, when `db/seeds.rb` runs again, then that row's `answer` still equals the admin's edited text (not the original seed text) and `Faq.count` is still 6.
+
+AC-64 *(added out of sequence — see Change Log; regression coverage for the defect corrected in R60)*: Given `db/seeds.rb` has run once and an admin has since edited one seeded `Faq`'s **`question`** (not its `answer`) via `PATCH /admin/faqs/:id`, when `db/seeds.rb` runs again, then that row's `question` still equals the admin's edited text, `Faq.count` is still 6 (not 7), and no row exists with the original, pre-edit question text.
+
+AC-65 *(added out of sequence — see Change Log)*: Given `db/seeds.rb` has run once and an admin has since deleted 3 of the 6 seeded `Faq` rows, when `db/seeds.rb` runs again, then `Faq.count` is still 3 and none of the 3 deleted rows have been recreated.
+
+AC-66 *(added out of sequence — see Change Log)*: Given `db/seeds.rb` has run once and an admin has since deleted all 6 seeded `Faq` rows (`Faq.count` is 0), when `db/seeds.rb` runs again, then all 6 rows from Interfaces → FAQ Seed Content are recreated verbatim, at positions 0–5.
 
 ### Business Hours
 
@@ -703,9 +721,27 @@ Covers: R60, AC-62, E26
 
 AT54 *(added out of sequence — see Change Log)*
 Given `db/seeds.rb` has run once and an admin has since edited one seeded `Faq`'s `answer`
-When `db/seeds.rb` runs a third time
+When `db/seeds.rb` runs again
 Then that row's `answer` still equals the admin's edited text, not the original seed text, and `Faq.count` is still 6
 Covers: R60, AC-63, E27
+
+AT55 *(added out of sequence — see Change Log; regression test for the defect corrected in R60)*
+Given `db/seeds.rb` has run once and an admin has since edited one seeded `Faq`'s `question` (e.g. "Can you tune my bike's ECU?" reworded to "Do you do ECU tuning?")
+When `db/seeds.rb` runs again
+Then that row's `question` still equals the admin's edited text, `Faq.count` is still 6, and no row exists whose `question` equals the original, pre-edit text
+Covers: R60, AC-64, E28
+
+AT56 *(added out of sequence — see Change Log)*
+Given `db/seeds.rb` has run once and an admin has since deleted 3 of the 6 seeded `Faq` rows
+When `db/seeds.rb` runs again
+Then `Faq.count` is still 3 and none of the 3 deleted rows have been recreated
+Covers: R60, AC-65, E29
+
+AT57 *(added out of sequence — see Change Log)*
+Given `db/seeds.rb` has run once and an admin has since deleted all 6 seeded `Faq` rows
+When `db/seeds.rb` runs again
+Then all 6 rows from Interfaces → FAQ Seed Content are recreated verbatim at positions 0–5
+Covers: R60, AC-66, E30
 
 AT13
 Given zero prior `BusinessHours` rows
@@ -948,7 +984,7 @@ Covers: R47, AC-60
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-08-04 | `Faq` is purely database-backed — no `published` flag, no i18n fallback, no restore-defaults action | Mirrors `ServiceSection` (ADR-001), not `AboutPageContent`/`HomePageContent` (ADR-004). FAQ has no pre-existing "original" copy to restore to, and every record is fully validated before it can ever be seen — the "never blank" guarantee ADR-004's pattern exists to provide is already satisfied by ordinary presence validation on create. |
-| 2026-08-04, amended | The FAQ seed is **create-if-absent, keyed on `question` text** (R60) — explicitly not an upsert | An upsert would overwrite an admin's reworded `answer` on every reseed, defeating the point of making FAQ admin-editable at all. Keyed on `question` rather than `position` because position changes under ordinary Move Up/Down use; keyed on `question` rather than a synthetic ID/slug because no such field exists on `Faq` and inventing one for this alone would be scope creep. Accepted, documented limitation: if an admin *deletes* a seeded row entirely, a reseed recreates it — the same resurrection behavior this codebase's existing `ServiceSection` seed already exhibits for a deleted section, not a new gap introduced here (E27). |
+| 2026-08-04, corrected (see Change Log) | The FAQ seed is a **table-empty guard** (`Faq.count.zero?`) (R60), not a per-row lookup | A per-row `find_or_create_by!(question:)` design was specified first and found defective on review: it matched on `question`, but `question` is admin-editable (R2, the edit form exposes it), so rewording a question — ordinary use, not an edge case — made a reseed create a 7th, duplicate row instead of recognizing the edited one. A table-empty guard closes the whole class of problem (question edits, answer edits, reordering, partial deletion) rather than patching the one instance found, because it inspects nothing about individual rows. Accepted, documented trade-off: deleting *every* `Faq` row makes a reseed indistinguishable from a fresh install, so it restores all 6 (E30) — worse than doing nothing, better than the prior mechanism's partial resurrection of exactly the rows an admin had deliberately deleted (E29). |
 | 2026-08-04 | `BusinessHours` uses blank-columns-as-signal instead of a `published` flag | The brief's own requirement — "omit `openingHours` entirely while blank" — is already exactly what per-day column presence gives for free. A separate flag would let hours be "published" while still blank, an extra state with no useful meaning. |
 | 2026-08-04 | FAQ and Business Hours are dashboard-only links, not persistent-nav items | SPEC-009 already declined a 6th persistent nav item for mobile-width reasons and established the precedent (`Users`, `Account`) of dashboard-only entry points for secondary admin surfaces. Two new resources following the same precedent is more consistent than reopening that constraint. |
 | 2026-08-04 | `LocalBusiness` schema uses `@type: "MotorcycleRepair"` | Schema.org's closest valid subtype for this business (`LocalBusiness > AutomotiveBusiness > MotorcycleRepair`), verified against schema.org's own type hierarchy during spec authoring. Every property used remains valid on plain `LocalBusiness` too, so this is reversible in one line if it ever proves to hurt rich-result eligibility. |
@@ -979,7 +1015,7 @@ Covers: R47, AC-60
 
 | Task | Description | ACs covered | Points |
 |------|-------------|-------------|--------|
-| T1 | `Faq` model + migration + validations (R1–R3); `Admin::FaqsController` (index/new/create/edit/update/destroy/move_up/move_down, R4); admin views mirroring `services_pages` stacked-card pattern (R5, R11); dashboard links (R9); i18n keys (R10); `db/seeds.rb` creates the 6 literal `Faq` rows verbatim, create-if-absent keyed on `question` (R59–R60). | AC-1–AC-7, AC-12–AC-14, AC-61–AC-63 | 6 |
+| T1 | `Faq` model + migration + validations (R1–R3); `Admin::FaqsController` (index/new/create/edit/update/destroy/move_up/move_down, R4); admin views mirroring `services_pages` stacked-card pattern (R5, R11); dashboard links (R9); i18n keys (R10); `db/seeds.rb` creates the 6 literal `Faq` rows verbatim, guarded by `Faq.count.zero?` (R59–R60). | AC-1–AC-7, AC-12–AC-14, AC-61–AC-66 | 6 |
 | T2 | `BusinessHours` model + migration + validations (R12–R14); `db/seeds.rb` blank-seed (R15); `Admin::BusinessHoursController` show/update (R18, R20); admin form; i18n keys. | AC-15–AC-21, AC-58 | 3 |
 | T3 | Home page: `@faqs` assignment, FAQ `<details>` section + `FAQPage` JSON-LD (R6–R8); About page: visible hours list (R19). | AC-8–AC-11, AC-22, AC-23 | 3 |
 | T4 | `structured_data_helper.rb`: `local_business_schema` + `BusinessHours#opening_hours_specification` (R16, R17, R26–R32); wire into layout `<head>`; fixed constants module. | AC-24, AC-25, AC-30–AC-34 | 5 |
@@ -1003,7 +1039,8 @@ Total estimated points: 35. Four tasks sit at or above the 5-point split-review 
 |------|--------|-------------|-----------|
 | 2026-08-04 | Initial draft | All | Translates the user's SEO/AEO scope decisions (FAQ, per-page metadata, structured data, sitemap/robots, OG tags, footer, favicon, blank-seeded opening hours) plus mid-authoring additions — expanded `areaServed` geo terms (Idaho Falls, Boise, Idaho, Utah, confirmed genuine per the user's "customers travel because he's one of the best in the region"), the explicit exclusion of any shipping/mail-in claim, and contact form spam protection (honeypot, timing check, rate limiting) — into one implementation-ready spec, per explicit instruction to favor a single one-pass document over an exhaustive multi-spec decomposition. |
 | 2026-08-04 | FAQ seed item 1 corrected: removed a misplaced "dyno-verified" that had welded two separate Services-page bullets together, leaving it modifying a clause neither bullet actually makes | Interfaces → FAQ Seed Content (position 0) | User review of the seeded copy. Straight text deletion, no other wording change; items 2 and 3's own "dyno-verified" (engine/ECU work) were already correct and untouched. |
-| 2026-08-04 | FAQ seed content promoted from an informal Open Questions note to normative content: moved into Interfaces → FAQ Seed Content (single authoritative copy), with new rules pinning it verbatim (R59) and specifying an idempotent, non-clobbering seed mechanism (R60) — create-if-absent keyed on `question` text, explicitly not an upsert, so a reseed never overwrites an admin's reworded answer. Added E26–E27, AC-61–AC-63, AT52–AT54 (added out of sequence, physically positioned near the other Part A / FAQ items) | R59, R60; E26, E27; AC-61–AC-63; AT52–AT54; T1 (bumped 5→6 points) | User review flagged that nothing in the spec previously stopped an implementer from paraphrasing or regenerating the seed copy — the six answers lived only in an Open Questions aside, unreferenced by any R#/AC#, which is exactly the section a developer reads as unresolved. |
+| 2026-08-04 | FAQ seed content promoted from an informal Open Questions note to normative content: moved into Interfaces → FAQ Seed Content (single authoritative copy), with a new rule pinning it verbatim (R59) and an (initial, since corrected below) idempotent seed mechanism (R60). Added E26–E27, AC-61–AC-63, AT52–AT54 (added out of sequence, physically positioned near the other Part A / FAQ items) | R59, R60; E26, E27; AC-61–AC-63; AT52–AT54; T1 (bumped 5→6 points) | User review flagged that nothing in the spec previously stopped an implementer from paraphrasing or regenerating the seed copy — the six answers lived only in an Open Questions aside, unreferenced by any R#/AC#, which is exactly the section a developer reads as unresolved. |
+| 2026-08-04 | **Corrected R60's mechanism.** The initial design keyed the seed's `find_or_create_by!` lookup on `question` text. Review caught that `question` is admin-editable (R2) — rewording a question through `PATCH /admin/faqs/:id` is ordinary use, not an edge case — and a reworded question no longer matches its original seed row, so a reseed created a duplicate 7th row rather than recognizing the edited one. Replaced with a table-empty guard (`Faq.count.zero?`): the seed runs only against a genuinely empty table and does nothing otherwise, regardless of which fields an admin has changed. This also removes a defect the old mechanism had but nobody had flagged yet: it silently resurrected any individually-deleted seeded row, so deleting 3 of 6 and reseeding used to bring exactly those 3 back. The new mechanism trades that for a different, honestly-documented consequence: deleting *all 6* is indistinguishable from a fresh install, so a reseed after that restores all 6 (E30) — accepted as strictly better than the defect it replaces. | R60 rewritten; E27 narrowed to the answer-edit case it still covers; added E28 (question-edit — the motivating defect), E29 (partial deletion, no resurrection), E30 (full deletion, honest resurrection); added AC-64–AC-66, AT55–AT57; updated the seed-mechanism Implementation Decisions row; T1's AC range extended to AC-66 | User review of R60 during a second pass, before implementation — the exact scenario described (Doug reworders "Can you tune my bike's ECU?") is realistic first-week admin behavior for an editable FAQ, not a contrived edge case. |
 
 ---
 
