@@ -126,8 +126,49 @@ RSpec.describe GalleryPhoto, type: :model do
     end
   end
 
+  describe "variant metadata" do
+    it "drops camera metadata from the display variant but keeps the ICC colour profile" do
+      # Arrange
+      photo = create(:gallery_photo, :with_camera_metadata)
+
+      # Act
+      fields = processed_variant_fields(photo.display_variant)
+
+      # Assert
+      expect(fields).to include("icc-profile-data")
+      expect(fields.grep(/\A(exif-|xmp-|iptc-)/)).to be_empty
+    end
+
+    it "drops camera metadata from the thumbnail variant but keeps the ICC colour profile" do
+      # Arrange
+      photo = create(:gallery_photo, :with_camera_metadata)
+
+      # Act
+      fields = processed_variant_fields(photo.thumbnail_variant)
+
+      # Assert
+      expect(fields).to include("icc-profile-data")
+      expect(fields.grep(/\A(exif-|xmp-|iptc-)/)).to be_empty
+    end
+
+    it "encodes a metadata-heavy source to fewer bytes than the metadata it arrived with" do
+      # Arrange
+      photo = create(:gallery_photo, :with_camera_metadata)
+
+      # Act
+      thumbnail_bytes = photo.thumbnail_variant.processed.image.byte_size
+
+      # Assert
+      expect(thumbnail_bytes).to be < photo.image.blob.byte_size
+    end
+  end
+
   def processed_variant_dimensions(variant)
     image = Vips::Image.new_from_buffer(variant.processed.image.download, "")
     [ image.width, image.height ]
+  end
+
+  def processed_variant_fields(variant)
+    Vips::Image.new_from_buffer(variant.processed.image.download, "").get_fields
   end
 end
