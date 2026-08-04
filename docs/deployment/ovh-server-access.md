@@ -406,8 +406,15 @@ is the ceiling on connections from the web tier. At 2 × 5 that is 10, against P
 default limit of 100. Raising either knob spends that budget, as does each Solid Queue
 process: `config/queue.yml` runs `JOB_THREADS` (default 3) worker threads across
 `JOB_CONCURRENCY` (default 1) processes, and `config/database.yml` sizes the `queue` pool
-at `JOB_THREADS + 2`, as Solid Queue requires. Both tiers are sized for the 2 vCPU /
-3.7 GB OVH box.
+at `JOB_THREADS + 2`, which is what Solid Queue wants. Both tiers are sized for the
+2 vCPU / 3.7 GB OVH box.
+
+Since 1.6.0 an undersized queue pool is advisory rather than fatal: the supervisor logs
+`SolidQueue.logger.warn` and boots anyway, where 1.4.0 aborted it. Given the supervisor
+runs inside Puma, that abort used to take the public site down at boot — so this is
+safer, at the cost of the failure now being quiet. `bin/kamal app exec --reuse
+"bin/rails solid_queue:check"` surfaces it against real production config; run on CI it
+finds no connection and silently reports nothing useful.
 
 ---
 
@@ -449,9 +456,17 @@ web availability. Puma's `solid_queue` plugin monitors the supervisor fork and, 
 dies, issues `Process.kill(:INT, $$)` on the Puma master — so a queue failure takes the
 public site down with it. That is backwards in principle for a marketing site, where the
 site is the product and email is secondary. It is accepted because a dedicated job host
-means paying for a second server to run what is currently only contact-form and
-password-reset email, and because Kamal restarts the container on exit, making the
-realistic failure mode a restart rather than a sustained outage.
+means paying for a second server, and because Kamal restarts the container on exit,
+making the realistic failure mode a restart rather than a sustained outage.
+
+Weigh that against what actually reaches the queue, which is more than admin email. The
+contact form uses `deliver_now`, so it never enqueues at all; admin password-reset mail
+does. But Active Storage is the real traffic: `has_one_attached` enqueues
+`ActiveStorage::AnalyzeJob` on every upload, and its default `dependent: :purge_later`
+enqueues `ActiveStorage::PurgeJob` whenever an attachment is replaced or its record
+destroyed. The worker takes `queues: "*"`, so it runs all of them. In practice the first
+thing to exercise the production queue will be a gallery photo upload, not an email —
+and gallery uploads are a routine admin action rather than a rare one.
 
 When that stops being acceptable: add a `job:` role under `servers:` with
 `cmd: bin/jobs`, tag the job host `solid_queue`, and drop the tag from web. Moving one
