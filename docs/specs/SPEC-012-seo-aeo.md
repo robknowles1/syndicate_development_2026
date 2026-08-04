@@ -966,7 +966,7 @@ One item is worth flagging for Doug specifically, not the developer: the FAQ is 
 **FAQ seed content** (for `db/seeds.rb`, `position` 0–5):
 
 1. Q: "What suspension work does Syndicate Development offer?"
-   A: "We handle full suspension service for motocross and supercross bikes — revalving and re-springing tuned to your weight and riding style, fork and shock rebuilds, linkage and bearing service, and dyno-verified setup for track day or race day. Whether you're running stock components or a full custom suspension package, we tune it to how you actually ride."
+   A: "We handle full suspension service for motocross and supercross bikes — revalving and re-springing tuned to your weight and riding style, fork and shock rebuilds, linkage and bearing service, and setup for track day or race day. Whether you're running stock components or a full custom suspension package, we tune it to how you actually ride."
 
 2. Q: "Do you build complete race engines?"
    A: "Yes. We do full engine builds and rebuilds for motocross and supercross bikes, including top-end and bottom-end service, porting and head work, valve train upgrades, and engine blueprinting and balancing. Every build is set up and verified on our in-house dyno before it goes back to you."
