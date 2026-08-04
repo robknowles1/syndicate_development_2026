@@ -399,9 +399,14 @@ jobs:
       #      with an EMPTY database, not the one it had.
       #
       # Everything needed to rotate the pin is in the five steps above; they
-      # depend on no other file. A longer walkthrough of server access arrives as
-      # docs/deployment/ovh-server-access.md when PR #51 merges — supplementary
-      # background, not a prerequisite, and not on this branch yet.
+      # depend on no other file. docs/deployment/ovh-server-access.md carries a
+      # longer walkthrough of server access — supplementary background, not a
+      # prerequisite. Its "Establishing access on a rebuilt or replacement
+      # server" section covers step 5 in more detail, including clearing a stale
+      # host key for a reused IP. Rotation of THIS pin is specified here, not
+      # there: that doc describes reaching the box from a workstation, where
+      # accepting a key interactively is the normal path, which is the opposite
+      # of what this step enforces.
       - name: Pin staging host key
         run: |
           mkdir -p ~/.ssh
