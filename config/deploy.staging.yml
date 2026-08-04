@@ -24,34 +24,24 @@ env:
     - RAILS_MASTER_KEY
     - RESEND_API_KEY
     - ADMIN_SEED_PASSWORD
-    # config/database.yml's staging block reads STAGING_DATABASE_PASSWORD.
-    #
-    # This used to inject SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD alongside
-    # it, hedging a disagreement between two then-unmerged branches over which
-    # name staging read. Both have since merged (#47 and #48) and both read
-    # STAGING_DATABASE_PASSWORD, so the hedge is dropped. That other name is
-    # production-only now — see config/deploy.yml and .kamal/secrets.
+    # config/database.yml's staging block reads this name. .kamal/secrets.staging
+    # also fans the same value out to POSTGRES_PASSWORD for the accessory.
     - STAGING_DATABASE_PASSWORD
   clear:
     # Overrides the RAILS_ENV=production baked into the Dockerfile, which selects
     # the `staging:` block in config/database.yml — a SINGLE primary database.
+    # Production's block declares three more connections (cache, queue, cable);
+    # staging uses none of them.
     #
-    # Production's block declares three more connections (cache, queue, cable)
-    # backed by db/cache_schema.rb and friends. Staging uses none of them:
-    # config/environments/staging.rb leaves cache_store and the Active Job
-    # adapter at their defaults, and config/cable.yml uses the async adapter, so
-    # the extra databases would be created and then sit empty.
-    #
-    # This is also why staging must not receive SOLID_QUEUE_IN_PUMA. There are no
-    # solid_queue_* tables here for a supervisor to poll, and Puma's solid_queue
-    # plugin signals the Puma master when the supervisor dies — so inheriting
-    # that flag would take staging's web tier down, not just its jobs. The flag
-    # is scoped to the production host by an env tag in config/deploy.yml
-    # precisely so this file does not have to opt out of it; a destination can
-    # override an inherited env.clear key but cannot remove one.
+    # That is also why staging must never receive SOLID_QUEUE_IN_PUMA: with no
+    # solid_queue_* tables the supervisor dies on boot, and Puma's solid_queue
+    # plugin signals the Puma master when it does — taking staging's web tier
+    # down, not just its jobs. config/deploy.yml scopes that flag to the
+    # production host by tag precisely so this file does not have to opt out; a
+    # destination can override an inherited env.clear key but cannot remove one.
     RAILS_ENV: staging
 
-    # Must match proxy.host. Any other Host header gets a 403 from host
+    # Must match proxy.host above. Any other Host header gets a 403 from host
     # authorization, and mailer links (password reset, invitations) are built
     # from this value.
     APP_HOST: staging.syndicate-development.com
@@ -65,7 +55,7 @@ env:
 
     # The accessory container's name, resolved by Docker's embedded DNS on the
     # shared `kamal` network. Not localhost — the database is a separate
-    # container.
+    # container. Must match `accessories.db.service` below.
     STAGING_DATABASE_HOST: syndicate_development_2026-db-staging
     STAGING_DATABASE_NAME: syndicate_development_2026_staging
     STAGING_DATABASE_USER: syndicate_development_2026
@@ -91,24 +81,14 @@ accessories:
     # to bind 5432. Only the host side moves; the container still listens on
     # 5432, so STAGING_DATABASE_HOST resolving to the service name is unaffected.
     #
-    # Dropping the mapping entirely would be the smaller surface — the app never
-    # uses it, since it reaches the accessory by service name over the shared
-    # `kamal` Docker network — but Kamal deep-merges this file over the base and
+    # Dropping the mapping entirely is not available as an option: Kamal
     # validates `port` as a string, so a null here fails with
-    # "accessories/db/port: should be a string". An inherited key can be
-    # overridden, not removed, so a distinct port is the way to break the clash.
+    # "accessories/db/port: should be a string", and an inherited key can be
+    # overridden but not removed.
     #
     # Loopback ONLY, as in production: ufw is inactive on this box, so publishing
-    # on 0.0.0.0 would put staging Postgres on the public internet.
-    #
-    # What the mapping buys is host-side access for debugging. From a
-    # workstation, tunnel and connect:
-    #   ssh -L 5433:127.0.0.1:5433 ubuntu@15.204.81.231
-    #   psql -h 127.0.0.1 -p 5433 -U syndicate_development_2026 \
-    #        -d syndicate_development_2026_staging
-    # Or skip the tunnel entirely and go through Kamal:
-    #   bin/kamal accessory exec db -d staging --interactive --reuse \
-    #     "psql -U syndicate_development_2026 syndicate_development_2026_staging"
+    # on 0.0.0.0 would put staging Postgres on the public internet. Reaching it
+    # for debugging is covered in docs/deployment/ovh-server-access.md.
     port: "127.0.0.1:5433:5432"
     env:
       clear:

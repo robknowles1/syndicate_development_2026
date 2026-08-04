@@ -169,51 +169,26 @@ jobs:
   # This job is expected to SUCCEED. A red build here is a real failure — read
   # the logs, do not wave it through.
   #
-  # It previously carried a notice saying the opposite: that the deploy would
-  # always fail because config/deploy.staging.yml sets RAILS_ENV=staging while
-  # neither config/environments/staging.rb nor the `staging:` key in
-  # config/database.yml existed on main. Both landed with PR #47
-  # (feature/spec-010-email-delivery), so the container boots and that notice is
-  # no longer true.
-  #
-  # What remains is configuration, not code. All six repository secrets used
-  # below must be set under Settings > Secrets and variables > Actions:
-  #
-  #   DEPLOY_SSH_PRIVATE_KEY     deploy key for ubuntu@15.204.81.231
-  #   RAILS_MASTER_KEY           decrypts config/credentials.yml.enc
-  #   KAMAL_REGISTRY_PASSWORD    ghcr.io token with write:packages
-  #   RESEND_API_KEY             outbound mail
-  #   ADMIN_SEED_PASSWORD        seeds both admin accounts — see the pre-flight
-  #                              step for the bounds it must satisfy
-  #   STAGING_DATABASE_PASSWORD  staging Postgres
-  #
-  # A blank secret is never rejected at the point it is supplied:
-  # `${{ secrets.X }}` renders as an empty string when the secret is not set,
-  # and the .kamal/secrets* files resolve an unset variable the same way, so an
-  # empty value travels into the deploy and surfaces much further in — at a
-  # registry auth error, an unhealthy container, or a raise from db/seeds.rb
-  # once the databases already exist. The "Verify deploy secrets are usable"
-  # step below is what stops that. It runs FIRST, before checkout, and the
-  # comment on it records where each blank value would otherwise surface.
+  # It needs six repository secrets under Settings > Secrets and variables >
+  # Actions; they are named in the pre-flight step below and tabulated, with
+  # their purposes, in docs/deployment/ovh-server-access.md.
   deploy_staging:
     runs-on: ubuntu-latest
     needs: [ scan_ruby, scan_js, lint, test, system-test ]
 
-    # A Kamal deploy to this box takes roughly 10-15 minutes. 30 leaves headroom
-    # for a slow build without letting a wedged run — an SSH connection that
-    # never times out, a registry push that stalls — sit on the concurrency
-    # group below for the 6-hour default and block every later merge behind it.
+    # A deploy takes 10-15 minutes. 30 leaves headroom without letting a wedged
+    # run sit on the concurrency group below for the 6-hour default and block
+    # every later merge behind it.
     timeout-minutes: 30
 
-    # This job authenticates to ghcr.io with KAMAL_REGISTRY_PASSWORD, a PAT, so
-    # it needs nothing from GITHUB_TOKEN beyond reading this repository for the
-    # checkout. Narrowing it here does not affect the other jobs.
+    # ghcr.io is authenticated with KAMAL_REGISTRY_PASSWORD, a PAT, so this job
+    # needs nothing from GITHUB_TOKEN beyond reading the repo for the checkout.
     permissions:
       contents: read
 
-    # Push-to-main only. `on.push.branches` already limits push events to main,
-    # and pull_request events run with github.ref = refs/pull/N/merge, so a PR
-    # targeting main fails both halves of this condition and never deploys.
+    # Push-to-main only. pull_request events run with github.ref =
+    # refs/pull/N/merge, so a PR targeting main fails both halves and never
+    # deploys.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     # Serialise deploys. Two Kamal runs against one host race over the same
@@ -230,55 +205,16 @@ jobs:
       # step: it needs no checkout and no Ruby, so a misconfigured repository
       # fails in seconds without loading an SSH key or touching the server.
       #
-      # It exists because these values fail LATE, and one of them fails late in
-      # a state that has to be repaired by hand.
+      # Do not drop this as redundant. db/seeds.rb guards ADMIN_SEED_PASSWORD
+      # too, but it raises INSIDE the container, after `db:prepare` has already
+      # created the databases — and a redeploy with a corrected value does not
+      # retry seeding, so recovery is a manual db:seed on the box. Two checks of
+      # one rule at two very different costs, deliberately.
       #
-      # ── ADMIN_SEED_PASSWORD: caught downstream too, but far too late ────────
-      # This step is NOT the only enforcement. PR #54 rewrote db/seeds.rb to
-      # guard the value explicitly — it reads ENV[...] rather than ENV.fetch
-      # (Kamal writes `KEY=` into the container when a secret resolves to
-      # nothing, so the key is present and empty, which fetch's default block
-      # never sees), rejects nil / blank / under-length / over-length, and uses
-      # the BANG find_or_create_by!. An unusable value now raises, naming the
-      # variable, instead of the older behaviour where seeding created no admin
-      # and still exited 0. Do not re-describe that silent path here: it is gone.
-      #
-      # What the seed guard cannot do is fail cheaply. It runs inside the
-      # container, which means the image is already built and pushed, the SSH
-      # key is already loaded into the agent, and `db:prepare` has already
-      # CREATED the databases. That last part is the expensive bit: prepare_all
-      # (activerecord/lib/active_record/tasks/database_tasks.rb) seeds only the
-      # databases the same run created, so once the raise aborts seeding, a
-      # re-run finds the databases already there and does not seed them. Fixing
-      # the secret and redeploying does NOT produce the admin accounts; someone
-      # has to run db:seed on the box by hand.
-      #
-      # This step fails in seconds instead, before checkout, before Ruby, before
-      # the SSH key is loaded and before anything contacts the server — so the
-      # bad value never gets far enough to leave that half-provisioned state.
-      # Two checks of one rule at two different costs, deliberately.
-      #
-      # ── Keeping the bounds in step with the app ─────────────────────────────
-      # app/models/admin_user.rb sets MINIMUM_PASSWORD_LENGTH = 12 and validates
-      # password length against it; has_secure_password caps input at 72 bytes,
-      # bcrypt's limit. db/seeds.rb reads both from those sources rather than
-      # restating them. The numbers below are the third encoding of that one
-      # rule and must be updated with it.
-      #
-      # The two bounds are measured in DIFFERENT units, and the check below
-      # mirrors that rather than averaging over it:
-      #   minimum  CHARACTERS — the model's length validator and seeds.rb's
-      #            String#length both count characters.
-      #   maximum  BYTES — bcrypt's limit is on encoded bytes, and both
-      #            has_secure_password and seeds.rb use String#bytesize.
-      # For ASCII the two coincide; for a multi-byte passphrase they do not, and
-      # a byte-counted minimum would pass a value seeds.rb then rejects — the
-      # precise mid-deploy failure this step exists to prevent.
-      #
-      # ── The other five ─────────────────────────────────────────────────────
-      # Those do fail on their own, but late and unhelpfully — a registry auth
-      # error, or a container that never becomes healthy with the cause four
-      # layers down. Naming the secret here is cheaper than the log dive.
+      # The bounds below are a THIRD encoding of that rule and must be updated
+      # with it: app/models/admin_user.rb sets MINIMUM_PASSWORD_LENGTH = 12, and
+      # has_secure_password caps input at 72 bytes. They are measured in
+      # different units on purpose — see docs/deployment/ovh-server-access.md.
       #
       # No secret value is ever printed, nor any prefix, nor any length — only
       # names. The counts below go through `wc`, which emits a number and never
@@ -294,13 +230,11 @@ jobs:
         run: |
           fail=0
 
-          # The explicit `return 0` is defensive, not load-bearing today: an `if`
-          # whose condition is false and which has no else already returns 0, so
-          # this function exits clean on a secret that is correctly set. What it
-          # pins is the exit STATUS. Append a trailing test or `&&` list here
-          # later and, without this line, require_present would return non-zero
-          # for a secret that is perfectly FINE — and `bash -e` would abort the
-          # step at the call site, on the good path.
+          # The explicit `return 0` pins the exit STATUS. Append a trailing test
+          # or an `&&` list to this function later and, without it,
+          # require_present would return non-zero for a secret that is perfectly
+          # FINE — and `bash -e` would abort the step at the call site, on the
+          # good path.
           require_present() {
             if [ -z "${!1}" ]; then
               echo "::error::$1 is unset or empty. Set it under Settings > Secrets and variables > Actions."
@@ -324,10 +258,11 @@ jobs:
           # already reported above and would otherwise produce two errors for
           # one cause.
           #
-          # `wc -c` is bytes regardless of locale. `wc -m` is characters, but
-          # only under a UTF-8 locale — hence the explicit LC_ALL on that one
-          # line. Neither prints the value. printf '%s' avoids the trailing
-          # newline `echo` would add and count.
+          # The minimum is in CHARACTERS and the maximum in BYTES, matching how
+          # the app enforces each. `wc -c` is bytes regardless of locale; `wc -m`
+          # is characters only under a UTF-8 locale, hence the explicit LC_ALL on
+          # that one line. Neither prints the value. printf '%s' avoids the
+          # trailing newline `echo` would add and count.
           if [ -n "$ADMIN_SEED_PASSWORD" ]; then
             seed_password_chars=$(printf '%s' "$ADMIN_SEED_PASSWORD" | LC_ALL=C.UTF-8 wc -m)
             seed_password_bytes=$(printf '%s' "$ADMIN_SEED_PASSWORD" | wc -c)
@@ -362,63 +297,26 @@ jobs:
       # Pins the staging server's SSH host key. MUST stay ahead of the ssh-agent
       # step so net-ssh has a known entry before the first connection.
       #
-      # Kamal leaves net-ssh's `verify_host_key` unset, which net-ssh 7.3.3 maps
-      # to :accept_new_or_local_tunnel — a verifier its own source comments as
-      # "(insecure)" (transport/session.rb:303-322). That verifier accepts
-      # whatever key an *unknown* host offers, and every GitHub runner is fresh,
-      # so every deploy was a first contact and the trust was never carried
-      # forward. Anything answering on 15.204.81.231:22 got RAILS_MASTER_KEY and
-      # every other secret in the deploy step below. With the entry present the
-      # host is no longer unknown, and a mismatched key raises HostKeyMismatch
-      # (verifiers/accept_new.rb rescues only HostKeyUnknown) — the deploy stops
-      # instead of handing the secrets over.
+      # Kamal leaves net-ssh's `verify_host_key` unset, which maps to a verifier
+      # that accepts whatever key an UNKNOWN host offers. Every GitHub runner is
+      # fresh, so without this pin every deploy is a first contact and anything
+      # answering on 15.204.81.231:22 receives RAILS_MASTER_KEY and every other
+      # secret in the deploy step below. With the entry present the host is no
+      # longer unknown and a mismatched key raises HostKeyMismatch, stopping the
+      # deploy instead of handing the secrets over.
       #
-      # The value is committed, not stored in a secret, because it is a PUBLIC
-      # key: the server presents it to every client that connects. Keeping it
-      # visible means the expected value shows up in code review and in `git
-      # log` when it changes, and means the pin cannot be silently absent — an
-      # unset secret would write an empty file and drop back to accept-new
-      # without failing anything.
-      #
-      # Verified 2026-07-28, two independent ways that agree:
-      #   ssh-keyscan over the network, and `ssh-keygen -lf
-      #   /etc/ssh/ssh_host_ed25519_key.pub` read on the box over an
-      #   already-authenticated session.
+      # The value is committed rather than held in a secret because it is a
+      # PUBLIC key — the server presents it to every client — and because an
+      # unset secret would write an empty file and drop silently back to
+      # accept-new. Verified 2026-07-28.
       #
       # ── IF A DEPLOY FAILS WITH "fingerprint ... does not match" ─────────────
-      # Either the server was rebuilt (its host key is generated at first boot,
-      # so a rebuild changes it) or the connection is being intercepted. Do NOT
-      # delete or loosen this to make the red build go away — that restores the
-      # exact hole this closes. Rotate deliberately:
-      #   1. Get the new key from the server over a channel that is NOT this
-      #      deploy path — the OVH console, or an SSH session whose fingerprint
-      #      you confirmed there:
-      #        ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
-      #   2. Confirm it matches what the network reports, from your workstation:
-      #        ssh-keyscan -t ed25519 15.204.81.231 | ssh-keygen -lf -
-      #      Both must print the same SHA256. If they disagree, stop: that is
-      #      the interception case, not a rebuild.
-      #   3. Update BOTH lines below — the known_hosts line and the SHA256 in
-      #      the guard. They are two encodings of one key and must agree.
-      #   4. Commit the change on its own, so the rotation is reviewable.
-      #   5. If it WAS a rebuild, the client side is gone too: a fresh box has
-      #      no authorized_keys, so once the pin is updated the deploy gets past
-      #      it and then fails to authenticate instead. From the OVH console,
-      #      append the public half of DEPLOY_SSH_PRIVATE_KEY to
-      #      ~ubuntu/.ssh/authorized_keys (mode 600, owned by ubuntu) before
-      #      re-running. A rebuild also wipes Docker state, so the next deploy
-      #      re-provisions the db accessory from scratch — staging comes back
-      #      with an EMPTY database, not the one it had.
-      #
-      # Everything needed to rotate the pin is in the five steps above; they
-      # depend on no other file. docs/deployment/ovh-server-access.md carries a
-      # longer walkthrough of server access — supplementary background, not a
-      # prerequisite. Its "Establishing access on a rebuilt or replacement
-      # server" section covers step 5 in more detail, including clearing a stale
-      # host key for a reused IP. Rotation of THIS pin is specified here, not
-      # there: that doc describes reaching the box from a workstation, where
-      # accepting a key interactively is the normal path, which is the opposite
-      # of what this step enforces.
+      # Either the server was rebuilt (its host key is generated at first boot)
+      # or the connection is being intercepted. Do NOT delete or loosen this to
+      # make the red build go away — that restores the exact hole it closes.
+      # The rotation procedure, including how to tell those two cases apart and
+      # what else a rebuild destroys, is in docs/deployment/ovh-server-access.md
+      # under "A deploy fails with a host-key fingerprint mismatch".
       - name: Pin staging host key
         run: |
           mkdir -p ~/.ssh
@@ -428,13 +326,13 @@ jobs:
           # Fail here, not mid-deploy, if the line above is ever mistyped. A
           # corrupt key does not error — net-ssh skips the unparseable entry,
           # finds no keys for the host, and quietly reverts to accept-new. This
-          # turns that silent downgrade into a red step.
+          # turns that silent downgrade into a red step. This SHA256 and the
+          # known_hosts line above encode the same key: rotate them together.
           ssh-keygen -lF 15.204.81.231 -f ~/.ssh/known_hosts \
             | grep -q 'SHA256:nuYrtS7SlRAtC7Eoa0XsIZvM+EQC9bDCn/McENOBIPo'
 
-      # Loads the deploy key for ubuntu@15.204.81.231 into an agent for Kamal's
-      # SSH connections. The host side of that handshake is pinned by the step
-      # above; this supplies only the client credential.
+      # Client half of the SSH handshake — the deploy key for
+      # ubuntu@15.204.81.231. The host half is pinned by the step above.
       - name: Add SSH deploy key
         uses: webfactory/ssh-agent@v0.10.0
         with:
@@ -442,19 +340,8 @@ jobs:
 
       # RAILS_MASTER_KEY is required here specifically: config/master.key is
       # gitignored and absent on the runner, so .kamal/secrets-common falls back
-      # to this variable.
-      #
-      # ADMIN_SEED_PASSWORD is guarded in db/seeds.rb, which raises and names the
-      # variable if it is unset, blank, under 12 characters or over 72 bytes. But
-      # that raise happens in here — inside the container, after the databases
-      # have been created — and re-running the deploy does not re-seed them. The
-      # pre-flight step at the top of this job is what keeps an unusable value
-      # from reaching this point at all, so by the time execution gets here the
-      # value has already been proven present and within bounds.
-      #
-      # STAGING_DATABASE_PASSWORD is fanned out by .kamal/secrets.staging to the
-      # two names staging needs: itself, read by config/database.yml, and
-      # POSTGRES_PASSWORD, read by the accessory's initdb.
+      # to this variable. STAGING_DATABASE_PASSWORD is fanned out by
+      # .kamal/secrets.staging to the two names staging needs.
       - name: Deploy to staging with Kamal
         env:
           RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}

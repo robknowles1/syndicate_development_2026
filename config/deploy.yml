@@ -1,17 +1,15 @@
 # Kamal base configuration — shared settings plus the PRODUCTION destination.
 #
-# Staging overlays this file with config/deploy.staging.yml (deep-merged; arrays
-# are replaced wholesale, hashes are merged key by key). Deploy staging with:
+# config/deploy.staging.yml overlays this file, so a change made here also
+# reaches staging unless staging overrides it. Deploy staging with:
 #
 #   bin/kamal deploy -d staging
 #
-# PRODUCTION IS NOT PROVISIONED VIA KAMAL YET. The apex currently resolves to a
-# DigitalOcean host (147.182.199.74) that serves the live site and is not managed
-# by this config. The production host below is a deliberate RFC 2606 `.invalid`
-# placeholder so that `kamal config` renders while any accidental
-# `kamal deploy` (no destination) fails immediately at DNS resolution instead of
-# deploying production onto the staging box. Set KAMAL_PRODUCTION_HOST, or replace
-# the default, when production is actually provisioned.
+# PRODUCTION IS NOT PROVISIONED VIA KAMAL YET. The production host below is a
+# deliberate RFC 2606 `.invalid` placeholder, so that `kamal config` renders
+# while an accidental `kamal deploy` (no destination) fails immediately at DNS
+# resolution instead of deploying production onto the staging box. Set
+# KAMAL_PRODUCTION_HOST, or replace the default, when production is provisioned.
 
 # Name of your application. Used to uniquely configure containers.
 service: syndicate_development_2026
@@ -23,20 +21,18 @@ image: robknowles1/syndicate_development_2026
 # Deploy to these servers.
 #
 # The `: solid_queue` suffix is an env TAG, not part of the hostname. It attaches
-# the env block under `env.tags.solid_queue` below to this host and only this
-# host, which is how production gets SOLID_QUEUE_IN_PUMA without staging
-# inheriting it. Keep the tag on whichever host is meant to run the Solid Queue
-# supervisor; a host listed without it does not run one.
+# the `env.tags.solid_queue` block below to this host and only this host, which
+# is how production gets SOLID_QUEUE_IN_PUMA without staging inheriting it. Keep
+# the tag on whichever host is meant to run the Solid Queue supervisor; a host
+# listed without it does not run one.
 servers:
   web:
     - <%= ENV.fetch("KAMAL_PRODUCTION_HOST", "production-not-provisioned.invalid") %>: solid_queue
 
-# Terminating proxy. THIS BLOCK IS LOAD-BEARING, NOT OPTIONAL.
-#
-# The environment files set `config.assume_ssl` and `config.force_ssl`. With no
-# proxy terminating TLS, Rails reads plaintext requests as secure, `force_ssl`
-# stops redirecting, and the admin session cookie is still flagged `Secure` — so
-# browsers refuse to send it back and admin login silently fails to persist.
+# Terminating proxy. THIS BLOCK IS LOAD-BEARING, NOT OPTIONAL. It is the other
+# half of `config.assume_ssl` in config/environments/production.rb — deploying
+# without it makes admin login silently fail to persist. Do not disable one
+# while the other is on; the failure chain is documented there.
 #
 # `ssl: true` makes kamal-proxy obtain a Let's Encrypt certificate for `host`.
 # That requires `host` to already resolve to this server and port 443 to be
@@ -61,6 +57,10 @@ registry:
     - KAMAL_REGISTRY_PASSWORD
 
 # Inject ENV variables into containers (secrets come from .kamal/secrets*).
+#
+# `clear:` DEEP-MERGES INTO EVERY DESTINATION. A key set here reaches staging as
+# well, and a destination can override an inherited key but never remove one — so
+# anything that must not apply everywhere belongs under `tags:` below, not here.
 env:
   secret:
     - RAILS_MASTER_KEY
@@ -74,14 +74,11 @@ env:
 
     RAILS_LOG_LEVEL: info
 
-    # Sized for the 2 vCPU / 3.7 GB OVH box, not for a larger default.
-    # RAILS_MAX_THREADS sets both Puma's thread count and the Active Record pool
-    # (config/database.yml reads the same variable), so 2 workers x 5 threads is
-    # a ceiling of 10 database connections against Postgres' default limit of 100.
-    #
-    # Watch that budget when raising either knob alongside the job settings
-    # below: each Puma worker holds RAILS_MAX_THREADS primary connections, and
-    # each Solid Queue process holds JOB_THREADS + 2 against the queue database.
+    # Sized for the 2 vCPU / 3.7 GB OVH box. RAILS_MAX_THREADS sets both Puma's
+    # thread count and the Active Record pool (config/database.yml reads the same
+    # variable), so 2 workers x 5 threads caps this tier at 10 connections
+    # against Postgres' default limit of 100. Raising either knob spends that
+    # budget, as does each Solid Queue process below (JOB_THREADS + 2).
     WEB_CONCURRENCY: 2
     RAILS_MAX_THREADS: 5
 
@@ -93,56 +90,35 @@ env:
     # Number of processes dedicated to Solid Queue (default: 1).
     # JOB_CONCURRENCY: 3
 
-    # SOLID_QUEUE_IN_PUMA IS NOT SET IN THIS SHARED BLOCK, AND MUST NOT BE.
-    # It is scoped to the production web host by the `solid_queue` env tag —
-    # see the `tags:` block below and the tag on the host under `servers:`.
-    #
-    # env.clear deep-merges into every destination, and Kamal lets a destination
-    # override an inherited key but never remove one. Setting the flag here
-    # would therefore hand it to staging as well, and staging must not have it:
-    # config/environments/staging.rb leaves the Active Job adapter at :async and
-    # staging runs a single primary database with no solid_queue_* tables, so
-    # the supervisor would die on boot and Puma's solid_queue plugin would take
-    # the Puma master down with it — staging's whole web tier, not just its jobs.
+    # SOLID_QUEUE_IN_PUMA IS DELIBERATELY ABSENT FROM THIS BLOCK, AND MUST STAY
+    # ABSENT. The deep merge above would hand it to staging, which has no
+    # solid_queue_* tables — the supervisor would die on boot and Puma's
+    # solid_queue plugin would take staging's whole web tier down with it. It is
+    # scoped to the production host by the `solid_queue` tag below instead.
 
-    # CONTACT_RECIPIENT_EMAIL IS DELIBERATELY NOT SET HERE.
-    # config/application.rb reads it with `ENV.fetch("CONTACT_RECIPIENT_EMAIL") {
-    # Rails.env.production? ? <shop> : <developer> }`. Only the *fallback* is
-    # environment-aware: an explicit value wins in every environment. Setting it
-    # in this shared block would be inherited by staging via deep merge and route
-    # staging's test submissions to the real customer. Leaving it unset lets the
-    # env-aware default route production to the shop and staging to the developer.
+    # CONTACT_RECIPIENT_EMAIL is not set here and does not need to be.
+    # config/mail_settings.rb returns the developer address for every
+    # non-production environment regardless of this variable, and falls back to
+    # the shop address in production — so the default already routes both tiers
+    # correctly, and setting it outside production has no effect.
 
   # Per-host env, applied only to hosts carrying the matching tag under
   # `servers:`. Unlike `clear:` above, tags do NOT reach a destination that
   # declares its own host list: Kamal deep-merges hashes but replaces arrays
   # wholesale, so a destination's `servers.web` list drops the base's tagged
-  # hosts along with the base's hosts. A new destination therefore starts with
-  # the supervisor OFF and has to opt in by tagging a host, which is the safe
-  # direction to fail. That is what makes this the right home for a flag
-  # production needs and staging must not have.
+  # hosts. A new destination therefore starts with the supervisor OFF and has to
+  # opt in by tagging a host, which is the safe direction to fail. That is what
+  # makes this the right home for a flag production needs and staging must not
+  # have.
   tags:
-    # Runs the Solid Queue supervisor inside this host's Puma process.
+    # Runs the Solid Queue supervisor inside this host's Puma process. Required
+    # in production, where config/environments/production.rb sets
+    # `queue_adapter = :solid_queue` and every `deliver_later` would otherwise be
+    # enqueued and never run — no error, no failed deploy, no email.
     #
-    # Required in production: config/environments/production.rb sets
-    # `queue_adapter = :solid_queue`, and
-    # app/controllers/admin/password_resets_controller.rb enqueues the reset
-    # email with `deliver_later`. Without a supervisor those jobs sit in the
-    # queue database forever — no error, no failed deploy, no reset email.
-    #
-    # Accepted tradeoff: this couples job availability to web availability.
-    # Puma's solid_queue plugin monitors the supervisor fork and, if it dies,
-    # issues Process.kill(:INT, $$) on the Puma master — so a queue failure
-    # takes the public site down with it. That is backwards in principle for a
-    # marketing site, where the site is the product and email is secondary, but
-    # a dedicated job host means paying for a second server to run what is
-    # currently only contact-form and password-reset email. Kamal restarts the
-    # container on exit, so the realistic failure mode is a restart rather than
-    # a sustained outage.
-    #
-    # When that tradeoff stops being acceptable, add a `job:` role under
-    # `servers:` with `cmd: bin/jobs`, tag the job host with `solid_queue`, and
-    # drop the tag from web. Moving one tag is the whole change.
+    # This couples job availability to web availability. The tradeoff, and the
+    # way out of it (add a `job:` role and move this tag to it), are in
+    # docs/deployment/ovh-server-access.md.
     solid_queue:
       clear:
         # config/puma.rb tests `== "true"`, so this value is load-bearing rather
@@ -181,8 +157,11 @@ ssh:
 
 # Postgres runs as a Kamal accessory on the same box.
 #
-# Accessories are NOT redeployed with the app — `kamal deploy` leaves a running
-# accessory alone. Boot or reboot it explicitly with `kamal accessory boot db`.
+# Accessories are NOT redeployed with the app: `kamal deploy` leaves a running
+# accessory alone and never creates a missing one. Only `kamal setup` boots them.
+# Boot or reboot one on its own with `kamal accessory boot db` — and read
+# docs/deployment/ovh-server-access.md first, because that command reports
+# success even when the container immediately exits.
 accessories:
   db:
     image: postgres:16
