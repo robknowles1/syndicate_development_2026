@@ -37,7 +37,7 @@ RSpec.describe "GET /gallery (SPEC-008 gallery photo management)", type: :reques
   end
 
   describe "when a GalleryPhoto has an attached image (AT2, AT3)" do
-    it "renders the img src as a display-variant representation path, not the raw blob path (AT2, R4, R10, R12, AC-2)" do
+    it "renders the img src as a variant representation path, not the raw blob path (AT2, R4, R10, R12, AC-2)" do
       # Arrange
       create(:gallery_photo, position: 0)
 
@@ -50,7 +50,7 @@ RSpec.describe "GET /gallery (SPEC-008 gallery photo management)", type: :reques
       expect(img_src).not_to match(%r{/rails/active_storage/blobs/})
     end
 
-    it "wraps the img in a lightbox-trigger button carrying the same display-variant URL as a param, not a navigable <a> href (AT3, R10, R12, AC-3)" do
+    it "wraps the img in a lightbox-trigger button, not a navigable <a> href (AT3, R10, R12, AC-3)" do
       # Arrange
       photo = create(:gallery_photo, position: 0)
 
@@ -62,9 +62,21 @@ RSpec.describe "GET /gallery (SPEC-008 gallery photo management)", type: :reques
       expect(document.css("div.grid a")).to be_empty
       trigger = document.css("div.grid button").first
       expect(trigger["data-action"]).to include("gallery-lightbox#open")
-      expect(URI(trigger["data-gallery-lightbox-src-param"]).path).to eq(URI(trigger.at_css("img")["src"]).path)
       expect(trigger["data-gallery-lightbox-src-param"]).to match(%r{/rails/active_storage/representations/})
       expect(trigger["data-gallery-lightbox-src-param"]).to include(photo.image.blob.signed_id)
+    end
+
+    it "serves the grid tile from the thumbnail variant while the lightbox keeps the full-size display variant (R10)" do
+      # Arrange
+      photo = create(:gallery_photo, position: 0)
+
+      # Act
+      get gallery_path
+
+      # Assert
+      trigger = Nokogiri::HTML(response.body).css("div.grid button").first
+      expect(URI(trigger.at_css("img")["src"]).path).to eq(rails_representation_path(photo.thumbnail_variant, only_path: true))
+      expect(URI(trigger["data-gallery-lightbox-src-param"]).path).to eq(rails_representation_path(photo.display_variant, only_path: true))
     end
 
     it "renders a lightbox overlay with a close button, hidden by default" do

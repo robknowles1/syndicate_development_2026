@@ -80,5 +80,54 @@ RSpec.describe GalleryPhoto, type: :model do
       # Act & Assert
       expect { photo.display_variant.processed }.not_to raise_error
     end
+
+    it "bounds a large image to 1200px on its long edge without cropping" do
+      # Arrange
+      photo = create(:gallery_photo, :large)
+
+      # Act
+      dimensions = processed_variant_dimensions(photo.display_variant)
+
+      # Assert
+      expect(dimensions).to eq([ 1200, 750 ])
+    end
+  end
+
+  describe "#thumbnail_variant" do
+    it "processes without raising a missing-processor error" do
+      # Arrange
+      photo = create(:gallery_photo, :large)
+
+      # Act & Assert
+      expect { photo.thumbnail_variant.processed }.not_to raise_error
+    end
+
+    it "crops a landscape image to a square matching the aspect-square grid tile" do
+      # Arrange
+      photo = create(:gallery_photo, :large)
+
+      # Act
+      dimensions = processed_variant_dimensions(photo.thumbnail_variant)
+
+      # Assert
+      expect(dimensions).to eq([ 600, 600 ])
+    end
+
+    it "encodes to fewer bytes than the display variant served to the lightbox" do
+      # Arrange
+      photo = create(:gallery_photo, :large)
+
+      # Act
+      thumbnail_bytes = photo.thumbnail_variant.processed.image.byte_size
+      display_bytes = photo.display_variant.processed.image.byte_size
+
+      # Assert
+      expect(thumbnail_bytes).to be < display_bytes
+    end
+  end
+
+  def processed_variant_dimensions(variant)
+    image = Vips::Image.new_from_buffer(variant.processed.image.download, "")
+    [ image.width, image.height ]
   end
 end

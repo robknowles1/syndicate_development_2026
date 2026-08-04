@@ -10,7 +10,7 @@
               data-action="gallery-lightbox#open"
               data-gallery-lightbox-src-param="<%= url_for(photo.display_variant) %>"
               data-gallery-lightbox-alt-param="<%= t("pages.gallery.photo_alt") %>">
-        <%= image_tag photo.display_variant,
+        <%= image_tag photo.thumbnail_variant,
               alt: t("pages.gallery.photo_alt"),
               class: "object-cover aspect-square w-full h-full hover:opacity-90 transition-opacity" %>
       </button>

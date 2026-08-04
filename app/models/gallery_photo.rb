@@ -10,6 +10,12 @@ class GalleryPhoto < ApplicationRecord
     image.variant(resize_to_limit: [ 1200, 1200 ], saver: { quality: 80 })
   end
 
+  # resize_to_fill, not resize_to_limit: grid tiles are aspect-square/object-cover,
+  # so a limit-fitted variant is upscaled and re-cropped by the browser (R10).
+  def thumbnail_variant
+    image.variant(resize_to_fill: [ 600, 600 ], saver: { quality: 80 })
+  end
+
   private
 
   def image_must_be_attached

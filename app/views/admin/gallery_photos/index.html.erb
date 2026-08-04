@@ -35,7 +35,7 @@
          data-gallery-sort-failed-message-value="<%= t("admin.gallery_photos.flash.reorder_failed") %>">
       <% @photos.each do |photo| %>
         <div class="relative aspect-square overflow-hidden rounded" data-gallery-photo-id="<%= photo.id %>">
-          <%= image_tag photo.display_variant,
+          <%= image_tag photo.thumbnail_variant,
                 alt: t("pages.gallery.photo_alt"),
                 class: "w-full h-full object-cover cursor-move" %>
           <%= link_to admin_gallery_photo_path(photo),
