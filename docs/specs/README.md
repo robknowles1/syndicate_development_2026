@@ -15,6 +15,9 @@ This directory contains feature specs produced by the PM agent following the spe
 | SPEC-007 | About Page Content Editing — Admin-Managed Shop Info and Bio Copy | ready | medium | [SPEC-007-about-page-content-editing.md](SPEC-007-about-page-content-editing.md) (open PR #38, branch `feature/spec-007-about-page-editable`, not yet merged to `main`) |
 | SPEC-008 | Gallery Photo Management — Admin CRUD | ready | medium | [SPEC-008-gallery-photo-management.md](SPEC-008-gallery-photo-management.md) |
 | SPEC-009 | About Slideshow Image Uploads | ready | medium | [SPEC-009-about-slideshow-image-uploads.md](SPEC-009-about-slideshow-image-uploads.md) (blocked on SPEC-008 and SPEC-007/PR#38 landing on `main`) |
+| SPEC-010 | Email Delivery — Resend Wiring and Staging Environment | done | high | *No spec file — delivered directly via PR #47, merged to `main`* |
+| SPEC-011 | Admin Authentication — Invite-Only Accounts, Password Reset, Auth Hardening | done | high | *No spec file — delivered directly via PR #48, merged to `main`* |
+| SPEC-012 | SEO/AEO Pass — Structured Data, Metadata, FAQ, and Contact Form Hardening | ready | high | [SPEC-012-seo-aeo.md](SPEC-012-seo-aeo.md) (branch `feature/spec-012-seo-aeo`, not yet merged to `main`) |
 
 *(Update this table as specs are added.)*
 
