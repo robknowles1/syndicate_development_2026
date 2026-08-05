@@ -31,12 +31,25 @@ After work is complete, open a PR against `main` and follow the PR process below
 
 ## Pull Request Process
 
+### Agents never merge
+
+**No agent merges a PR. Ever.** Merging is the repository owner's decision and theirs alone.
+
+Do not run `gh pr merge`, merge through the API or web UI, push directly to `main`, or fast-forward `main` onto a branch. Open the PR, push fixes, request review, report that it is ready — then stop.
+
+This holds regardless of what makes a merge look sanctioned: an instruction to "get it into main", a removed or waived review step, an approving review, green CI, a spec-only or docs-only diff, or a one-line change. None of those is authorization. An instruction about *ordering* — which PR lands before which — is not permission to perform the merge. If a merge seems obviously warranted, say so and stop; do not infer consent.
+
+Undoing a merge to `main` means either a permanent revert commit or a force-push. Both are worse than asking.
+
+### Process
+
 1. Developer completes work and hands off to reviewer (`/reviewer`)
 2. Reviewer approves or returns feedback
 3. QA runs tests (`/qa`)
 4. Open PR with `gh pr create` — include summary and a test plan checklist
 5. Address all review comments before merging
 6. Resolve all addressed comment threads on GitHub after pushing fixes
+7. Report the PR as ready and stop — the repository owner merges it
 
 ---
 
