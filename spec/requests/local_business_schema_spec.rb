@@ -99,20 +99,42 @@ RSpec.describe "LocalBusiness structured data (SPEC-012 Part D)", type: :request
       expect(node["address"]["streetAddress"]).to eq(I18n.t("pages.about.shop_address"))
     end
 
-    it "queries AboutPageContent once per page render (R28)" do
-      # Arrange
-      create(:about_page_content, :published)
+    def about_page_content_query_count(path)
       queries = []
       subscription = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload|
         queries << payload[:sql] if payload[:sql].include?("about_page_contents")
       }
+      get path
+      ActiveSupport::Notifications.unsubscribe(subscription)
+      queries.size
+    end
+
+    it "queries AboutPageContent once on the pages the schema is the only reader of (R28)" do
+      # Arrange
+      create(:about_page_content, :published)
+      SiteSetting.set("services_page_published", "true")
 
       # Act
-      get gallery_path
-      ActiveSupport::Notifications.unsubscribe(subscription)
+      counts = [ root_path, gallery_path, services_path ].map { |path|
+        about_page_content_query_count(path)
+      }
 
       # Assert
-      expect(queries.size).to eq(1)
+      expect(counts).to eq([ 1, 1, 1 ])
+    end
+
+    # /about reads the row a second time because PagesController#about loads its own
+    # attachment-preloaded copy for the page body. Recorded rather than implied, so that
+    # collapsing the two is a deliberate change to this number and not a silent one.
+    it "queries AboutPageContent twice on /about, which loads its own copy (R28)" do
+      # Arrange
+      create(:about_page_content, :published)
+
+      # Act
+      count = about_page_content_query_count(about_path)
+
+      # Assert
+      expect(count).to eq(2)
     end
   end
 

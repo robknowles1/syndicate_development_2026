@@ -11,7 +11,6 @@ RSpec.describe "SPEC-012 About page hours static source inspection" do
 
       # Assert
       expect(admin_lookups).to be_empty
-      expect(view_source).to include('t("pages.about.hours.day_#{day}")')
     end
 
     it "contains no hardcoded English day name (AT20, R19, AC-23)" do

@@ -5,10 +5,6 @@ RSpec.describe "Home FAQ and About hours at phone widths", type: :system do
 
   phone_widths = [ 375, 390 ]
 
-  # The public layout has no <main>, so the shared tap-target helper measures nothing here.
-  # actual_viewport_width is the assertion that still moves: Chrome grows the layout
-  # viewport to swallow overflow, which is what makes window.innerWidth read clean on a
-  # page that overflows.
   def expect_no_sideways_scroll_at(width)
     expect(actual_viewport_width).to eq(width),
       "the layout viewport grew to #{actual_viewport_width}px, so content overflowed #{width}px"

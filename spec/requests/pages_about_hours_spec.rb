@@ -41,6 +41,25 @@ RSpec.describe "GET /about (visible business hours — SPEC-012 T3)", type: :req
       expect(hours_list(response.body).text).to include("8:00 AM")
       expect(hours_list(response.body).text).to include("5:30 PM")
     end
+
+    it "resolves day labels from the public namespace, never the admin one (AT20, R19, AC-23)" do
+      # Arrange — I18n::Backend::Simple loads en.yml lazily on the first translate and
+      # would overwrite these sentinels, so force that load before storing them.
+      I18n.t("pages.about.hours.day_monday")
+      I18n.backend.store_translations(:en,
+        admin: { business_hours: { day_monday: "ADMIN-NAMESPACE-SENTINEL" } },
+        pages: { about: { hours: { day_monday: "PUBLIC-NAMESPACE-SENTINEL" } } })
+      BusinessHours.create!(monday_opens_at: "08:00", monday_closes_at: "17:00")
+
+      # Act
+      get about_path
+
+      # Assert
+      expect(response.body).to include("PUBLIC-NAMESPACE-SENTINEL")
+      expect(response.body).not_to include("ADMIN-NAMESPACE-SENTINEL")
+    ensure
+      I18n.reload!
+    end
   end
 
   describe "when every day is blank (E6)" do
@@ -70,7 +89,7 @@ RSpec.describe "GET /about (visible business hours — SPEC-012 T3)", type: :req
     end
   end
 
-  describe "the visible hours list and the schema describe the same days (R19, content parity)" do
+  describe "when a day carries hours (R19, content parity)" do
     it "lists exactly the days openingHoursSpecification claims" do
       # Arrange
       BusinessHours.create!(

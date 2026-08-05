@@ -3,7 +3,7 @@ class PagesController < ApplicationController
 
   def home
     @home_page_content = HomePageContent.first
-    @faqs = Faq.order(:position)
+    @faqs = Faq.order(:position).load
   end
 
   def about
