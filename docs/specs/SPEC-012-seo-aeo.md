@@ -196,11 +196,23 @@ New key `pages.home.faq_heading`: "Frequently Asked Questions".
 
 New keys under `admin.faqs`: `heading`, `question_label`, `answer_label`, `save`, `new_heading`, `edit_heading`, `move_up`, `move_down`, `edit`, `delete`, `confirm_delete`, `empty_state`, `add_first`, `flash.created`, `flash.updated`, `flash.destroyed`, `flash.moved`.
 
-New keys under `admin.business_hours`: `heading`, `opens_label`, `closes_label`, `save`, `update_notice`, `hint` (explains that a blank day is omitted from the site's structured data and from the visible hours list), plus 7 day labels (`day_monday` … `day_sunday`).
+New keys under `admin.business_hours`: `heading`, `opens_label`, `closes_label`, `save`, `update_notice`, `hint` (explains that a blank day is omitted from the site's structured data and from the visible hours list), plus 7 day labels (`day_monday` … `day_sunday`) **for the admin form only** — no public view renders an `admin.*` key (see the public set below).
 
 New keys under `admin.dashboard`: `faqs_link`, `business_hours_link`.
 
-New key under `pages.about`: `hours_heading` ("Hours").
+New keys under `pages.about`: `hours_heading` ("Hours"), plus 7 **public** day labels — the strings the About page's visible hours list renders (R19):
+
+| Key | Value |
+|-----|-------|
+| `pages.about.hours.day_monday` | "Monday" |
+| `pages.about.hours.day_tuesday` | "Tuesday" |
+| `pages.about.hours.day_wednesday` | "Wednesday" |
+| `pages.about.hours.day_thursday` | "Thursday" |
+| `pages.about.hours.day_friday` | "Friday" |
+| `pages.about.hours.day_saturday` | "Saturday" |
+| `pages.about.hours.day_sunday` | "Sunday" |
+
+These are a deliberately separate set from the `admin.business_hours.day_*` labels above, not a shared one: the About page is public output and must not render a key from the `admin` namespace, and the two surfaces are free to word a day differently without one edit changing the other. Both sets are suffixed with the same `BusinessHours::DAYS` strings (R12), so each surface needs exactly one interpolated lookup — `t("pages.about.hours.day_#{day}")` on the public page, `t("admin.business_hours.day_#{day}")` on the admin form — and neither needs a second copy of the day order.
 
 New key under `contact.form`: `honeypot_label` — inert decoy label text, never perceivable by a real user (aria-hidden), still routed through i18n per the codebase's no-hardcoded-strings rule.
 
@@ -263,7 +275,7 @@ R13: For each day in `BusinessHours::DAYS`, that day has hours only when **both*
 
 R14: `BusinessHours` validates, for each day in `DAYS`: if exactly one of `<day>_opens_at` / `<day>_closes_at` is present (not both), an error is added on the present attribute (a half-filled day is invalid — both or neither). If both are present, `<day>_closes_at` must be after `<day>_opens_at` (a same-day span; overnight-spanning hours are not supported — a reasonable constraint for a daytime motorcycle shop, not a stated requirement to relax).
 
-R15: `db/seeds.rb` ensures exactly one `BusinessHours` row exists via `first_or_initialize`, with every column left at its default `nil` — seeded blank, per the brief. Running seeds twice must not raise or create a second row.
+R15: `db/seeds.rb` ensures exactly one `BusinessHours` row **exists and is persisted**, with every column left at its default `nil` — seeded blank, per the brief. `first_or_initialize` alone builds an in-memory record and writes nothing, so the seed must either use `BusinessHours.first_or_create!` or follow `first_or_initialize` with an explicit `save!` guarded on `new_record?`, matching the `HomePageContent`/`AboutPageContent` blocks already in `db/seeds.rb`. Running seeds twice must not raise or create a second row.
 
 R16: `BusinessHours#opening_hours_specification` returns an array of `OpeningHoursSpecification` hashes, one per day that satisfies R13, in `DAYS` order:
 ```ruby
@@ -280,7 +292,10 @@ R17: `local_business_schema` includes the `openingHoursSpecification` key **only
 
 R18: `GET /admin/business_hours` renders one row per `DAYS` entry — day label (`t("admin.business_hours.day_#{day}")`) plus two `f.time_field` inputs (`<day>_opens_at`, `<day>_closes_at`) labelled Opens/Closes. `PATCH /admin/business_hours` updates the singleton via `first_or_initialize`; on a validation failure (R14), re-renders `:show` at HTTP 422 with the errors.
 
-R19: `app/views/pages/about.html.erb` renders a plain `<ul>` under a `t("pages.about.hours_heading")` heading, listing only the days that satisfy R13, in `DAYS` order, each formatted for human reading (e.g. `content.monday_opens_at.strftime("%-l:%M %p")` – `closes_at` likewise) — content parity for `BusinessHours`, mirroring R7's rule for FAQ: the schema must never describe hours that aren't also visible somewhere on the page. The whole block is omitted when zero days satisfy R13.
+R19: `app/views/pages/about.html.erb` renders a plain `<ul>` under a `t("pages.about.hours_heading")` heading, listing only the days that satisfy R13, in `DAYS` order — content parity for `BusinessHours`, mirroring R7's rule for FAQ: the schema must never describe hours that aren't also visible somewhere on the page. The whole block is omitted when zero days satisfy R13. Each row is a day label followed by that day's span:
+
+- **Day label:** `t("pages.about.hours.day_#{day}")` — the public day keys defined in Interfaces → Required i18n Keys. Not an English literal (CLAUDE.md's no-hardcoded-strings rule, enforced by `spec/integration/locale_completeness_spec.rb`), and **not** `t("admin.business_hours.day_#{day}")`, which is admin-form chrome and must not appear in public output.
+- **Span:** the two `time` columns formatted for human reading, e.g. `content.monday_opens_at.strftime("%-l:%M %p")` and `closes_at` likewise.
 
 R20: `Admin::BusinessHoursController` and its views follow CLAUDE.md's mobile-first rules identically to R11 — `w-full` time inputs, `py-3` save button, no horizontal scroll at 375 px. Not added to the persistent nav (R9).
 
@@ -298,11 +313,16 @@ R25: The `<title>`/description text is exactly the literal copy specified in the
 
 ### Part D — Structured Data: `LocalBusiness` / `MotorcycleRepair`
 
-R26: The layout (`application.html.erb`) renders one `<script type="application/ld+json">` block, present on every public page (Home, About, Gallery, Services — wherever the layout renders), containing `json_escape(local_business_schema.to_json)`.
+R26: The layout (`application.html.erb`) renders one `<script type="application/ld+json">` block, present on every public page (Home, About, Gallery, Services — wherever the layout renders), containing `json_escape(local_business_schema.to_json)`. The object carries `"@id" => "#{root_url}#business"` — a stable identifier so the four copies of the node are recognised by consumers as one entity described four times, rather than four separate businesses that happen to share a name and address. Without it the same shop is emitted at four URLs with nothing tying them together.
 
 R27: `local_business_schema` uses `@type: "MotorcycleRepair"` (schema.org: `LocalBusiness > AutomotiveBusiness > MotorcycleRepair`) rather than generic `LocalBusiness`. *Implementation Decision:* this is a strict specialization — every property used here (`telephone`, `address`, `geo`, `areaServed`, `openingHoursSpecification`) is valid on both types, so falling back to plain `LocalBusiness` is a one-line change if `MotorcycleRepair` ever causes a rich-result validation issue. Chosen because it is the closest schema.org type to what this business actually is, and more specific typing is generally more useful to answer engines, not less.
 
-R28: `local_business_schema`'s `telephone` and `address.streetAddress` reuse the **exact same resolved value** the About page itself renders — `content = AboutPageContent.first&.published? ? AboutPageContent.first : nil`, then `content&.shop_phone_number || t("pages.about.shop_phone_number")` and `content&.shop_address || t("pages.about.shop_address")` — never a second, independently hardcoded copy. If Doug edits the phone number or address on the About page, the schema updates with it automatically.
+R28: `local_business_schema`'s `telephone` and `address.streetAddress` reuse the **exact same resolved value** the About page itself renders — never a second, independently hardcoded copy. If Doug edits the phone number or address on the About page, the schema updates with it automatically. The record is resolved into a single local first:
+```ruby
+content = AboutPageContent.first
+content = nil unless content&.published?
+```
+then `content&.shop_phone_number || t("pages.about.shop_phone_number")` and `content&.shop_address || t("pages.about.shop_address")`. **One `AboutPageContent.first` call, not two** — R26 renders this block from the layout on every public page, so a second call would put an extra query on every `/`, `/gallery` and `/services` request for a value already in hand.
 
 R29: `address.addressLocality`, `address.addressRegion`, `address.postalCode`, and `address.addressCountry` are the fixed constants from Interfaces (`ADDRESS_LOCALITY`/`ADDRESS_REGION`/`POSTAL_CODE`/`ADDRESS_COUNTRY`) — not admin-editable, not parsed out of the free-text `shop_address` string (Non-Goals). `geo.latitude`/`geo.longitude` are the fixed `GEO_LATITUDE`/`GEO_LONGITUDE` constants.
 
@@ -318,7 +338,7 @@ R33: `SitemapsController#show` renders `app/views/sitemaps/show.xml.builder` (`C
 
 R34: `RobotsController#show` renders `app/views/robots/show.text.erb` (`Content-Type: text/plain`). **In production** (`Rails.env.production?`): `Allow: /`, `Disallow: /admin`, and a `Sitemap:` line pointing at `sitemap_url`. **In every other environment** (staging included): `Disallow: /` — nothing is crawlable. *Implementation Decision:* staging is a real, publicly reachable host (`staging.syndicate-development.com`, per `config/deploy.staging.yml`) with no separate access control. Shipping a permissive `robots.txt` there risks a search engine indexing the staging site — duplicate content at best, a competing/stale result at worst. Gating on `Rails.env.production?` (already how this app distinguishes environments — `RAILS_ENV=staging` is set in `config/deploy.staging.yml`) is simple, environment-accurate, and needs no new configuration.
 
-R35: `public/robots.txt` is **deleted** from the repo. Rails' static file middleware (`ActionDispatch::Static`, active whenever `config.public_file_server` headers are configured — true in every environment per `config/environments/*.rb`) serves a matching file under `public/` before a request ever reaches the router. Leaving the stub in place would permanently shadow the new dynamic route regardless of what the route or controller does.
+R35: `public/robots.txt` is **deleted** from the repo. Rails' static file middleware (`ActionDispatch::Static`) serves a matching file under `public/` before a request ever reaches the router, so leaving the stub in place would permanently shadow the new dynamic route regardless of what the route or controller does. The middleware is inserted when `config.public_file_server.enabled` is true, which is the framework default (`railties/lib/rails/application/configuration.rb`) and is not overridden anywhere in this app — each `config/environments/*.rb` sets only `config.public_file_server.headers`, which configures the middleware's cache-control header and neither enables nor disables it. So the shadowing applies in every environment, including production.
 
 R36: `app/views/layouts/admin.html.erb` gains `<meta name="robots" content="noindex, nofollow">` in its `<head>`, present whenever the admin layout renders. Defense in depth alongside R34's `Disallow: /admin` — a crawler that ignores `robots.txt`, or an admin URL that ends up linked somewhere, still can't get an admin page indexed.
 
@@ -355,34 +375,63 @@ R43: The year is computed at render time (`Date.current.year`) — never a hardc
 
 ### Part H — Favicon
 
-R44: `public/icon.png` is replaced with a 32×32 PNG crop of the shop's lion logo; `public/apple-touch-icon.png` (new file) is a 180×180 PNG crop of the same source. `public/icon.svg` is deleted — no vector source exists for the lion mark, and scaling a raster crop up to fake one is out of scope.
+R44: Three PNG crops of the shop's lion logo replace the stock Rails icon set, all exported from the one square crop R45 defines:
 
-R45: **Source and crop, verified during spec authoring:** fetch `https://syndicate-development.com/moto.png` (822×540 PNG, transparent background — this is the pre-optimization original; `app/assets/images/syndicate-lion.png` in this repo is a post-optimization 177×150 crop, too small to re-crop cleanly for a 180×180 target). Crop a 540×540 square anchored at the top-left corner (`x: 0, y: 0` to `x: 540, y: 540`), which keeps the full roaring head and most of the mane while dropping only the thin trailing mane wisp past `x: 540`. Verified during spec authoring (both the 540×540 crop, and that crop downscaled to 180×180 and to 32×32) to read clearly as a lion head at both target sizes. Suggested recipe: `sips -c 540 540 --cropOffset 0 0 moto-original.png --out lion-square.png`, then `sips -z 180 180 lion-square.png --out apple-touch-icon.png` and `sips -z 32 32 lion-square.png --out icon.png` (or an equivalent image tool) — transparency preserved throughout.
+| File | Size | Status |
+|------|------|--------|
+| `public/icon.png` | 512×512 | Replaces the stock 512×512 file, same dimensions |
+| `public/icon-32.png` | 32×32 | New file |
+| `public/apple-touch-icon.png` | 180×180 | New file |
+
+`public/icon.svg` is deleted — no vector source exists for the lion mark, and scaling a raster crop up to fake one is out of scope.
+
+`icon.png` **keeps its 512×512 dimensions**; it is not shrunk to 32×32. It is the only large icon the site has: the hi-DPI tab icon on a retina display comes from it, and it is the asset a web app manifest would point at — `application.html.erb` already carries a commented-out manifest link, so that is a live, one-uncomment-away consumer. Shrinking the large icon to produce the small one would throw both away to save 4 KB. The 32×32 is an additional file, not a replacement.
+
+R45: **Source and crop, verified during spec authoring:** fetch `https://syndicate-development.com/moto.png` (822×540 PNG, transparent background — this is the pre-optimization original; `app/assets/images/syndicate-lion.png` in this repo is a post-optimization 177×150 crop, too small to re-crop cleanly for a 180×180 target).
+
+**The fetched original is committed to this repository at `docs/assets/favicon/moto-original-822x540.png` as the first step of T7, before any crop is exported.** That URL is the live site this project replaces: at cutover it stops serving, and with it goes the only copy of the source these three icons are derived from — after which no one can re-crop, re-export at a new size, or verify what was cropped. Committing the 822×540 original makes R45 reproducible for as long as the repo exists. It goes under `docs/assets/` rather than `app/assets/` or `public/` deliberately: it is a build input, not a served asset, and neither Propshaft nor the static file server should be handing an 822×540 source image to visitors. **If the cutover lands before T7 does, fetch and commit this file immediately regardless of where T7 sits in the queue** — it is the one step in this spec that stops being possible with the passage of time.
+
+Crop a 540×540 square anchored at the top-left corner (`x: 0, y: 0` to `x: 540, y: 540`), which keeps the full roaring head and most of the mane while dropping only the thin trailing mane wisp past `x: 540`. Verified during spec authoring (both the 540×540 crop, and that crop downscaled to 512×512, 180×180 and 32×32) to read clearly as a lion head at every target size. Suggested recipe, from the committed original:
+```
+sips -c 540 540 --cropOffset 0 0 docs/assets/favicon/moto-original-822x540.png --out lion-square.png
+sips -z 512 512 lion-square.png --out public/icon.png
+sips -z 180 180 lion-square.png --out public/apple-touch-icon.png
+sips -z 32  32  lion-square.png --out public/icon-32.png
+```
+(or an equivalent image tool) — transparency preserved throughout. `lion-square.png` is an intermediate and is not committed; the committed original plus these four lines reproduce all three icons.
 
 R46: `application.html.erb`'s favicon links become:
 ```html
-<link rel="icon" href="/icon.png" type="image/png" sizes="32x32">
+<link rel="icon" href="/icon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="/icon.png" type="image/png" sizes="512x512">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
 ```
-replacing the current 3-line stock-Rails block (`icon.png` without `sizes`, `icon.svg`, `apple-touch-icon` pointing at the same 512×512 stock file).
+replacing the current 3-line stock-Rails block (`icon.png` without `sizes`, `icon.svg`, `apple-touch-icon` pointing at the same 512×512 stock file). Both `rel="icon"` entries are declared with explicit `sizes` so the browser picks the 32×32 for a standard tab and the 512×512 where it wants the detail; a single unsized link would leave that to chance.
 
 R47: Only the public layout changes. The admin layout gets no favicon markup (Non-Goals).
 
 ### Part I — Contact Form Spam Protection
 
-R48: `ContactsController` gains three declarative rate limits, evaluated ahead of `#create`'s body, using Rails 8's built-in `rate_limit` — the same mechanism `Admin::SessionsController` already uses:
+R48: `ContactsController` gains two declarative rate limits using Rails 8's built-in `rate_limit` — the same mechanism `Admin::SessionsController` already uses — declared **below** the two `before_action` guards, in this exact source order (R55 explains why the order is load-bearing):
 ```ruby
-rate_limit to: 5, within: 10.minutes, only: :create, name: "contact_per_ip",
-  by: -> { request.remote_ip },
-  with: -> { fake_success_response }
+class ContactsController < ApplicationController
+  before_action :reject_if_honeypot_filled, only: :create
+  before_action :reject_if_submitted_too_quickly, only: :create
 
-rate_limit to: 3, within: 10.minutes, only: :create, name: "contact_per_email",
-  by: -> { params[:email].to_s.strip.downcase },
-  with: -> { fake_success_response }
+  rate_limit to: 5, within: 10.minutes, only: :create, name: "contact_per_ip",
+    by: -> { request.remote_ip },
+    with: -> { fake_success_response }
+
+  rate_limit to: 3, within: 10.minutes, only: :create, name: "contact_per_email",
+    by: -> { params[:email].to_s.strip.downcase },
+    with: -> { fake_success_response },
+    if: -> { params[:email].to_s.strip.present? }
 ```
 *Rationale for the numbers:* three genuine submissions from the same claimed email within 10 minutes is already an edge case (a typo correction, an immediate follow-up); a fourth is far more likely automated. Five from one IP within 10 minutes covers a shared connection (e.g. a household) making more than one genuine enquiry while still bounding a flood. Both windows are short enough that a real visitor who gets throttled by mistake can simply try again shortly after — there is no account to lock out here, unlike login.
 
-R49: Unlike `Admin::SessionsController`'s rate limits — which deliberately tell a real, locked-out admin what happened (`t("admin.login.too_many_attempts")`) — the contact form's rate-limit rejection produces the **identical response a successful submission produces** (`fake_success_response`, R52). This is a deliberate divergence from the login precedent, not an inconsistency: the constraint here is that a blocked submission must not reveal why it was blocked, which login's UX goal (inform a real, inconvenienced admin) does not share.
+*The `if:` guard on the email-keyed limit is required, not decorative.* `params[:email].to_s.strip.downcase` collapses to `""` for every submission that omits or blanks the email field, which would put all blank-email submissions site-wide into a single shared bucket. Three of them in 10 minutes — from anyone, anywhere — would make the fourth genuine visitor who simply forgot to fill in their email receive a fake-success redirect instead of the honest `t("contact.errors.missing_required_fields")` alert, contradicting R55 and AC-54 (E32). Skipping the limit entirely for a blank email costs nothing: such a submission is rejected by the existing presence validation and sends no mail regardless, and it is still bounded by the per-IP limit. `rate_limit` forwards `**options` straight to the `before_action` it registers, so `if:` is the supported way to express this — a `by:` lambda returning `nil` would **not** work, because `rate_limiting` builds its cache key with `.compact`, which drops the nil and yields the same single shared bucket the guard exists to avoid.
+
+R49: Unlike `Admin::SessionsController`'s rate limits — which deliberately tell a real, locked-out admin what happened (`t("admin.login.too_many_attempts")`) — the contact form's rate-limit rejection produces the **identical response a successful submission produces** (`fake_success_response`, R52). This is a deliberate divergence from the login precedent, not an inconsistency: the constraint here is that a blocked submission must not reveal why it was blocked, which login's UX goal (inform a real, inconvenienced admin) does not share. What is identical is the response *content* — status, redirect target, flash (AC-49). Response *timing* is not, and that gap is recorded as an accepted, time-boxed risk in E31 rather than left to be inferred from AC-49's "byte-for-byte" wording.
 
 R50: `request.remote_ip` and `params[:email]` are read the same way `Admin::SessionsController` reads them — `request.remote_ip` already respects this app's configured `trusted_proxies` (`config/environments/production.rb`/`staging.rb`), and `params[:email]` is normalized (`.to_s.strip.downcase`) before being used as a rate-limit key, exactly like the login email-keyed limit. This narrows, but as the existing login comment already documents, does not eliminate, the risk of a spoofed `X-Forwarded-For` resetting the IP-keyed bucket — the email-keyed bucket is what holds when it is.
 
@@ -397,7 +446,7 @@ R51: A hidden honeypot field, name `website`, is added to the contact form (`app
 
 R52: `ContactsController` gains a private `fake_success_response` method — `redirect_to about_path, notice: I18n.t("contact.notices.message_sent")` — the single place that response is built, called by every rejection path (R48's two `with:` lambdas, and the `before_action`s in R53–R54) so the "what does a block look like" behavior has one definition, not four independent copies that could drift apart.
 
-R53: A `before_action :reject_if_honeypot_filled, only: :create` runs `fake_success_response` and returns (no email sent, no further processing) whenever `params[:website].present?`.
+R53: A `before_action :reject_if_honeypot_filled, only: :create` — declared first in the class body, above both `rate_limit`s (R48, R55) — runs `fake_success_response` and returns (no email sent, no further processing) whenever `params[:website].present?`.
 
 R54: A signed timing token is rendered as a hidden field in the same form:
 ```erb
@@ -407,15 +456,29 @@ where `contact_form_rendered_at_token` (a new `ApplicationHelper` method) is `Ra
 ```ruby
 rendered_at = Rails.application.message_verifier(:contact_form).verify(params[:rendered_at])
 ```
-rescuing `ActiveSupport::MessageVerifier::InvalidSignature` (tampered or absent token) as a rejection — and calls `fake_success_response` (no email sent) unless `Time.current.to_i - rendered_at >= 2` (`ContactsController::MINIMUM_SECONDS_BEFORE_SUBMIT = 2`). No upper bound — a real visitor who leaves the page open a long time before submitting is not penalized, only a submission arriving implausibly fast is rejected.
+rescuing `ActiveSupport::MessageVerifier::InvalidSignature` (tampered or absent token) as a rejection — and calls `fake_success_response` (no email sent) unless `Time.current.to_i - rendered_at >= 2` (`ContactsController::MINIMUM_SECONDS_BEFORE_SUBMIT = 2`). No upper bound — a real visitor who leaves the page open a long time before submitting is not penalized, only a submission arriving implausibly fast is rejected. This `before_action` is declared second, immediately after R53's and still above both `rate_limit`s (R48, R55).
 
-R55: Check order in `#create`'s `before_action` chain: honeypot (R53) → timing (R54) → the two `rate_limit`s (R48, evaluated by Rails' own filter mechanism) → the existing name/email/message presence validation (unchanged). Only a submission that clears every spam-defense gate reaches the existing validation logic, whose behavior (alert flash on a genuinely missing required field, real send + notice flash on success) is **completely unchanged** by this spec — spam defenses and field validation produce visibly identical *rejection* responses only when spam is what's being rejected; a real visitor's own mistake still gets real, specific feedback.
+R55: Check order in `#create`'s `before_action` chain: honeypot (R53) → timing (R54) → the two `rate_limit`s (R48) → the existing name/email/message presence validation (unchanged). Only a submission that clears every spam-defense gate reaches the existing validation logic, whose behavior (alert flash on a genuinely missing required field, real send + notice flash on success) is **completely unchanged** by this spec — spam defenses and field validation produce visibly identical *rejection* responses only when spam is what's being rejected; a real visitor's own mistake still gets real, specific feedback.
 
-R56: `deliver_now` is retained (Non-Goals) — the rate limits in R48 are this pass's mitigation for the synchronous-SMTP DoS exposure `deliver_now` carries, pending a queue supervisor running in every environment.
+**That order is produced by source order in the class body, and nothing else.** `rate_limit` is a thin wrapper that registers a `before_action` *at the point of declaration* (`ActionController::RateLimiting::ClassMethods#rate_limit`), so callbacks run in the order they are written. The two `before_action` declarations in R53–R54 must therefore appear **above** both `rate_limit` declarations in `ContactsController`'s class body, exactly as R48's snippet shows. Written the other way round, the rate limits run first and this rule is silently inverted — no error, no failing test unless one asserts the order, which AC-67/AT58 exist to do.
 
-R57: `spec/requests/contacts_spec.rb`'s shared `valid_params` is extended to include a validly-signed, sufficiently-aged `rendered_at` token by default (e.g. signed for a timestamp several seconds in the past — deterministic, no sleep needed in a request spec that never renders the real page) so every existing scenario — success and the missing-field failure cases alike — still clears the new gates and exercises the same behavior it did before. New scenarios are added (not substituted) for honeypot-filled, timing-too-fast, and both rate limits.
+**What the order buys — rejected requests must not consume a rate-limit bucket.** `rate_limiting` calls `store.increment` on *every* request that reaches it, before it compares the count to the limit, so any request the filter runs at all spends a slot. Running the honeypot and timing guards first means a bot spraying rejected submissions never touches either bucket: a `redirect_to` inside a `before_action` halts the chain, so those requests stop before the limiter. This is the intended accounting, stated so it is not "fixed" later by moving the guards down: **honeypot- and timing-rejected requests do not consume the per-IP or per-email allowance.** Inverted, a bot could burn a shared household IP's 5-per-10-minutes — or a specific person's 3-per-10-minutes, by submitting their address with the honeypot filled — and lock out a real visitor who sends nothing wrong at all. The rate limits exist to bound traffic that has already got past the cheap guards; spending their allowance on traffic the cheap guards already caught converts a spam defense into a denial-of-service lever against real visitors.
 
-R58: `spec/system/contact_form_spec.rb`'s scenarios that submit the form add an explicit wait (e.g. `sleep` for longer than `MINIMUM_SECONDS_BEFORE_SUBMIT`) between visiting the page and clicking submit. *Implementation Decision:* the real page render already produces a genuine, validly-signed token — the only risk is a fast Capybara/Selenium run completing well under the 2-second floor, which would make an unmodified system spec flaky (sometimes above the threshold, sometimes not) rather than reliably passing. An explicit, deliberate wait removes that flakiness outright rather than papering over it.
+R56: `deliver_now` is retained (Non-Goals) — the rate limits in R48 are this pass's mitigation for the synchronous-SMTP DoS exposure `deliver_now` carries, pending a queue supervisor running in every environment. It is also what makes a genuine success measurably slower than a rejection, the one respect in which fake success is not indistinguishable (E31); switching to `deliver_later` closes that as a side effect, so E31 is scoped to this deferral's lifetime rather than solved separately.
+
+R57: `spec/requests/contacts_spec.rb` builds its shared parameters in a `let(:valid_params)` block today (`spec/requests/contacts_spec.rb:5`). `.claude/standards/practices/testing.md` § 3.4 prohibits `let`/`let!` outright, so that block is **removed, not extended**: replace it with an explicitly-called helper method defined in the spec file (e.g. `def valid_contact_params(overrides = {})`) and invoked in each example's own Arrange phase, per testing.md's rule that identical setup is extracted into a helper called explicitly rather than declared lazily. The helper returns the existing `name`/`email`/`subject`/`message` values, no `website` value, and a validly-signed `rendered_at` token generated for a timestamp several seconds in the past — deterministic, no sleep needed in a request spec that never renders the real page — so every existing scenario, success and missing-field failure alike, still clears the new gates and exercises the same behavior it did before. New scenarios are added (not substituted) for honeypot-filled, timing-too-fast, both rate limits, guard-ordering (AC-67), rejection logging (AC-68), and the blank-email skip (AC-69).
+
+R58: `spec/system/contact_form_spec.rb`'s scenarios that submit the form advance the clock with `travel 5.seconds` between `visit about_path` and clicking submit — **not** `sleep`. *Implementation Decision:* the real page render already produces a genuine, validly-signed token; the only risk is a fast Capybara/Selenium run completing well under the 2-second floor, which would make an unmodified system spec flaky (sometimes above the threshold, sometimes not) rather than reliably passing. `travel` removes that flakiness deterministically and instantly: `ActiveSupport::Testing::TimeHelpers` is already included for every spec (`spec/rails_helper.rb:77`), and the token is both generated and verified inside the same Rails process the system spec drives, so the advanced clock applies to both halves of the check. `sleep` was considered and rejected — 4 affected scenarios × 2+ seconds is 8+ seconds of real wall-clock time added to a `system-test` job already running ~1m35s, paid on every CI run forever, to buy exactly what `travel` gives for free.
+
+R61 *(added out of sequence — see Change Log)*: Every rejection path — R53's honeypot, R54's timing check, and each of R48's two rate limits — emits exactly one `Rails.logger.warn` line immediately before calling `fake_success_response`. Each line carries:
+
+- a **reason token distinct from the other three** (`honeypot`, `timing`, `rate_limit`), so the four paths are told apart in a log stream, not merely counted;
+- for a rate-limit rejection, the **`name:` of the limit that fired** (`contact_per_ip` or `contact_per_email`), since which bucket filled is the whole diagnostic value;
+- `request.remote_ip`, which every Rails request line already carries anyway.
+
+**No submitted field value appears in the line** — not the `message` body, not `name`, `email`, or `subject`. The log exists to make rejections *observable*, not to reconstruct the message: the request's own log entry already records filtered params, and copying visitor-supplied text into `warn` output would put arbitrary attacker-controlled content, and a real customer's enquiry, into logs that are neither access-controlled nor retention-bounded for that purpose.
+
+*Why this is a rule and not an optional nicety:* every rejection path in this spec is silent to the visitor by design (R49, R52), so without this line a wrongly-rejected genuine enquiry is undiscoverable by anyone. Two such paths already exist on paper: an autofilled honeypot silently discards a real message (E19), and anyone can burn a specific person's 3-per-10-minutes email allowance by submitting that address three times, after which the real customer's message is dropped and they see a success screen (R48). E19's stated mitigation — "rename the field if observed in practice" — is not actionable at all unless "observed in practice" has a mechanism, and this is that mechanism. `warn` rather than `info` so the lines survive a production log level that filters `info`.
 
 ---
 
@@ -467,7 +530,7 @@ E17: `/robots.txt` is requested with the static stub from a stale deployed image
 
 E18: `og:image`/`twitter:image`/`local_business_schema.image` all point at the same asset. A broken or missing `gallery/m45a2849.jpg` would degrade all three simultaneously — an accepted, single point of dependency, since introducing per-surface fallback images is out of scope for this pass.
 
-E19: A visitor's browser aggressively autofills every input on a page, including off-screen ones, filling the honeypot `website` field despite `autocomplete="off"`. Accepted, documented risk (R51) — a real submission would then be silently treated as spam (`fake_success_response`, no email sent, no error shown). Mitigation if this is observed in practice: rename the field, a one-line change; not solved preemptively without evidence it's needed.
+E19: A visitor's browser aggressively autofills every input on a page, including off-screen ones, filling the honeypot `website` field despite `autocomplete="off"`. Accepted, documented risk (R51) — a real submission would then be silently treated as spam (`fake_success_response`, no email sent, no error shown). Mitigation if this is observed in practice: rename the field, a one-line change; not solved preemptively without evidence it's needed. "Observed in practice" is only possible because of R61: the honeypot path logs a `warn` line with its own reason token, so a run of them against otherwise-plausible submissions is visible in the log rather than invisible to everyone including Doug.
 
 E20: The honeypot is filled **and** the timing check would also have passed **and** the fields are all otherwise valid. Still rejected — honeypot alone is sufficient (R53 runs before, and independently of, R54).
 
@@ -480,6 +543,10 @@ E23: The per-IP rate limit (5/10 min) is exhausted by requests that vary the cla
 E24: The per-email rate limit (3/10 min) is exhausted by requests arriving from different IPs (e.g. a botnet, or `X-Forwarded-For` variation) but claiming the same `email`. Still throttled — the per-email bucket does not depend on IP (R48), which is precisely the bound `Admin::SessionsController`'s own comments describe as "the one that holds when remote_ip is worthless."
 
 E25: A genuine visitor submits the form with a missing required field (blank `name`) after clearing all spam gates. Existing behavior is completely unchanged: redirect to `/about` with the existing alert flash, no email sent — this is not a spam rejection and must not be silently converted into a fake-success response (R55).
+
+E31 *(added out of sequence — see Change Log)*: A bot measures **response latency** instead of response content. `deliver_now` is retained (R56), so a genuine success blocks on a live SMTP round trip to Resend — typically hundreds of milliseconds — while every rejection path returns immediately. The fake-success response is byte-for-byte identical in status, redirect target, and flash (R52, AC-49) and still distinguishable by a stopwatch. Accepted, documented risk, recorded rather than papered over: **no artificial latency is added to match a plausible send.** A matched delay is work whose only purpose is to be deleted later — it would slow every rejection on a 2-vCPU box holding a Puma thread for the duration, which is the same resource the rate limits in R48 exist to protect, and it would need removing the moment the underlying cause goes away. The channel closes on its own when `deliver_later` lands (Non-Goals deferral, R56): once the success path stops blocking on SMTP, every path returns at the same speed for the same reason, with no timing code to maintain. Until then the exposure is bounded — the honeypot and timing checks (R51, R54) cost a bot nothing to *detect* this way but nothing to *evade* either, and the rate limits bound how often it can measure. Precedent for reasoning about this channel at all: `app/controllers/admin/sessions_controller.rb` already documents that "neither the body nor the response time distinguishes a wrong password from an address with no account" — there, closing it was free; here it is not, so it is deferred rather than faked.
+
+E32 *(added out of sequence — see Change Log)*: `params[:email]` is blank or absent. Without the `if:` guard, the per-email key `params[:email].to_s.strip.downcase` collapses to `""` and every blank-email submission site-wide shares one bucket, so the fourth genuine visitor in 10 minutes who simply forgot to fill in their email would get a fake-success redirect instead of the honest `t("contact.errors.missing_required_fields")` alert — the exact conversion R55 and AC-54 forbid. R48's `if: -> { params[:email].to_s.strip.present? }` skips the email-keyed limit entirely for such a submission. Nothing is lost by skipping it: the existing presence validation already rejects a blank email and sends no mail, and the per-IP limit still bounds the same traffic.
 
 ---
 
@@ -545,7 +612,7 @@ AC-21: `PATCH /admin/business_hours` with an invalid day (E5-shaped) returns 422
 
 AC-22: Given `BusinessHours` has every column blank, `GET /about`'s response body contains no hours list (no `t("pages.about.hours_heading")`, no day text).
 
-AC-23: Given `BusinessHours` has `monday`/`wednesday`/`friday` set and the rest blank, `GET /about`'s hours list contains exactly those 3 days, in Monday–Sunday order, and no others.
+AC-23: Given `BusinessHours` has `monday`/`wednesday`/`friday` set and the rest blank, `GET /about`'s hours list contains exactly those 3 days, in Monday–Sunday order, and no others. Each day label equals `t("pages.about.hours.day_#{day}")`; the response contains no string resolved from the `admin.business_hours.day_*` namespace and no hardcoded English day literal in `app/views/pages/about.html.erb`.
 
 AC-24: Given the same `BusinessHours` state as AC-23, `GET /`'s (or wherever `local_business_schema` renders — every public page) `LocalBusiness` JSON-LD has an `openingHoursSpecification` array with exactly 3 entries matching those days' `opens`/`closes` in `HH:MM` format, and no `openingHoursSpecification` key at all when every day is blank (AC-25).
 
@@ -563,7 +630,7 @@ AC-29: No page's `<title>` or meta description contains the strings "Idaho Falls
 
 ### Structured Data
 
-AC-30: Every public page's response includes exactly one `<script type="application/ld+json">` block whose parsed content has `"@type": "MotorcycleRepair"`.
+AC-30: Every public page's response includes exactly one `<script type="application/ld+json">` block whose parsed content has `"@type": "MotorcycleRepair"`, and that object's `@id` equals `"#{root_url}#business"` — the same value on all four pages.
 
 AC-31: That object's `telephone` and `address.streetAddress` equal the same resolved values the About page itself currently renders for phone/address, under both published and unpublished `AboutPageContent` states.
 
@@ -599,9 +666,9 @@ AC-44: Every public page's response includes a `<footer>` containing the current
 
 AC-45: Two requests made in different years (simulated via `travel_to`) each render the footer with their own respective year — the year is not baked in at boot or asset-compile time.
 
-AC-46: The layout's favicon links are exactly `<link rel="icon" href="/icon.png" type="image/png" sizes="32x32">` and `<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">`; no `icon.svg` link is present.
+AC-46: The layout's favicon links are exactly the three in R46 — `rel="icon"` at `/icon-32.png` `sizes="32x32"`, `rel="icon"` at `/icon.png` `sizes="512x512"`, and `rel="apple-touch-icon"` at `/apple-touch-icon.png` `sizes="180x180"`; no `icon.svg` link is present.
 
-AC-47: `public/icon.png` is a 32×32 PNG; `public/apple-touch-icon.png` is a 180×180 PNG; `public/icon.svg` does not exist in the repository.
+AC-47: `public/icon.png` is a 512×512 PNG; `public/icon-32.png` is a 32×32 PNG; `public/apple-touch-icon.png` is a 180×180 PNG; `public/icon.svg` does not exist in the repository; and `docs/assets/favicon/moto-original-822x540.png` exists in the repository at 822×540 (R45's committed crop source).
 
 AC-58: The admin Business Hours form (`GET /admin/business_hours`) renders without horizontal scroll at 375 px viewport width; the day/time inputs carry `w-full`; the save button carries at minimum `py-3`.
 
@@ -627,9 +694,15 @@ AC-54: `POST /contact` with a blank `name`, honeypot empty, and a valid past-thr
 
 AC-55: The honeypot field's wrapping element carries `aria-hidden="true"`; the input itself carries `tabindex="-1"` and `autocomplete="off"`; neither the label nor the input is positioned on-screen (verified via its CSS class, not `display:none`/`visibility:hidden`).
 
-AC-56: `spec/requests/contacts_spec.rb`'s existing scenarios (success, missing name, missing email, missing message, phone optional, phone passed through) all still pass after this spec's changes, using a `valid_params` that includes a valid honeypot-blank + past-threshold-timing default.
+AC-56: `spec/requests/contacts_spec.rb`'s existing scenarios (success, missing name, missing email, missing message, phone optional, phone passed through) all still pass after this spec's changes, each calling an explicitly-defined helper method in its own Arrange phase to build params with a honeypot-blank + past-threshold-timing default. The file declares no `let` or `let!` (testing.md § 3.4).
 
-AC-57: `spec/system/contact_form_spec.rb`'s existing scenarios all still pass, with an added deliberate wait before each form submission exceeding the minimum-elapsed threshold.
+AC-57: `spec/system/contact_form_spec.rb`'s existing scenarios all still pass, each advancing the clock past the minimum-elapsed threshold with `travel` between visiting the page and submitting. The file contains no `sleep` call.
+
+AC-67 *(added out of sequence — see Change Log)*: Honeypot- and timing-rejected requests do not consume a rate-limit bucket. Given a clean rate-limit cache, `POST /contact` sent 6 times from one IP with the honeypot filled (all other fields valid, token past threshold) returns the fake-success response 6 times and sends zero emails; a 7th request from the same IP with the honeypot empty and everything else valid then sends exactly one email — the per-IP allowance of 5 was never touched. Asserted behaviourally rather than by reading source, so it fails if the `before_action` and `rate_limit` declarations are ever reordered in the class body.
+
+AC-68 *(added out of sequence — see Change Log)*: Each of the four rejection paths (honeypot, timing, per-IP limit, per-email limit) writes exactly one `Rails.logger` line at `warn` level. Each line's reason token is distinct from the other three; a rate-limit rejection's line also names the limit that fired (`contact_per_ip` or `contact_per_email`). No line contains any part of the submitted `message`, `name`, `email`, or `subject`.
+
+AC-69 *(added out of sequence — see Change Log)*: `POST /contact` with `email` blank, repeated 4 times within 10 minutes from one IP (honeypot empty, valid past-threshold token, `name` and `message` present), produces the existing `t("contact.errors.missing_required_fields")` alert on **all four**, never the success notice, and sends zero emails — the per-email limit is skipped for a blank email, so blank-email submissions never share one site-wide bucket.
 
 ---
 
@@ -788,7 +861,7 @@ Covers: R14, R18, AC-21, E5
 AT20
 Given `BusinessHours` has `monday`/`wednesday`/`friday` set, the rest blank
 When `GET /about`
-Then the hours list contains exactly those 3 days in Monday–Sunday order and no others; when every column is blank, no hours list renders at all
+Then the hours list contains exactly those 3 days in Monday–Sunday order and no others, each label equal to `t("pages.about.hours.day_#{day}")` with no `admin.business_hours.day_*` value and no hardcoded English day literal in the view; when every column is blank, no hours list renders at all
 Covers: R19, AC-22, AC-23, E6, E7
 
 AT21
@@ -818,7 +891,7 @@ Covers: R23, AC-28, E10
 AT25
 Given any public page
 When its `application/ld+json` `MotorcycleRepair` block is parsed
-Then it is present exactly once, and `telephone`/`address.streetAddress` equal the same resolved values the About page renders, under both published and unpublished `AboutPageContent` states
+Then it is present exactly once, its `@id` equals `"#{root_url}#business"` on every public page, and `telephone`/`address.streetAddress` equal the same resolved values the About page renders, under both published and unpublished `AboutPageContent` states
 Covers: R26, R27, R28, AC-30, AC-31, E12, E14
 
 AT26
@@ -888,9 +961,9 @@ Then the favicon `<link>` tags exactly match R46, with no `icon.svg` link presen
 Covers: R46, AC-46
 
 AT37
-Given `public/icon.png` and `public/apple-touch-icon.png`
+Given `public/icon.png`, `public/icon-32.png`, `public/apple-touch-icon.png`, and `docs/assets/favicon/moto-original-822x540.png`
 When inspected
-Then they are 32×32 and 180×180 PNGs respectively
+Then they are 512×512, 32×32, 180×180, and 822×540 PNGs respectively — the crop source is committed alongside the icons it produced
 Covers: R44, R45, AC-47
 
 AT38
@@ -935,6 +1008,24 @@ When `POST /contact` with `name` blank, honeypot empty, and a valid past-thresho
 Then the response shows the existing alert flash (`t("contact.errors.missing_required_fields")`) and sends zero emails — not the fake-success response
 Covers: R55, AC-54, E25
 
+AT58 *(added out of sequence — see Change Log)*
+Given a clean rate-limit cache
+When `POST /contact` is sent 6 times from one IP with the honeypot `website` field filled (all other fields valid, token past threshold), then a 7th time from the same IP with the honeypot empty and everything else valid
+Then all 6 honeypot submissions return the fake-success response and send zero emails, and the 7th sends exactly one email — the honeypot guard halted every rejected request before the per-IP limiter could increment its bucket, so the allowance of 5 was never spent
+Covers: R48, R53, R55, AC-67
+
+AT59 *(added out of sequence — see Change Log)*
+Given a clean rate-limit cache and a captured `Rails.logger`
+When `POST /contact` is rejected once by each of the four paths in turn (honeypot filled; token signed under 2 seconds ago; per-IP limit exceeded; per-email limit exceeded)
+Then each rejection writes exactly one `warn` line, the four reason tokens are distinct from one another, the two rate-limit lines name `contact_per_ip` and `contact_per_email` respectively, and no line contains any part of the submitted `message`, `name`, `email`, or `subject`
+Covers: R61, AC-68
+
+AT60 *(added out of sequence — see Change Log)*
+Given a clean rate-limit cache
+When `POST /contact` is sent 4 times within 10 minutes from one IP with `email` blank, honeypot empty, a valid past-threshold token, and `name`/`message` present
+Then all 4 responses carry the existing missing-required-fields alert rather than the success notice, and zero emails are sent — the per-email limit was skipped for the blank email, so no shared `""` bucket ever filled
+Covers: R48, R55, AC-69, E32
+
 AT45
 Given the shipped honeypot markup
 When inspected
@@ -942,15 +1033,15 @@ Then the wrapper carries `aria-hidden="true"`, the input carries `tabindex="-1"`
 Covers: R51, AC-55
 
 AT46
-Given `spec/requests/contacts_spec.rb` as modified by this spec
-When the full existing scenario list (success, missing name/email/message, phone optional, phone passed through) is run
-Then every scenario still passes
+Given `spec/requests/contacts_spec.rb` as modified by this spec — the `let(:valid_params)` block replaced by an explicitly-called helper method
+When the full existing scenario list (success, missing name/email/message, phone optional, phone passed through) is run, and the file is inspected for `let`/`let!`
+Then every scenario still passes and the file declares no `let` or `let!`
 Covers: R57, AC-56
 
 AT47
 Given `spec/system/contact_form_spec.rb` as modified by this spec
-When the full existing scenario list is run
-Then every scenario still passes with the added pre-submit wait
+When the full existing scenario list is run, and the file is inspected for `sleep`
+Then every scenario still passes with the clock advanced by `travel` before each submission, and the file contains no `sleep` call
 Covers: R58, AC-57
 
 AT48
@@ -994,7 +1085,9 @@ Covers: R47, AC-60
 | 2026-08-04 | `robots.txt` is environment-aware (`Rails.env.production?`), not a static file | Staging is a real, publicly reachable host with no access control of its own. A permissive static `robots.txt` shipped there risks a search engine indexing pre-release content. |
 | 2026-08-04 | Contact form: fake-success response for every spam-defense rejection, but unchanged behavior for genuine field-validation errors | The user's constraint is specifically "a blocked submission must not tell the bot why" — that applies to the three anti-spam layers, not to the pre-existing UX for a real visitor's own mistake, which continues to deserve honest, specific feedback. |
 | 2026-08-04 | Contact form: `deliver_now` retained, rate limiting is the interim DoS mitigation | Matches the user's explicit deferral of `deliver_later` until Solid Queue runs in every environment (today: production only). Recorded so the deferred work is picked up once staging also runs a queue supervisor. |
-| 2026-08-04 | Contact form timing threshold set at 2 seconds, with an explicit sleep added to the system spec rather than a lower/flakier threshold | A threshold low enough to never risk system-spec flakiness on a fast CI runner would also be too low to filter an instant scripted POST. An explicit wait removes the tension entirely rather than trading it for a weaker check. |
+| 2026-08-04 | Contact form timing threshold set at 2 seconds, with the system spec advancing the clock via `travel` rather than lowering the threshold or sleeping | A threshold low enough to never risk system-spec flakiness on a fast CI runner would also be too low to filter an instant scripted POST. `travel` removes the tension entirely rather than trading it for a weaker check — and, unlike the `sleep` first specified, costs no wall-clock time on a `system-test` job already running ~1m35s. The token is generated and verified in the same process the system spec drives, so the advanced clock covers both halves. |
+| 2026-08-04, added on review | The honeypot and timing `before_action`s are declared **above** the two `rate_limit`s, and rejected requests therefore consume no rate-limit allowance | `rate_limit` registers its `before_action` at the point of declaration, so callback order is source order, and `rate_limiting` increments the bucket for every request that reaches it — before comparing the count to the limit. Declaring the limits first would let a bot spraying honeypot-filled submissions exhaust a shared household IP's allowance, or a named person's email allowance, and lock out a visitor who did nothing wrong. Stated as a rule (R55) and asserted behaviourally (AC-67/AT58) so the ordering cannot be silently inverted by a later tidy-up. |
+| 2026-08-04, added on review | The fake-success response's timing side channel is accepted and time-boxed, not padded with artificial latency | `deliver_now` makes a genuine success measurably slower than any rejection (E31). Matching the delay would mean holding a Puma thread on a 2-vCPU box for no reason other than to look busy — spending the resource the rate limits exist to protect — and it is code whose only future is deletion, since `deliver_later` (already a recorded deferral, R56) closes the gap for free. Recorded as an accepted risk with a named exit condition rather than solved with work that has to be removed. |
 
 ---
 
@@ -1015,18 +1108,18 @@ Covers: R47, AC-60
 
 | Task | Description | ACs covered | Points |
 |------|-------------|-------------|--------|
-| T1 | `Faq` model + migration + validations (R1–R3); `Admin::FaqsController` (index/new/create/edit/update/destroy/move_up/move_down, R4); admin views mirroring `services_pages` stacked-card pattern (R5, R11); dashboard links (R9); i18n keys (R10); `db/seeds.rb` creates the 6 literal `Faq` rows verbatim, guarded by `Faq.count.zero?` (R59–R60). | AC-1–AC-7, AC-12–AC-14, AC-61–AC-66 | 6 |
+| T1 | `Faq` model + migration + validations (R1–R3); `Admin::FaqsController` (index/new/create/edit/update/destroy/move_up/move_down, R4); admin views mirroring `services_pages` stacked-card pattern (R5, R11); dashboard links (R9); i18n keys (R10); `db/seeds.rb` creates the 6 literal `Faq` rows verbatim, guarded by `Faq.count.zero?` (R59–R60). | AC-1–AC-7, AC-12–AC-14, AC-61–AC-66 | 8 |
 | T2 | `BusinessHours` model + migration + validations (R12–R14); `db/seeds.rb` blank-seed (R15); `Admin::BusinessHoursController` show/update (R18, R20); admin form; i18n keys. | AC-15–AC-21, AC-58 | 3 |
-| T3 | Home page: `@faqs` assignment, FAQ `<details>` section + `FAQPage` JSON-LD (R6–R8); About page: visible hours list (R19). | AC-8–AC-11, AC-22, AC-23 | 3 |
+| T3 | Home page: `@faqs` assignment, FAQ `<details>` section + `FAQPage` JSON-LD (R6–R8); About page: visible hours list using the public `pages.about.hours.day_*` keys (R19). **`app/views/pages/home.html.erb` currently carries spec-duplicating comments (`<%# R4: md:whitespace-nowrap forces single line at md+ breakpoint %>` and similar) of the kind CLAUDE.md § Comments and `.claude/standards/practices/coding-style.md` § 2.4 prohibit. Do not extend that pattern with new `R#`-referencing comments, and delete the ones in the blocks this task touches.** | AC-8–AC-11, AC-22, AC-23 | 3 |
 | T4 | `structured_data_helper.rb`: `local_business_schema` + `BusinessHours#opening_hours_specification` (R16, R17, R26–R32); wire into layout `<head>`; fixed constants module. | AC-24, AC-25, AC-30–AC-34 | 5 |
 | T5 | Per-page title/description/canonical infrastructure (`content_for`, layout changes, R21–R25) across all 4 public views; new i18n copy. | AC-26–AC-29 | 2 |
 | T6 | Sitemap (`SitemapsController`, `.xml.builder`, R33) + Robots (`RobotsController`, `.text.erb`, environment-aware, R34–R35, R37–R38); delete `public/robots.txt`; admin `noindex` meta (R36). | AC-35–AC-41 | 3 |
 | T7 | Open Graph / Twitter tags (R39–R40); footer (R41–R43); favicon fetch/crop/export + layout links (R44–R47, admin layout untouched). | AC-42–AC-47, AC-59, AC-60 | 3 |
-| T8 | Contact form: honeypot field + rejection (R51, R53); signed timing token + rejection (R54); two `rate_limit` declarations (R48–R50); `fake_success_response` (R52); check ordering (R55); `deliver_now` retained note (R56). | AC-48–AC-55 | 5 |
+| T8 | Contact form: honeypot field + rejection (R51, R53); signed timing token + rejection (R54); two `rate_limit` declarations including the blank-email `if:` guard (R48–R50); `fake_success_response` (R52); check ordering — guards declared above the limits (R55); rejection logging (R61); `deliver_now` retained note (R56). | AC-48–AC-55, AC-67–AC-69 | 5 |
 | T9 | Update `spec/requests/contacts_spec.rb` (`valid_params` default token, new spam-rejection scenarios, R57) and `spec/system/contact_form_spec.rb` (pre-submit wait, R58); full model/request/system test coverage for T1–T7 (FAQ, BusinessHours, schema, sitemap/robots, OG, footer, favicon, mobile-first 375px checks). | AC-56, AC-57 (+ regression coverage for all above) | 5 |
 
-Total estimated points: 35. Four tasks sit at or above the 5-point split-review guardrail (T1, T4, T8, T9); each was reviewed and kept as a single task rather than split:
-- **T1 (6)** — the seed addition (R59–R60) is a small, mechanical literal-array-plus-loop attached to the model it seeds; splitting it into its own task would review the six literal strings in isolation from the model/validation code that gives them meaning, which is less useful, not more.
+Total estimated points: 37. Points are Fibonacci-only per `.claude/standards/version-control-standards.md` § Task Sizing → Allowed Values (1, 2, 3, 5, 8, 13); T1 sits at 8, the next legal value above 5, not at the 6 an earlier revision used. Four tasks sit at or above the 5-point split-review guardrail (T1, T4, T8, T9); each was reviewed and kept as a single task rather than split:
+- **T1 (8)** — 8 points requires an explicitly documented rationale to remain unsplit, and this is it. The task is one model with its CRUD surface plus the seed that fills it; the seed addition (R59–R60) is a small, mechanical literal-array-plus-loop attached to the model it seeds. Splitting the seed out would review six literal strings in isolation from the model and validation code that give them meaning — less useful, not more — and splitting the CRUD from the model would leave a table nothing can write to. The risk the 8 acknowledges is breadth (migration, controller, 8 routes, views, i18n, seed), not a hard problem; it is accepted here rather than pretended away with a smaller number.
 - **T4 (5)** — no natural mid-point split; the helper's two methods (`local_business_schema`, `opening_hours_specification`) are consumed by the same single layout change in the same PR.
 - **T8 (5)** — its five sub-mechanisms (honeypot, timing, two rate limits, shared fake-success response) are small individually but must land together for the check ordering (R55) to be testable at all; a partial landing would leave the contact form's spam defenses incomplete mid-review.
 - **T9 (5)** — pure test coverage for T1–T8's combined surface; splitting it would mean either duplicating setup across multiple test-only PRs or reviewing tests without the code they exercise having fully landed.
@@ -1042,6 +1135,7 @@ Total estimated points: 35. Four tasks sit at or above the 5-point split-review 
 | 2026-08-04 | FAQ seed content promoted from an informal Open Questions note to normative content: moved into Interfaces → FAQ Seed Content (single authoritative copy), with a new rule pinning it verbatim (R59) and an (initial, since corrected below) idempotent seed mechanism (R60). Added E26–E27, AC-61–AC-63, AT52–AT54 (added out of sequence, physically positioned near the other Part A / FAQ items) | R59, R60; E26, E27; AC-61–AC-63; AT52–AT54; T1 (bumped 5→6 points) | User review flagged that nothing in the spec previously stopped an implementer from paraphrasing or regenerating the seed copy — the six answers lived only in an Open Questions aside, unreferenced by any R#/AC#, which is exactly the section a developer reads as unresolved. |
 | 2026-08-04 | **Corrected R60's mechanism.** The initial design keyed the seed's `find_or_create_by!` lookup on `question` text. Review caught that `question` is admin-editable (R2) — rewording a question through `PATCH /admin/faqs/:id` is ordinary use, not an edge case — and a reworded question no longer matches its original seed row, so a reseed created a duplicate 7th row rather than recognizing the edited one. Replaced with a table-empty guard (`Faq.count.zero?`): the seed runs only against a genuinely empty table and does nothing otherwise, regardless of which fields an admin has changed. This also removes a defect the old mechanism had but nobody had flagged yet: it silently resurrected any individually-deleted seeded row, so deleting 3 of 6 and reseeding used to bring exactly those 3 back. The new mechanism trades that for a different, honestly-documented consequence: deleting *all 6* is indistinguishable from a fresh install, so a reseed after that restores all 6 (E30) — accepted as strictly better than the defect it replaces. | R60 rewritten; E27 narrowed to the answer-edit case it still covers; added E28 (question-edit — the motivating defect), E29 (partial deletion, no resurrection), E30 (full deletion, honest resurrection); added AC-64–AC-66, AT55–AT57; updated the seed-mechanism Implementation Decisions row; T1's AC range extended to AC-66 | User review of R60 during a second pass, before implementation — the exact scenario described (Doug reworders "Can you tune my bike's ECU?") is realistic first-week admin behavior for an editable FAQ, not a contrived edge case. |
 | 2026-08-04 | **Softened FAQ seed item 6 (position 5).** Replaced the answer's claim about where customers currently travel from — "riders travel from across Idaho and northern Utah … including from Idaho Falls, Boise, and the Salt Lake area" — with what the shop takes on: "we take suspension, engine, and ECU work from riders across southeast Idaho and the surrounding region, not just Pocatello." Regional geography, the service list, and the call-ahead CTA are unchanged. The question text is unchanged. | Interfaces → FAQ Seed Content (position 5); Open Questions note narrowed | The Salt Lake claim was inferred during spec authoring, not confirmed. R59 pins this text verbatim and `faq_page_schema` (R7, R8) feeds it into `FAQPage` structured data, so an unverified factual claim about existing customers would have become a machine-readable assertion an answer engine may surface as a rich result. Reframing it from *what customers do* to *what the shop takes on* keeps the local-SEO value and makes the claim true by construction. No rule, AC, AT, or edge case changes — R59 still pins the table, AC-61 still matches against it, AT52 still compares to the same source of truth. |
+| 2026-08-04 | **Review response (PR #58).** Two gaps where the spec asked for behavior the implementer could not produce from what it gave them: (1) the public hours list had no day-name strings — the only 7 day labels defined were `admin.business_hours.day_*`, so R19/AC-23 could only be satisfied by hardcoding English into a public view or rendering an `admin.*` key from one; added 7 public `pages.about.hours.day_*` keys and made R19 name them. (2) R55's mandated check order was unachievable from R48's own snippet: `rate_limit` registers its `before_action` at the point of declaration, so the layout shown put the limits first, inverting the rule — R48 now shows the guards above the limits, R55 states that source order is the mechanism and that honeypot/timing rejections must not consume a bucket, and AC-67/AT58 assert it behaviourally. Also: the per-email limit now skips a blank email (E32, AC-69/AT60) instead of putting every blank-email submission site-wide into one `""` bucket; every rejection path logs a distinguishable `warn` line (R61, AC-68/AT59), which is what makes E19's "rename the field if observed in practice" actionable; the fake-success timing side channel is recorded as an accepted, time-boxed risk (E31) rather than padded with artificial latency; R15 now persists (`first_or_create!`, or `first_or_initialize` + `save!`) instead of specifying `first_or_initialize` alone, which creates nothing; R44/R46/AC-46/AC-47 keep `icon.png` at 512×512 and add the 32×32 as `icon-32.png` rather than shrinking the only large icon; R45 commits the 822×540 crop source to `docs/assets/favicon/` before the live source disappears at cutover; R57 replaces the prohibited `let(:valid_params)` with an explicitly-called helper (testing.md § 3.4); R58 uses `travel 5.seconds` instead of `sleep`; R35's rationale corrected (`config.public_file_server.enabled` enables `ActionDispatch::Static`, not `.headers`); R28 resolves `AboutPageContent.first` into one local instead of calling it twice on every public page; R26 adds `"@id" => "#{root_url}#business"`; T1 corrected 6 → 8 (Fibonacci-only per version-control-standards, total 35 → 37); T3 carries a note not to extend `home.html.erb`'s spec-duplicating comments. | R15, R19, R26, R28, R35, R44–R46, R48, R49, R53–R58; added R61; added E31, E32; added AC-67–AC-69; added AT58–AT60; amended AC-23, AC-30, AC-46, AC-47, AC-56, AC-57; amended AT20, AT25, AT37, AT46, AT47; Interfaces → Required i18n Keys; T1, T3, T8; Implementation Decisions | Code review on PR #58 (CHANGES REQUIRED, 2 critical + 8 major + 6 minor). Fixed here rather than at implementation time because this spec merges before implementation begins, and R25/R59 pin its literal copy as normative — a defect in the document becomes a defect in the code that follows it. |
 
 ---
 
