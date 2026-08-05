@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title><%= t("application.title") %></title>
+    <title><%= content_for?(:title) ? content_for(:title) : t("application.title") %></title>
+    <meta name="description" content="<%= content_for?(:meta_description) ? content_for(:meta_description) : t("application.meta_description") %>">
+    <link rel="canonical" href="<%= content_for?(:canonical_url) ? content_for(:canonical_url) : request.base_url + request.path %>">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="application-name" content="<%= t('application.name') %>">
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+
+    <%= json_ld_script_tag local_business_schema %>
 
     <%= yield :head %>
 

@@ -102,4 +102,88 @@ RSpec.describe BusinessHours, type: :model do
       expect(hours.errors.attribute_names).to contain_exactly(:monday_opens_at, :friday_closes_at)
     end
   end
+
+  describe "#hours_on?" do
+    it "is true only when both of the day's times are present (R13)" do
+      # Arrange
+      hours = described_class.new(
+        monday_opens_at: "08:00", monday_closes_at: "17:00",
+        tuesday_opens_at: "08:00"
+      )
+
+      # Act
+      set_days = described_class::DAYS.select { |day| hours.hours_on?(day) }
+
+      # Assert
+      expect(set_days).to eq([ "monday" ])
+    end
+  end
+
+  describe "#days_with_hours" do
+    it "returns only the days with both times, in DAYS order (R13, R19, E7)" do
+      # Arrange
+      hours = described_class.new(
+        friday_opens_at: "10:00", friday_closes_at: "16:00",
+        monday_opens_at: "08:00", monday_closes_at: "17:00",
+        wednesday_opens_at: "09:00", wednesday_closes_at: "15:00"
+      )
+
+      # Act
+      days = hours.days_with_hours
+
+      # Assert
+      expect(days).to eq(%w[monday wednesday friday])
+    end
+
+    it "returns an empty list when every column is blank (R19, E6)" do
+      expect(described_class.new.days_with_hours).to be_empty
+    end
+  end
+
+  describe "#opening_hours_specification" do
+    it "returns one HH:MM entry per set day, in DAYS order (AT21, R16, AC-24, E7)" do
+      # Arrange
+      hours = described_class.new(
+        wednesday_opens_at: "09:30", wednesday_closes_at: "15:05",
+        monday_opens_at: "08:00", monday_closes_at: "17:00"
+      )
+
+      # Act
+      specification = hours.opening_hours_specification
+
+      # Assert
+      expect(specification).to eq([
+        {
+          "@type" => "OpeningHoursSpecification",
+          "dayOfWeek" => "https://schema.org/Monday",
+          "opens" => "08:00",
+          "closes" => "17:00"
+        },
+        {
+          "@type" => "OpeningHoursSpecification",
+          "dayOfWeek" => "https://schema.org/Wednesday",
+          "opens" => "09:30",
+          "closes" => "15:05"
+        }
+      ])
+    end
+
+    it "returns nil when no day carries both times (AT21, R16, AC-25, E6)" do
+      expect(described_class.new.opening_hours_specification).to be_nil
+    end
+
+    it "skips a half-filled day rather than emitting a partial entry (R13, R16)" do
+      # Arrange
+      hours = described_class.new(
+        sunday_opens_at: "10:00",
+        saturday_opens_at: "09:00", saturday_closes_at: "12:00"
+      )
+
+      # Act
+      specification = hours.opening_hours_specification
+
+      # Assert
+      expect(specification.map { |entry| entry["dayOfWeek"] }).to eq([ "https://schema.org/Saturday" ])
+    end
+  end
 end

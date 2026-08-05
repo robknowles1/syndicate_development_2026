@@ -31,6 +31,7 @@ en:
   application:
     title: "Syndicate Development"
     name: "Syndicate Development"
+    meta_description: "Custom performance motocross and supercross motorcycle builds, suspension setup, engine work, and ECU tuning at Syndicate Development in Pocatello, Idaho."
 
   nav:
     logo_alt: "Syndicate Development"
@@ -42,6 +43,8 @@ en:
 
   pages:
     home:
+      meta_title: "Syndicate Development | Custom Motorcycle Shop in Pocatello, Idaho"
+      meta_description: "Custom motorcycle builds, suspension setup, and ECU tuning for motocross and supercross riders in Pocatello, Idaho. Race prep, engine work, and dyno-tuned performance."
       hero_heading: "SYNDICATE DEVELOPMENT"
       hero_tagline: "Performance, Passion, Precision."
       cta_gallery: "PROJECT GALLERY"
@@ -54,7 +57,10 @@ en:
         Give us a call or send us a message and let us know what we can do for you!
       cta_heading: "READY TO START BUILDING?"
       cta_contact: "CONTACT THE SHOP"
+      faq_heading: "Frequently Asked Questions"
     about:
+      meta_title: "About Syndicate Development | Pocatello, Idaho"
+      meta_description: "Meet Doug Haskett, the mechanic behind Syndicate Development's custom suspension, engine, and ECU work for motocross and supercross riders in Pocatello, Idaho."
       shop_heading: "SYNDICATE DEVELOPMENT"
       shop_phone_label: "Shop Phone:"
       shop_phone_number: "208-251-9536"
@@ -70,6 +76,16 @@ en:
         race, and his lifelong passion for bikes combined with his knowledge and state of the art performance equipment and dyno
         room make him a highly sought-after mechanic today. Have a question? Send a message!
       contact_heading: "CONTACT THE SHOP"
+      hours_heading: "Hours"
+      hours:
+        span: "%{opens} – %{closes}"
+        day_monday: "Monday"
+        day_tuesday: "Tuesday"
+        day_wednesday: "Wednesday"
+        day_thursday: "Thursday"
+        day_friday: "Friday"
+        day_saturday: "Saturday"
+        day_sunday: "Sunday"
       slideshow_alt_1: "Syndicate Development motorcycle 1"
       slideshow_alt_2: "Syndicate Development motorcycle 2"
       slideshow_alt_3: "Syndicate Development motorcycle 3"
@@ -86,11 +102,15 @@ en:
         message_placeholder: "Tell us what you need..."
         submit: "Send Message"
     gallery:
+      meta_title: "Project Gallery | Syndicate Development Custom Motorcycles"
+      meta_description: "See custom motocross and supercross builds from Syndicate Development — suspension, engine, and ECU projects completed in Pocatello, Idaho."
       heading: "PROJECT GALLERY"
       photo_alt: "Syndicate Development project photo"
       lightbox_aria_label: "Photo preview"
       lightbox_close_aria_label: "Close photo preview"
     services:
+      meta_title: "Services | Suspension, Engine Builds & ECU Tuning — Syndicate Development"
+      meta_description: "Custom suspension setup, full race engine builds, and dyno-tuned ECU mapping for motocross and supercross bikes at Syndicate Development in Pocatello, Idaho."
       heading: "Services"
       empty_message: "Contact us to learn about our services."
 
@@ -294,7 +314,7 @@ en:
       closes_label: "Closes"
       save: "Save Changes"
       update_notice: "Business hours saved."
-      hint: "Leave both times blank for any day the shop is closed, or that you have not set yet — a day counts as open only when it has both an opening and a closing time."
+      hint: "Leave both times blank for any day the shop is closed, or that you have not set yet. A day is listed under Hours on the About page, and included in the opening hours search engines read, only when it has both an opening and a closing time."
       day_monday: "Monday"
       day_tuesday: "Tuesday"
       day_wednesday: "Wednesday"

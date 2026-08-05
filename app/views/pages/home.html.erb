@@ -1,21 +1,20 @@
-<%# Resolve content once — R3a: single computation, all 4 fields derive from this local %>
+<% content_for :title, t("pages.home.meta_title") %>
+<% content_for :meta_description, t("pages.home.meta_description") %>
+<% content_for :canonical_url, root_url %>
+
 <% content = @home_page_content&.published? ? @home_page_content : nil %>
 
-<%# Hero Section %>
 <section class="w-full h-screen bg-cover bg-center flex items-end pb-16 px-8"
          style="background-image: url('<%= asset_path('gallery/m45a2849.jpg') %>');"
          >
   <div class="text-white">
-    <%# R4: md:whitespace-nowrap forces single line at md+ breakpoint %>
     <h1 class="text-4xl md:text-7xl font-black tracking-widest uppercase break-words md:whitespace-nowrap"><%= t("pages.home.hero_heading") %></h1>
-    <%# R5: md:truncate clips with ellipsis at md+ breakpoint %>
     <p class="text-xl md:text-2xl font-bold tracking-wide mt-2 md:truncate"><%= content&.hero_tagline || t("pages.home.hero_tagline") %></p>
     <%= link_to t("pages.home.cta_gallery"), gallery_path,
           class: "inline-block mt-6 px-8 py-3 border-2 border-white text-white font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors" %>
   </div>
 </section>
 
-<%# Mission Section %>
 <section class="py-20 px-6 text-center bg-white">
   <h2 class="text-3xl md:text-4xl font-black uppercase tracking-wide mb-4" style="color: #db0505;">
     <%= content&.mission_heading || t("pages.home.mission_heading") %>
@@ -23,13 +22,29 @@
   <h4 class="text-lg md:text-xl font-bold uppercase tracking-wide text-gray-800 mb-8">
     <%= content&.mission_subheading || t("pages.home.mission_subheading") %>
   </h4>
-  <%# R9: whitespace-pre-line renders \n as visible line breaks regardless of publish state %>
   <p class="max-w-3xl mx-auto text-gray-700 text-base md:text-lg leading-relaxed whitespace-pre-line">
     <%= content&.mission_body || t("pages.home.mission_body") %>
   </p>
 </section>
 
-<%# CTA Section %>
+<% if @faqs.any? %>
+  <section class="py-16 px-6 bg-gray-50">
+    <h2 class="text-3xl md:text-4xl font-black uppercase tracking-wide mb-8 text-center" style="color: #242121;">
+      <%= t("pages.home.faq_heading") %>
+    </h2>
+    <div class="max-w-3xl mx-auto space-y-3">
+      <% @faqs.each do |faq| %>
+        <details class="bg-white border border-gray-200 rounded-lg px-4">
+          <summary class="cursor-pointer font-bold text-gray-900 py-4 marker:text-red-600 break-words"><%= faq.question %></summary>
+          <p class="pb-4 text-gray-700 text-base leading-relaxed whitespace-pre-line break-words"><%= faq.answer %></p>
+        </details>
+      <% end %>
+    </div>
+  </section>
+
+  <%= json_ld_script_tag faq_page_schema(@faqs) %>
+<% end %>
+
 <section class="w-full h-screen bg-cover bg-center flex flex-col items-center justify-center text-center px-6"
          style="background-image: url('<%= asset_path('gallery/m45a2996.jpg') %>');">
   <div class="text-white">
