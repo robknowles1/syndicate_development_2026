@@ -1,0 +1,45 @@
+<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+  <h1 class="text-2xl font-bold"><%= t("admin.faqs.heading") %></h1>
+  <%= link_to t("admin.faqs.add_first"), new_admin_faq_path,
+        class: "bg-red-600 text-white font-bold py-3 px-4 rounded hover:bg-red-700 text-sm" %>
+</div>
+
+<section class="bg-white rounded-lg shadow p-4 md:p-6">
+
+  <% if @faqs.empty? %>
+    <p class="text-gray-500 italic"><%= t("admin.faqs.empty_state") %></p>
+    <p class="mt-2">
+      <%= link_to t("admin.faqs.add_first"), new_admin_faq_path,
+            class: "inline-block py-3 text-red-600 font-bold hover:text-red-800" %>
+    </p>
+  <% else %>
+    <ul class="divide-y divide-gray-100">
+      <% @faqs.each do |faq| %>
+        <li class="py-4 first:pt-0 last:pb-0">
+          <div class="min-w-0 mb-3">
+            <p class="font-semibold leading-snug break-words"><%= faq.question %></p>
+            <p class="text-xs text-gray-400 break-words"><%= truncate(faq.answer, length: 120) %></p>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <%= link_to t("admin.faqs.move_up"),
+                  move_up_admin_faq_path(faq),
+                  data: { turbo_method: :patch },
+                  class: "text-sm bg-gray-100 hover:bg-gray-200 px-3 py-3 rounded font-semibold" %>
+            <%= link_to t("admin.faqs.move_down"),
+                  move_down_admin_faq_path(faq),
+                  data: { turbo_method: :patch },
+                  class: "text-sm bg-gray-100 hover:bg-gray-200 px-3 py-3 rounded font-semibold" %>
+            <%= link_to t("admin.faqs.edit"),
+                  edit_admin_faq_path(faq),
+                  class: "text-sm bg-blue-100 hover:bg-blue-200 px-3 py-3 rounded font-semibold" %>
+            <%= link_to t("admin.faqs.delete"),
+                  admin_faq_path(faq),
+                  data: { turbo_method: :delete, turbo_confirm: t("admin.faqs.confirm_delete") },
+                  class: "text-sm font-semibold px-3 py-3 rounded text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100" %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>

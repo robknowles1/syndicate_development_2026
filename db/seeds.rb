@@ -133,3 +133,26 @@ sections_data.each do |data|
     ServiceBullet.find_or_create_by!(service_section: section, position: index) { |b| b.body = body }
   end
 end
+
+faq_seed_content = [
+  [ "What suspension work does Syndicate Development offer?",
+    "We handle full suspension service for motocross and supercross bikes — revalving and re-springing tuned to your weight and riding style, fork and shock rebuilds, linkage and bearing service, and setup for track day or race day. Whether you're running stock components or a full custom suspension package, we tune it to how you actually ride." ],
+  [ "Do you build complete race engines?",
+    "Yes. We do full engine builds and rebuilds for motocross and supercross bikes, including top-end and bottom-end service, porting and head work, valve train upgrades, and engine blueprinting and balancing. Every build is set up and verified on our in-house dyno before it goes back to you." ],
+  [ "Can you tune my bike's ECU?",
+    "We do fuel injection mapping, ignition timing, and custom ECU tuning for fuel-injected motocross and supercross bikes, including launch and traction control setup and custom maps for aftermarket exhausts and air kits. All tuning is dyno-verified, not guesswork." ],
+  [ "How long does a typical job take?",
+    "Turnaround depends on the scope of the work — a suspension service or ECU tune is usually quicker than a full engine build. Give us a call or send a message with what you need done and we'll give you a realistic timeline before you drop the bike off." ],
+  [ "Do you work on stock or trail bikes, or only race bikes?",
+    "Both. While we specialize in custom performance work for motocross and supercross machines, we also handle regular servicing for stock and trail bikes — from routine maintenance to the same suspension and engine work we do for race bikes." ],
+  [ "Do customers travel from outside Pocatello for work here?",
+    "Yes — we take suspension, engine, and ECU work from riders across southeast Idaho and the surrounding region, not just Pocatello. If you're coming from out of town, give us a call ahead of time so we can plan your build or service around your trip and have parts ready when you arrive." ]
+]
+
+# Guarded on the table, never on a row: every column here is admin-editable, so a per-row
+# lookup would recreate a FAQ the admin had reworded or deliberately deleted.
+if Faq.count.zero?
+  faq_seed_content.each_with_index do |(question, answer), position|
+    Faq.create!(question: question, answer: answer, position: position)
+  end
+end

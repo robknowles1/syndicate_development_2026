@@ -1,0 +1,9 @@
+<div class="flex flex-wrap items-center gap-4 mb-6">
+  <h1 class="text-2xl font-bold"><%= t("admin.faqs.edit_heading") %></h1>
+  <%= link_to t("admin.faqs.heading"), admin_faqs_path,
+        class: "inline-block py-3 text-sm text-gray-500 hover:text-gray-700 underline" %>
+</div>
+
+<div class="bg-white rounded-lg shadow p-4 md:p-6 max-w-2xl">
+  <%= render "form", faq: @faq %>
+</div>

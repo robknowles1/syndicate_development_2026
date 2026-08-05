@@ -34,4 +34,26 @@ RSpec.describe "Admin::Dashboard", type: :request do
       end
     end
   end
+
+  describe "GET /admin links to the dashboard-only admin surfaces" do
+    def sign_in_dashboard_admin
+      dashboard_admin = create(:admin_user, email: "dashboard-admin@example.com")
+      post admin_login_path, params: { email: dashboard_admin.email, password: "securepassword123" }
+    end
+
+    context "when authenticated" do
+      it "links to FAQs from outside the persistent nav (AT12, AC-12)" do
+        # Arrange
+        sign_in_dashboard_admin
+
+        # Act
+        get admin_root_path
+        page = Nokogiri::HTML(response.body)
+
+        # Assert
+        expect(page.css("a[href='#{admin_faqs_path}']")).not_to be_empty
+        expect(page.css("nav ul a[href='#{admin_faqs_path}']")).to be_empty
+      end
+    end
+  end
 end
