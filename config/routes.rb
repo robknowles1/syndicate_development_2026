@@ -61,5 +61,12 @@ Rails.application.routes.draw do
         patch :reorder
       end
     end
+    resources :faqs, only: [ :index, :new, :create, :edit, :update, :destroy ] do
+      member do
+        patch :move_up
+        patch :move_down
+      end
+    end
+    resource :business_hours, only: [ :show, :update ]
   end
 end

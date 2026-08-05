@@ -163,6 +163,8 @@ en:
       home_page_link: "Edit Home Page Content"
       about_page_link: "Edit About Page Content"
       gallery_link: "Manage Gallery Photos"
+      faqs_link: "Manage FAQs"
+      business_hours_link: "Edit Business Hours"
       users_link: "Manage Admin Users"
       account_link: "Change My Password"
     home_page_content:
@@ -267,6 +269,39 @@ en:
         uploaded: "Photo uploaded."
         deleted: "Photo deleted."
         reorder_failed: "Could not save the new photo order. The page will reload."
+    faqs:
+      heading: "FAQs"
+      question_label: "Question"
+      answer_label: "Answer"
+      save: "Save"
+      edit: "Edit"
+      delete: "Remove"
+      move_up: "Up"
+      move_down: "Down"
+      confirm_delete: "Are you sure you want to delete this FAQ?"
+      add_first: "Add FAQ"
+      empty_state: "No FAQs yet."
+      new_heading: "New FAQ"
+      edit_heading: "Edit FAQ"
+      flash:
+        created: "FAQ created."
+        updated: "FAQ updated."
+        destroyed: "FAQ deleted."
+        moved: "FAQ reordered."
+    business_hours:
+      heading: "Business Hours"
+      opens_label: "Opens"
+      closes_label: "Closes"
+      save: "Save Changes"
+      update_notice: "Business hours saved."
+      hint: "Leave both times blank for any day the shop is closed, or that you have not set yet — a day counts as open only when it has both an opening and a closing time."
+      day_monday: "Monday"
+      day_tuesday: "Tuesday"
+      day_wednesday: "Wednesday"
+      day_thursday: "Thursday"
+      day_friday: "Friday"
+      day_saturday: "Saturday"
+      day_sunday: "Sunday"
     layout:
       title: "Admin — Syndicate Development"
       header: "Syndicate Admin"
@@ -282,6 +317,10 @@ en:
   activerecord:
     errors:
       models:
+        business_hours:
+          missing_closing_time: "is set but the closing time for that day is blank"
+          missing_opening_time: "is set but the opening time for that day is blank"
+          closes_before_opens: "must be later than the opening time"
         service_section:
           attributes:
             base:

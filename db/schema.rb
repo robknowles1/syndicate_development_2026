@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_28_214019) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_05_003230) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -67,6 +67,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_214019) do
     t.string "session_token"
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_admin_users_on_email", unique: true
+  end
+
+  create_table "business_hours", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.time "friday_closes_at"
+    t.time "friday_opens_at"
+    t.time "monday_closes_at"
+    t.time "monday_opens_at"
+    t.time "saturday_closes_at"
+    t.time "saturday_opens_at"
+    t.time "sunday_closes_at"
+    t.time "sunday_opens_at"
+    t.time "thursday_closes_at"
+    t.time "thursday_opens_at"
+    t.time "tuesday_closes_at"
+    t.time "tuesday_opens_at"
+    t.datetime "updated_at", null: false
+    t.time "wednesday_closes_at"
+    t.time "wednesday_opens_at"
+  end
+
+  create_table "faqs", force: :cascade do |t|
+    t.text "answer", null: false
+    t.datetime "created_at", null: false
+    t.integer "position", default: 0, null: false
+    t.string "question", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "gallery_photos", force: :cascade do |t|
