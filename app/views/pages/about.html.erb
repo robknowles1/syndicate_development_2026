@@ -1,6 +1,9 @@
+<% content_for :title, t("pages.about.meta_title") %>
+<% content_for :meta_description, t("pages.about.meta_description") %>
+<% content_for :canonical_url, about_url %>
+
 <% content = @about_page_content&.published? ? @about_page_content : nil %>
 
-<%# CSS Fade Slideshow %>
 <style>
   .slideshow {
     position: relative;
