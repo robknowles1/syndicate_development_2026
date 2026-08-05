@@ -1,9 +1,9 @@
 module StructuredDataHelper
-  BUSINESS_NAME = "Syndicate Development"
-  ADDRESS_LOCALITY = "Pocatello"
-  ADDRESS_REGION = "ID"
-  POSTAL_CODE = "83204"
-  ADDRESS_COUNTRY = "US"
+  BUSINESS_NAME = "Syndicate Development".freeze
+  ADDRESS_LOCALITY = "Pocatello".freeze
+  ADDRESS_REGION = "ID".freeze
+  POSTAL_CODE = "83204".freeze
+  ADDRESS_COUNTRY = "US".freeze
   GEO_LATITUDE = 42.8739291
   GEO_LONGITUDE = -112.4668151
   AREA_SERVED = [
@@ -13,7 +13,7 @@ module StructuredDataHelper
     { "@type" => "State", "name" => "Idaho" },
     { "@type" => "State", "name" => "Utah" }
   ].freeze
-  BUSINESS_IMAGE = "gallery/m45a2849.jpg"
+  BUSINESS_IMAGE = "gallery/m45a2849.jpg".freeze
 
   def local_business_schema
     content = AboutPageContent.first
