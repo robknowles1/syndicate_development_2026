@@ -11,6 +11,8 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
+    <%= json_ld_script_tag local_business_schema %>
+
     <%= yield :head %>
 
     <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
