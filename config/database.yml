@@ -124,7 +124,8 @@ production:
     <<: *primary_production
     database: syndicate_development_2026_production_queue
     migrations_paths: db/queue_migrate
-    # Solid Queue requires at least `threads` + 2 connections per worker process. This
+    # Solid Queue wants at least `threads` + 2 connections per worker process — as of
+    # 1.6.0 an undersized pool logs a warning and boots rather than aborting. This
     # must NOT inherit RAILS_MAX_THREADS from *default: that knob sizes Puma's web pool
     # and config/puma.rb already defaults it to 3, so an operator reconciling the two
     # would silently starve the workers. JOB_THREADS drives both this pool and `threads:`
