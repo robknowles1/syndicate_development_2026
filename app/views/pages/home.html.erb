@@ -27,6 +27,24 @@
   </p>
 </section>
 
+<% if @faqs.any? %>
+  <section class="py-16 px-6 bg-gray-50">
+    <h2 class="text-3xl md:text-4xl font-black uppercase tracking-wide mb-8 text-center" style="color: #242121;">
+      <%= t("pages.home.faq_heading") %>
+    </h2>
+    <div class="max-w-3xl mx-auto space-y-3">
+      <% @faqs.each do |faq| %>
+        <details class="bg-white border border-gray-200 rounded-lg px-4">
+          <summary class="cursor-pointer font-bold text-gray-900 py-4 marker:text-red-600 break-words"><%= faq.question %></summary>
+          <p class="pb-4 text-gray-700 text-base leading-relaxed whitespace-pre-line break-words"><%= faq.answer %></p>
+        </details>
+      <% end %>
+    </div>
+  </section>
+
+  <%= json_ld_script_tag faq_page_schema(@faqs) %>
+<% end %>
+
 <section class="w-full h-screen bg-cover bg-center flex flex-col items-center justify-center text-center px-6"
          style="background-image: url('<%= asset_path('gallery/m45a2996.jpg') %>');">
   <div class="text-white">

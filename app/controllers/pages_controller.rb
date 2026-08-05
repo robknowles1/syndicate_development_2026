@@ -3,6 +3,7 @@ class PagesController < ApplicationController
 
   def home
     @home_page_content = HomePageContent.first
+    @faqs = Faq.order(:position)
   end
 
   def about
@@ -11,6 +12,7 @@ class PagesController < ApplicationController
       .with_attached_slideshow_image_2
       .with_attached_slideshow_image_3
       .first
+    @business_hours = BusinessHours.first
   end
 
   def gallery

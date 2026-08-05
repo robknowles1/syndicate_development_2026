@@ -49,6 +49,20 @@ module StructuredDataHelper
     schema
   end
 
+  def faq_page_schema(faqs)
+    {
+      "@context" => "https://schema.org",
+      "@type" => "FAQPage",
+      "mainEntity" => faqs.map { |faq|
+        {
+          "@type" => "Question",
+          "name" => faq.question,
+          "acceptedAnswer" => { "@type" => "Answer", "text" => faq.answer }
+        }
+      }
+    }
+  end
+
   # `raw` here is load-bearing, not an oversight. json_escape has already neutralised the
   # `<`, `>` and `&` that admin-authored text could use to close this <script>; escaping
   # again would only reach the quotes, and HTML entities are not decoded inside a script
