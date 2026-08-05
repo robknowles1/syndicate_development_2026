@@ -15,7 +15,12 @@ RSpec.describe "Admin business hours view at phone widths", type: :system do
     admin
   end
 
+  # Chrome grows the layout viewport to swallow overflowing content, which is what makes
+  # window.innerWidth — and so both helpers below — read clean on a page that overflows.
+  # The width the browser ended up at is the measurement that still moves.
   def expect_usable_at(width)
+    expect(actual_viewport_width).to eq(width),
+      "the layout viewport grew to #{actual_viewport_width}px, so content overflowed #{width}px"
     expect(horizontal_overflow?).to be(false),
       "the page scrolled sideways at #{width}px"
     expect(any_control_offscreen?).to be(false),
