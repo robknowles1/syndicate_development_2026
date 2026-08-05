@@ -10,8 +10,9 @@ RSpec.describe "db/seeds.rb FAQ seeding", type: :request do
   end
 
   def sign_in_admin
-    admin = AdminUser.find_by(email: "robknowles105@gmail.com")
-    post admin_login_path, params: { email: admin.email, password: "seed-password-1234" }
+    admin = create(:admin_user)
+    post admin_login_path, params: { email: admin.email, password: "securepassword123" }
+    admin
   end
 
   def expected_seed_faqs
