@@ -156,3 +156,6 @@ if Faq.count.zero?
     Faq.create!(question: question, answer: answer, position: position)
   end
 end
+
+business_hours = BusinessHours.first_or_initialize
+business_hours.save! if business_hours.new_record?

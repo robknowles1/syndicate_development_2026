@@ -67,5 +67,6 @@ Rails.application.routes.draw do
         patch :move_down
       end
     end
+    resource :business_hours, only: [ :show, :update ]
   end
 end

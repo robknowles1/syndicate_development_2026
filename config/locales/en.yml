@@ -164,6 +164,7 @@ en:
       about_page_link: "Edit About Page Content"
       gallery_link: "Manage Gallery Photos"
       faqs_link: "Manage FAQs"
+      business_hours_link: "Edit Business Hours"
       users_link: "Manage Admin Users"
       account_link: "Change My Password"
     home_page_content:
@@ -287,6 +288,20 @@ en:
         updated: "FAQ updated."
         destroyed: "FAQ deleted."
         moved: "FAQ reordered."
+    business_hours:
+      heading: "Business Hours"
+      opens_label: "Opens"
+      closes_label: "Closes"
+      save: "Save Changes"
+      update_notice: "Business hours saved."
+      hint: "Leave both times blank for any day the shop is closed or you have not set yet — blank days are left off the public site and out of its search listing."
+      day_monday: "Monday"
+      day_tuesday: "Tuesday"
+      day_wednesday: "Wednesday"
+      day_thursday: "Thursday"
+      day_friday: "Friday"
+      day_saturday: "Saturday"
+      day_sunday: "Sunday"
     layout:
       title: "Admin — Syndicate Development"
       header: "Syndicate Admin"
@@ -302,6 +317,10 @@ en:
   activerecord:
     errors:
       models:
+        business_hours:
+          missing_closing_time: "is set but the closing time for that day is blank"
+          missing_opening_time: "is set but the opening time for that day is blank"
+          closes_before_opens: "must be later than the opening time"
         service_section:
           attributes:
             base:

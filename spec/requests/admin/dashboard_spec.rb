@@ -42,7 +42,7 @@ RSpec.describe "Admin::Dashboard", type: :request do
     end
 
     context "when authenticated" do
-      it "links to FAQs from outside the persistent nav (AT12, AC-12)" do
+      it "links to FAQs and Business Hours from outside the persistent nav (AT12, AC-12)" do
         # Arrange
         sign_in_dashboard_admin
 
@@ -52,7 +52,9 @@ RSpec.describe "Admin::Dashboard", type: :request do
 
         # Assert
         expect(page.css("a[href='#{admin_faqs_path}']")).not_to be_empty
+        expect(page.css("a[href='#{admin_business_hours_path}']")).not_to be_empty
         expect(page.css("nav ul a[href='#{admin_faqs_path}']")).to be_empty
+        expect(page.css("nav ul a[href='#{admin_business_hours_path}']")).to be_empty
       end
     end
   end
