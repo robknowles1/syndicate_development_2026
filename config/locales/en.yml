@@ -119,6 +119,7 @@ en:
   contact:
     form:
       no_subject: "(No subject)"
+      honeypot_label: "Website"
     errors:
       missing_required_fields: "Please fill in all required fields (name, email, and message)."
     notices:

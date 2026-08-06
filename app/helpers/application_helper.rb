@@ -20,4 +20,8 @@ module ApplicationHelper
       tabler_icon(icon_key, class: css_class)
     end
   end
+
+  def contact_form_rendered_at_token
+    Rails.application.message_verifier(:contact_form).generate(Time.current.to_i)
+  end
 end

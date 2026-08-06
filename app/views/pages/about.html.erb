@@ -149,6 +149,13 @@
               required: true %>
       </div>
 
+      <div aria-hidden="true" class="absolute -left-[9999px] -top-[9999px]">
+        <%= label_tag :website, t("contact.form.honeypot_label") %>
+        <%= text_field_tag :website, nil, autocomplete: "off", tabindex: -1 %>
+      </div>
+
+      <%= hidden_field_tag :rendered_at, contact_form_rendered_at_token %>
+
       <div>
         <%= f.submit t("pages.about.form.submit"),
               class: "bg-red-600 text-white font-bold uppercase tracking-widest px-8 py-3 hover:bg-red-700 transition-colors cursor-pointer rounded" %>
