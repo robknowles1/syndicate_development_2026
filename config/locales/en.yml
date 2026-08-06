@@ -32,6 +32,8 @@ en:
     title: "Syndicate Development"
     name: "Syndicate Development"
     meta_description: "Custom performance motocross and supercross motorcycle builds, suspension setup, engine work, and ECU tuning at Syndicate Development in Pocatello, Idaho."
+    footer:
+      copyright: "© %{year} %{business_name}. All rights reserved."
 
   nav:
     logo_alt: "Syndicate Development"
