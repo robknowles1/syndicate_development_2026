@@ -1,4 +1,5 @@
 require "rails_helper"
+require "vips"
 
 RSpec.describe "SPEC-012 static file inspection" do
   def repository_path(relative_path)
@@ -7,6 +8,16 @@ RSpec.describe "SPEC-012 static file inspection" do
 
   def png_dimensions(relative_path)
     IO.binread(repository_path(relative_path), 24).unpack("x16N2")
+  end
+
+  # Columns only, deliberately. The lion sits against a transparent strip at the top of
+  # its source, so the correctly framed icons already measure 3-5% blank rows and a
+  # symmetric threshold would ride the edge of failing on a legitimate re-export.
+  def blank_column_fraction(relative_path)
+    image = Vips::Image.new_from_file(repository_path(relative_path).to_s)
+    alpha = image[image.bands - 1]
+    blank = (0...image.width).count { |x| alpha.crop(x, 0, 1, image.height).max.zero? }
+    blank.fdiv(image.width)
   end
 
   describe "files under public/ that would shadow a dynamic route" do
@@ -40,6 +51,19 @@ RSpec.describe "SPEC-012 static file inspection" do
     it "drops the stock Rails vector icon (AT31, R44, AC-47)" do
       # Assert
       expect(repository_path("public/icon.svg")).not_to exist
+    end
+
+    it "frames the artwork against the edges rather than a dead margin (R45)" do
+      # Arrange — a crop offset that pads instead of panning leaves a quarter of each
+      # icon empty and amputates the mane; dimensions alone cannot see that
+      icons = [ "public/icon.png", "public/icon-32.png", "public/apple-touch-icon.png" ]
+
+      # Act
+      margins = icons.to_h { |icon| [ icon, blank_column_fraction(icon) ] }
+
+      # Assert
+      expect(margins).to all(satisfy { |_icon, fraction| fraction <= 0.05 }),
+        "expected no icon to be mostly empty at its edges, got #{margins.inspect}"
     end
 
     it "keeps the 822x540 crop source alongside the icons it produced (AT37, R45, AC-47)" do

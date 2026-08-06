@@ -37,7 +37,7 @@ keeps the whole roaring head, muzzle included, and drops only the trailing mane
 wisp past `x: 540`.
 
 ```bash
-sips -c 540 540 --cropOffset 0 -141 docs/assets/favicon/moto-original-822x540.png --out lion-square.png
+magick docs/assets/favicon/moto-original-822x540.png -crop 540x540+0+0 +repage lion-square.png
 sips -z 512 512 lion-square.png --out public/icon.png
 sips -z 180 180 lion-square.png --out public/apple-touch-icon.png
 sips -z 32  32  lion-square.png --out public/icon-32.png
@@ -45,13 +45,32 @@ sips -z 32  32  lion-square.png --out public/icon-32.png
 
 `lion-square.png` is an intermediate and is not committed.
 
-`sips --cropOffset` measures from the **centre** of the source, not the top-left
-corner, and it takes its arguments as `offsetY offsetX`. A top-left anchored crop
-therefore needs `-141` on the X axis — half the 282px the 822px-wide source
-overhangs the 540px square. SPEC-012 R45 gives this line as `--cropOffset 0 0`,
-which silently produces a centre crop with the lion's muzzle sliced off the left
-edge. Check the output before shipping it; both crops are 540×540 and only the
-picture tells them apart.
+### Why the crop does not use `sips`
+
+SPEC-012 R45 gives the crop as `sips -c 540 540 --cropOffset 0 0`. That does not
+produce the crop R45's own prose describes. `sips(1)` documents `--cropOffset
+offsetY offsetH` as *"Crop offset from top left corner"*, and positive offsets do
+behave that way — but `0` is taken as *no offset given* and falls back to a centred
+crop, which slices the lion's muzzle off the left edge.
+
+Measured against known `magick` windows on this source (differences of a few
+thousand pixels are re-encode noise, not framing):
+
+| invocation | equivalent window | result |
+|---|---|---|
+| `--cropOffset 0 0` | `-crop 540x540+141+0` | centred — muzzle sliced off |
+| `--cropOffset 0 1` | `-crop 540x540+1+0` | within 1px of the intended crop |
+| `--cropOffset 0 282` | `-crop 540x540+282+0` | positive offsets index from the left |
+| `--cropOffset 0 -141` | 399px crop, then 141 transparent columns spliced on | **pads, does not pan** |
+
+A negative offset is not a leftward pan. It pads that many transparent columns onto
+the left and clips the same number off the right, which is how an earlier attempt at
+this crop shipped three icons that were a quarter empty with the mane amputated.
+
+Check the output before shipping it. Every candidate is 540×540 and only the picture
+tells them apart — `spec/lib/seo_static_files_spec.rb` now fails on any icon whose
+columns are more than 5% blank, which catches the padding mistake but not a
+mis-centred crop.
 
 ## What it is not
 

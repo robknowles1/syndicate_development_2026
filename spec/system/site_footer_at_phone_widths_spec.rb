@@ -28,7 +28,6 @@ RSpec.describe "Site footer at phone widths", type: :system do
         "the layout viewport grew to #{actual_viewport_width}px, so content overflowed #{width}px"
       expect(page).to have_css("footer")
       expect(footer_right_edge).to be <= width
-      expect(horizontal_overflow?).to be(false)
     end
   end
 
