@@ -1,0 +1,87 @@
+require "rails_helper"
+require "vips"
+
+RSpec.describe "SPEC-012 static file inspection" do
+  def repository_path(relative_path)
+    Rails.root.join(relative_path)
+  end
+
+  def png_dimensions(relative_path)
+    IO.binread(repository_path(relative_path), 24).unpack("x16N2")
+  end
+
+  # Columns only, deliberately. The lion sits against a transparent strip at the top of
+  # its source, so the correctly framed icons already measure 3-5% blank rows and a
+  # symmetric threshold would ride the edge of failing on a legitimate re-export.
+  def blank_column_fraction(relative_path)
+    image = Vips::Image.new_from_file(repository_path(relative_path).to_s)
+    alpha = image[image.bands - 1]
+    blank = (0...image.width).count { |x| alpha.crop(x, 0, 1, image.height).max.zero? }
+    blank.fdiv(image.width)
+  end
+
+  describe "files under public/ that would shadow a dynamic route" do
+    it "ships no static robots.txt (AT31, R35, AC-40, E17)" do
+      # Assert
+      expect(repository_path("public/robots.txt")).not_to exist
+    end
+
+    it "ships no static sitemap.xml (AT28, R38)" do
+      # Assert
+      expect(repository_path("public/sitemap.xml")).not_to exist
+    end
+  end
+
+  describe "favicon assets" do
+    it "keeps icon.png at its full 512x512 size (AT37, R44, AC-47)" do
+      # Assert
+      expect(png_dimensions("public/icon.png")).to eq([ 512, 512 ])
+    end
+
+    it "adds a 32x32 tab icon (AT37, R44, AC-47)" do
+      # Assert
+      expect(png_dimensions("public/icon-32.png")).to eq([ 32, 32 ])
+    end
+
+    it "adds a 180x180 apple touch icon (AT37, R44, AC-47)" do
+      # Assert
+      expect(png_dimensions("public/apple-touch-icon.png")).to eq([ 180, 180 ])
+    end
+
+    it "drops the stock Rails vector icon (AT31, R44, AC-47)" do
+      # Assert
+      expect(repository_path("public/icon.svg")).not_to exist
+    end
+
+    it "frames the artwork against the edges rather than a dead margin (R45)" do
+      # Arrange — a crop offset that pads instead of panning leaves a quarter of each
+      # icon empty and amputates the mane; dimensions alone cannot see that
+      icons = [ "public/icon.png", "public/icon-32.png", "public/apple-touch-icon.png" ]
+
+      # Act
+      margins = icons.to_h { |icon| [ icon, blank_column_fraction(icon) ] }
+
+      # Assert
+      expect(margins).to all(satisfy { |_icon, fraction| fraction <= 0.05 }),
+        "expected no icon to be mostly empty at its edges, got #{margins.inspect}"
+    end
+
+    it "keeps the 822x540 crop source alongside the icons it produced (AT37, R45, AC-47)" do
+      # Assert
+      expect(png_dimensions("docs/assets/favicon/moto-original-822x540.png")).to eq([ 822, 540 ])
+    end
+  end
+
+  describe "app/views/layouts/admin.html.erb" do
+    it "adds no favicon link tags to the admin layout (AT51, R47, AC-60)" do
+      # Arrange
+      layout_source = File.read(repository_path("app/views/layouts/admin.html.erb"))
+
+      # Act
+      icon_links = Nokogiri::HTML(layout_source).css("link[rel*='icon']")
+
+      # Assert
+      expect(icon_links).to be_empty
+    end
+  end
+end

@@ -16,6 +16,9 @@ Rails.application.routes.draw do
   get "/services", to: "pages#services"
   post "/contact", to: "contacts#create", as: :contact
 
+  get "/sitemap.xml", to: "sitemaps#show", as: :sitemap, defaults: { format: :xml }
+  get "/robots.txt",  to: "robots#show",   as: :robots,  defaults: { format: :text }
+
   namespace :admin do
     get    "login",  to: "sessions#new",     as: :login
     post   "login",  to: "sessions#create"
