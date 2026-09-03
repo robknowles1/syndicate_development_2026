@@ -70,6 +70,12 @@ Rails.application.routes.draw do
         patch :move_down
       end
     end
+    resources :social_media_links, only: [ :index, :new, :create, :edit, :update, :destroy ] do
+      member do
+        patch :move_up
+        patch :move_down
+      end
+    end
     resource :business_hours, only: [ :show, :update ]
   end
 end

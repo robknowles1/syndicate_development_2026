@@ -46,6 +46,9 @@ module StructuredDataHelper
     opening_hours = BusinessHours.first&.opening_hours_specification
     schema["openingHoursSpecification"] = opening_hours if opening_hours
 
+    social_urls = active_social_media_links.map(&:url)
+    schema["sameAs"] = social_urls if social_urls.any?
+
     schema
   end
 

@@ -82,6 +82,12 @@
     </p>
   </div>
 
+  <%= render "shared/social_media_links",
+        location: "about",
+        wrapper_css_class: "flex flex-wrap items-center gap-4 mb-6 -ml-2",
+        link_css_class: "block p-2 text-gray-700 hover:text-red-600 transition-colors",
+        icon_css_class: "w-6 h-6" %>
+
   <% open_days = @business_hours&.days_with_hours || [] %>
   <% if open_days.any? %>
     <div id="shop-hours" class="mb-6">

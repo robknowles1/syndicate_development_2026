@@ -1,0 +1,14 @@
+<%# locals: (location:, wrapper_css_class:, link_css_class:, icon_css_class:) %>
+<% links = active_social_media_links %>
+<% if links.any? %>
+  <ul data-social-media-links="<%= location %>" class="<%= wrapper_css_class %>">
+    <% links.each do |link| %>
+      <li>
+        <%= link_to link.url, target: "_blank", rel: "noopener noreferrer",
+              aria: { label: link.platform_label }, class: link_css_class do %>
+          <%= tabler_icon link.icon_key, class: icon_css_class, "aria-hidden": "true" %>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

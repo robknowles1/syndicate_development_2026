@@ -63,6 +63,11 @@
     <%= yield %>
 
     <footer class="bg-[#242121] text-white text-center px-4 py-6">
+      <%= render "shared/social_media_links",
+            location: "footer",
+            wrapper_css_class: "flex flex-wrap items-center justify-center gap-4 mb-4",
+            link_css_class: "block p-2 text-white hover:text-red-600 transition-colors",
+            icon_css_class: "w-6 h-6" %>
       <p class="text-sm tracking-wide">
         <%= t("application.footer.copyright", year: Date.current.year, business_name: t("application.name")) %>
       </p>
