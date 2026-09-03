@@ -25,7 +25,7 @@ module ApplicationHelper
   # a controller-assigned ivar: any action that forgot to set one would silently drop the
   # links from that page's footer.
   def active_social_media_links
-    SocialMediaLink.active.order(:position)
+    SocialMediaLink.active.order(:position, :id)
   end
 
   def contact_form_rendered_at_token

@@ -3,7 +3,7 @@ module Admin
     before_action :set_social_media_link, only: [ :edit, :update, :destroy, :move_up, :move_down ]
 
     def index
-      @social_media_links = SocialMediaLink.order(:position)
+      @social_media_links = SocialMediaLink.order(:position, :id)
     end
 
     def new
