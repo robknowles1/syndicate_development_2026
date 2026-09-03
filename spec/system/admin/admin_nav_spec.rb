@@ -59,7 +59,7 @@ RSpec.describe "Admin nav at phone widths", type: :system do
       metrics = layout_metrics
 
       # Assert
-      expect(metrics["count"]).to eq(5)
+      expect(metrics["count"]).to eq(6)
       expect(metrics["horizontalOverflow"]).to be(false),
         "admin nav caused horizontal document overflow at #{width}px"
       expect(metrics["anyOffscreen"]).to be(false),
