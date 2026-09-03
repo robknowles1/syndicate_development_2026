@@ -115,6 +115,47 @@ RSpec.describe SocialMediaLink, type: :model do
       end
     end
 
+    [ "https://", "https:///", "https://:80", "https://@", "https://?x=1", "https://#frag" ].each do |empty_host_url|
+      context "with the host-less url #{empty_host_url.inspect}" do
+        it "is invalid, because a scheme alone is not a well-formed URL (R4)" do
+          # Arrange
+          link = build(:social_media_link, url: empty_host_url)
+
+          # Act
+          link.valid?
+
+          # Assert
+          expect(link.errors.details[:url]).to include(a_hash_including(error: :invalid))
+        end
+      end
+    end
+
+    context "with a host-less url" do
+      it "reports the invalid format exactly once (R4)" do
+        # Arrange
+        link = build(:social_media_link, url: "https://")
+
+        # Act
+        link.valid?
+
+        # Assert
+        expect(link.errors[:url].size).to eq(1)
+      end
+    end
+
+    context "with a url whose userinfo hides a second host" do
+      it "is invalid, because it cannot be parsed into a single host (R4)" do
+        # Arrange
+        link = build(:social_media_link, url: "https://user:pass@evil.com@instagram.com")
+
+        # Act
+        link.valid?
+
+        # Assert
+        expect(link.errors.details[:url]).to include(a_hash_including(error: :invalid))
+      end
+    end
+
     context "with a non-integer position" do
       it "is invalid (R5)" do
         # Arrange
