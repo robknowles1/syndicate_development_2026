@@ -11,19 +11,34 @@ RSpec.describe "Social media links at phone widths", type: :system do
     create(:social_media_link, platform: "youtube", url: "https://youtube.com/@syndicate", position: 2)
   end
 
-  # Each link's clickable box against the raw icon it wraps, so padding that exists only
-  # as a class name cannot pass for a real tap area.
-  def tap_area_growth_at(location)
+  # Measures the rendered boxes rather than asserting on class names, so padding that exists
+  # only as a class name cannot pass for a real tap area.
+  def tap_area_boxes_at(location)
     page.evaluate_script(<<~JS)
       (() => {
         const links = [...document.querySelectorAll("[data-social-media-links='#{location}'] a")];
         return links.map(link => {
           const icon = link.querySelector('svg').getBoundingClientRect();
           const box = link.getBoundingClientRect();
-          return [box.width - icon.width, box.height - icon.height];
+          return { width: box.width, height: box.height, iconWidth: icon.width, iconHeight: icon.height };
         });
       })()
     JS
+  end
+
+  def assert_tap_targets_at_least_44(location, width)
+    boxes = tap_area_boxes_at(location)
+    expect(boxes.size).to eq(3), "expected 3 links at #{location}"
+    boxes.each do |box|
+      expect(box["width"]).to be >= 44,
+        "#{location} link tap width was #{box['width']}px at #{width}px viewport"
+      expect(box["height"]).to be >= 44,
+        "#{location} link tap height was #{box['height']}px at #{width}px viewport"
+      expect(box["width"]).to be > box["iconWidth"],
+        "#{location} link was no wider than its icon at #{width}px"
+      expect(box["height"]).to be > box["iconHeight"],
+        "#{location} link was no taller than its icon at #{width}px"
+    end
   end
 
   phone_widths.each do |width|
@@ -58,7 +73,7 @@ RSpec.describe "Social media links at phone widths", type: :system do
         "the About page scrolled sideways at #{width}px"
     end
 
-    it "pads every icon's tap area beyond the glyph at #{width}px (AT31, R19, AC-31)" do
+    it "gives every footer and CTA icon a 44px tap target at #{width}px (AT31, R19, AC-31)" do
       # Arrange
       create_three_active_links
       emulate_viewport(width: width)
@@ -67,14 +82,20 @@ RSpec.describe "Social media links at phone widths", type: :system do
       visit root_path
 
       # Assert
-      %w[footer home-cta].each do |location|
-        growth = tap_area_growth_at(location)
-        expect(growth.size).to eq(3), "expected 3 links at #{location}"
-        growth.each do |width_growth, height_growth|
-          expect(width_growth).to be > 0, "#{location} link was no wider than its icon at #{width}px"
-          expect(height_growth).to be > 0, "#{location} link was no taller than its icon at #{width}px"
-        end
-      end
+      assert_tap_targets_at_least_44("footer", width)
+      assert_tap_targets_at_least_44("home-cta", width)
+    end
+
+    it "gives every About page icon a 44px tap target at #{width}px (AT31, R19, AC-31)" do
+      # Arrange
+      create_three_active_links
+      emulate_viewport(width: width)
+
+      # Act
+      visit about_path
+
+      # Assert
+      assert_tap_targets_at_least_44("about", width)
     end
   end
 
