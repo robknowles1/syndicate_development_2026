@@ -52,6 +52,14 @@ No new routes. 3 existing views/helpers gain a rendering of the shared partial o
 | About shop info | `app/views/pages/about.html.erb` | Immediately below the existing phone/address block (after line 83), before the Hours section |
 | Schema.org | `app/helpers/structured_data_helper.rb` | `local_business_schema` gains a `"sameAs"` key |
 
+The shared partial's rendered `<ul>` wrapper carries `data-social-media-links="<location>"`, the selector AC-22, AC-24, and AC-26 assert against for the zero-links state. `location` is the fourth local named in R13, one of the following 3 fixed values, one per call site:
+
+| Location | `location` value |
+|----------|-------------------|
+| Footer | `footer` |
+| Home CTA band | `home-cta` |
+| About shop info | `about` |
+
 ### Admin
 
 New resource, new controller, following `Admin::FaqsController` exactly:
@@ -182,7 +190,7 @@ R12: Every rendered social link (all 4 locations) carries `rel="noopener norefer
 
 ### Rendering — Shared Partial and 4 Locations
 
-R13: A single shared partial, `app/views/shared/_social_media_links.html.erb`, renders the icon-only row. It queries `SocialMediaLink.active.order(:position)` itself (via a small helper method, e.g. `active_social_media_links`, callable from any view without controller-level wiring) rather than depending on a controller-set instance variable — this guarantees the footer (rendered from the shared layout on every action of every controller) is always correct without every current and future controller action remembering to set an ivar. The partial accepts locals for per-location styling (e.g. `icon_css_class:`, `link_css_class:`, `wrapper_css_class:`) and is rendered from all 4 call sites with those locals set per R14-R16.
+R13: A single shared partial, `app/views/shared/_social_media_links.html.erb`, renders the icon-only row. It queries `SocialMediaLink.active.order(:position)` itself (via a small helper method, e.g. `active_social_media_links`, callable from any view without controller-level wiring) rather than depending on a controller-set instance variable — this guarantees the footer (rendered from the shared layout on every action of every controller) is always correct without every current and future controller action remembering to set an ivar. The partial accepts locals for per-location styling (e.g. `icon_css_class:`, `link_css_class:`, `wrapper_css_class:`) plus a `location:` local identifying the call site (see Interfaces), and is rendered from all 4 call sites with those locals set per R14-R16.
 
 R14: **Zero-render rule, all 4 locations.** When `SocialMediaLink.active` is empty, the partial renders nothing at all — no wrapping container element, no heading, no leftover margin or divider that would otherwise separate adjacent content. This is implemented as a single top-level guard (`<% links = active_social_media_links %><% if links.any? %>...<% end %>`) so the empty case can never accidentally leave behind an empty `<div>`/`<ul>` with its own spacing.
 
@@ -545,6 +553,7 @@ Total estimated points: 18. T8 sits at the 5-point guardrail threshold — flagg
 | Date | Change | Affected IDs | Rationale |
 |------|--------|-------------|-----------|
 | 2026-09-02 | Initial draft | All | Translates the repo owner's request into an implementation-ready spec. Resolves all 8 settled decisions from the requesting session explicitly: platform allowlist shape (R2, following `ServiceSection::ICON_KEYS`), the admin-names/public-icons split and its accessible-name consequence (R7, R15), all 4 render locations with a single shared partial to prevent drift (R13-R16), the zero-links-renders-nothing requirement made an explicit AC at every location (AC-22, AC-24, AC-26, AC-28) rather than left implicit, URL validation scope and posture (R4, R11), one-platform-one-link (R3, R10), and the `active`-not-`published` visibility decision with its full rationale (R6). |
+| 2026-09-03 | Recorded the wrapper's identifying selector (Interfaces, R13) | R13, AC-22, AC-24, AC-26 | AC-22, AC-24, and AC-26 required asserting the zero-links state via "the wrapper's identifying selector" without the spec ever defining what that selector was, leaving it to be invented during implementation. This amendment records the selector chosen: a `data-social-media-links="<location>"` attribute on the rendered `<ul>`, with a fourth partial local (`location:`) and its 3 fixed values, so the contract the acceptance tests depend on is documented rather than existing only in code. |
 
 ---
 
