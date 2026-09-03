@@ -9,6 +9,10 @@ RSpec.describe "Public social media links", type: :request do
     Nokogiri::HTML(response_body).css("[data-social-media-links='#{location}']")
   end
 
+  def platform_labels(*platforms)
+    platforms.map { |platform| I18n.t("social_media.platforms.#{platform}") }
+  end
+
   def create_instagram_and_facebook
     create(:social_media_link, platform: "instagram", url: "https://instagram.com/syndicate", position: 0)
     create(:social_media_link, platform: "facebook", url: "https://facebook.com/syndicate", position: 1)
@@ -27,7 +31,7 @@ RSpec.describe "Public social media links", type: :request do
         # Assert
         expect(links.map { |a| a["href"] })
           .to eq([ "https://instagram.com/syndicate", "https://facebook.com/syndicate" ])
-        expect(links.map { |a| a["aria-label"] }).to eq([ "Instagram", "Facebook" ])
+        expect(links.map { |a| a["aria-label"] }).to eq(platform_labels("instagram", "facebook"))
         expect(links.map { |a| a["rel"] }).to all(eq("noopener noreferrer"))
         expect(links.map { |a| a["target"] }).to all(eq("_blank"))
       end
@@ -59,6 +63,22 @@ RSpec.describe "Public social media links", type: :request do
       end
     end
 
+    context "with platforms whose labels are not their keys capitalised" do
+      it "reads every aria-label from platform_label rather than deriving one (AT30, R7, AC-30)" do
+        # Arrange
+        create(:social_media_link, platform: "youtube", url: "https://youtube.com/@a", position: 0)
+        create(:social_media_link, platform: "tiktok", url: "https://tiktok.com/@b", position: 1)
+        create(:social_media_link, platform: "linkedin", url: "https://linkedin.com/company/c", position: 2)
+
+        # Act
+        get root_path
+
+        # Assert
+        expect(social_links_at(response.body, "footer").map { |a| a["aria-label"] })
+          .to eq(platform_labels("youtube", "tiktok", "linkedin"))
+      end
+    end
+
     context "with an inactive link mixed among active ones" do
       it "excludes the inactive link and keeps the others in order (E5)" do
         # Arrange
@@ -71,7 +91,7 @@ RSpec.describe "Public social media links", type: :request do
 
         # Assert
         expect(social_links_at(response.body, "footer").map { |a| a["aria-label"] })
-          .to eq([ "Instagram", "Facebook" ])
+          .to eq(platform_labels("instagram", "facebook"))
       end
     end
 
@@ -110,7 +130,7 @@ RSpec.describe "Public social media links", type: :request do
           get path
 
           expect(social_links_at(response.body, "footer").map { |a| a["aria-label"] })
-            .to eq([ "Instagram", "Facebook" ]), "expected the footer row on #{path}"
+            .to eq(platform_labels("instagram", "facebook")), "expected the footer row on #{path}"
         end
       end
     end
@@ -129,7 +149,7 @@ RSpec.describe "Public social media links", type: :request do
         # Assert
         expect(links.map { |a| a["href"] })
           .to eq([ "https://instagram.com/syndicate", "https://facebook.com/syndicate" ])
-        expect(links.map { |a| a["aria-label"] }).to eq([ "Instagram", "Facebook" ])
+        expect(links.map { |a| a["aria-label"] }).to eq(platform_labels("instagram", "facebook"))
         expect(links.map { |a| a.at_css("svg")["aria-hidden"] }).to all(eq("true"))
         expect(links.map { |a| a.text.strip }).to all(be_empty)
       end
@@ -171,7 +191,7 @@ RSpec.describe "Public social media links", type: :request do
         # Assert
         expect(links.map { |a| a["href"] })
           .to eq([ "https://instagram.com/syndicate", "https://facebook.com/syndicate" ])
-        expect(links.map { |a| a["aria-label"] }).to eq([ "Instagram", "Facebook" ])
+        expect(links.map { |a| a["aria-label"] }).to eq(platform_labels("instagram", "facebook"))
         expect(links.map { |a| a.at_css("svg")["aria-hidden"] }).to all(eq("true"))
         expect(links.map { |a| a.text.strip }).to all(be_empty)
       end
@@ -213,7 +233,7 @@ RSpec.describe "Public social media links", type: :request do
         get root_path
 
         # Assert
-        expect(social_links_at(response.body, "footer").map { |a| a["aria-label"] }).to eq([ "Instagram" ])
+        expect(social_links_at(response.body, "footer").map { |a| a["aria-label"] }).to eq(platform_labels("instagram"))
       end
     end
   end

@@ -39,7 +39,8 @@ RSpec.describe "Admin::SocialMediaLinks", type: :request do
         get admin_social_media_links_path
 
         # Assert
-        expect(response.body.index("Instagram")).to be < response.body.index("Facebook")
+        expect(response.body.index(I18n.t("social_media.platforms.instagram")))
+          .to be < response.body.index(I18n.t("social_media.platforms.facebook"))
       end
     end
 
