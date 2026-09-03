@@ -8,7 +8,8 @@ module AdminHelper
       [ t("admin.layout.nav.home"),      admin_home_page_content_path ],
       [ t("admin.layout.nav.about"),     admin_about_page_content_path ],
       [ t("admin.layout.nav.gallery"),   admin_gallery_photos_path ],
-      [ t("admin.layout.nav.services"),  admin_services_page_path ]
+      [ t("admin.layout.nav.services"),  admin_services_page_path ],
+      [ t("admin.layout.nav.social"),    admin_social_media_links_path ]
     ]
   end
 

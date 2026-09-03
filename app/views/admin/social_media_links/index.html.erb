@@ -1,0 +1,52 @@
+<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+  <h1 class="text-2xl font-bold"><%= t("admin.social_media_links.heading") %></h1>
+  <%= link_to t("admin.social_media_links.add_first"), new_admin_social_media_link_path,
+        class: "bg-red-600 text-white font-bold py-3 px-4 rounded hover:bg-red-700 text-sm" %>
+</div>
+
+<section class="bg-white rounded-lg shadow p-4 md:p-6">
+
+  <% if @social_media_links.empty? %>
+    <p class="text-gray-500 italic"><%= t("admin.social_media_links.empty_state") %></p>
+    <p class="mt-2">
+      <%= link_to t("admin.social_media_links.add_first"), new_admin_social_media_link_path,
+            class: "inline-block py-3 text-red-600 font-bold hover:text-red-800" %>
+    </p>
+  <% else %>
+    <ul class="divide-y divide-gray-100">
+      <% @social_media_links.each do |social_media_link| %>
+        <li class="py-4 first:pt-0 last:pb-0">
+          <div class="min-w-0 mb-3">
+            <p class="font-semibold leading-snug break-words">
+              <%= social_media_link.platform_label %>
+              <% unless social_media_link.active? %>
+                <span class="ml-2 text-xs font-bold uppercase tracking-wide text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  <%= t("admin.social_media_links.inactive_badge") %>
+                </span>
+              <% end %>
+            </p>
+            <p class="text-xs text-gray-400 break-words"><%= social_media_link.url %></p>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <%= link_to t("admin.social_media_links.move_up"),
+                  move_up_admin_social_media_link_path(social_media_link),
+                  data: { turbo_method: :patch },
+                  class: "text-sm bg-gray-100 hover:bg-gray-200 px-3 py-3 rounded font-semibold" %>
+            <%= link_to t("admin.social_media_links.move_down"),
+                  move_down_admin_social_media_link_path(social_media_link),
+                  data: { turbo_method: :patch },
+                  class: "text-sm bg-gray-100 hover:bg-gray-200 px-3 py-3 rounded font-semibold" %>
+            <%= link_to t("admin.social_media_links.edit"),
+                  edit_admin_social_media_link_path(social_media_link),
+                  class: "text-sm bg-blue-100 hover:bg-blue-200 px-3 py-3 rounded font-semibold" %>
+            <%= link_to t("admin.social_media_links.delete"),
+                  admin_social_media_link_path(social_media_link),
+                  data: { turbo_method: :delete, turbo_confirm: t("admin.social_media_links.confirm_delete") },
+                  class: "text-sm font-semibold px-3 py-3 rounded text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100" %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>

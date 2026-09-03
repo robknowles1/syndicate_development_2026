@@ -125,6 +125,16 @@ en:
     notices:
       message_sent: "Message sent! We'll be in touch soon."
 
+  social_media:
+    platforms:
+      instagram: "Instagram"
+      facebook: "Facebook"
+      youtube: "YouTube"
+      tiktok: "TikTok"
+      x: "X"
+      threads: "Threads"
+      linkedin: "LinkedIn"
+
   admin:
     login:
       heading: "Admin Login"
@@ -190,6 +200,7 @@ en:
       business_hours_link: "Edit Business Hours"
       users_link: "Manage Admin Users"
       account_link: "Change My Password"
+      social_media_links_link: "Manage Social Media Links"
     home_page_content:
       heading: "Home Page Content"
       hero_tagline_label: "Hero Tagline"
@@ -311,6 +322,29 @@ en:
         updated: "FAQ updated."
         destroyed: "FAQ deleted."
         moved: "FAQ reordered."
+    social_media_links:
+      heading: "Social Media"
+      platform_label: "Platform"
+      url_label: "Profile URL"
+      url_placeholder: "https://instagram.com/yourshop"
+      active_label: "Show on the website"
+      active_hint: "Uncheck to hide this profile everywhere on the public site without deleting the link."
+      save: "Save"
+      edit: "Edit"
+      delete: "Remove"
+      move_up: "Up"
+      move_down: "Down"
+      confirm_delete: "Are you sure you want to delete this social media link?"
+      add_first: "Add Social Media Link"
+      empty_state: "No social media links yet."
+      new_heading: "New Social Media Link"
+      edit_heading: "Edit Social Media Link"
+      inactive_badge: "Hidden"
+      flash:
+        created: "Social media link created."
+        updated: "Social media link updated."
+        destroyed: "Social media link deleted."
+        moved: "Social media links reordered."
     business_hours:
       heading: "Business Hours"
       opens_label: "Opens"
@@ -336,6 +370,7 @@ en:
         about: "About"
         gallery: "Gallery"
         services: "Services"
+        social: "Social"
 
   activerecord:
     errors:

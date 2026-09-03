@@ -21,12 +21,13 @@ RSpec.describe "Admin layout — persistent admin nav bar", type: :request do
       admin_home_page_content_path => I18n.t("admin.layout.nav.home"),
       admin_about_page_content_path => I18n.t("admin.layout.nav.about"),
       admin_gallery_photos_path => I18n.t("admin.layout.nav.gallery"),
-      admin_services_page_path => I18n.t("admin.layout.nav.services")
+      admin_services_page_path => I18n.t("admin.layout.nav.services"),
+      admin_social_media_links_path => I18n.t("admin.layout.nav.social")
     }
   end
 
   describe "when authenticated (AT18, R14, R16, R18, AC-16, AC-19, E11)" do
-    it "renders the nav with all five destinations on every admin page" do
+    it "renders the nav with all six destinations on every admin page" do
       # Arrange
       sign_in_admin(create(:admin_user))
       expected_labels = admin_pages.values

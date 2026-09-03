@@ -21,6 +21,13 @@ module ApplicationHelper
     end
   end
 
+  # The footer renders this on every action of every controller, so it must not depend on
+  # a controller-assigned ivar: any action that forgot to set one would silently drop the
+  # links from that page's footer.
+  def active_social_media_links
+    SocialMediaLink.active.order(:position, :id)
+  end
+
   def contact_form_rendered_at_token
     Rails.application.message_verifier(:contact_form).generate(Time.current.to_i)
   end
