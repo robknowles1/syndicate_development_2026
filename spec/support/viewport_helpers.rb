@@ -5,8 +5,10 @@
 # on a phone that way, past a spec that resized to "375".
 #
 # CDP's device metrics override sets the viewport directly and does reach phone widths.
-# `mobile: true` additionally enables touch-event emulation, so specs exercising drag or
-# tap behaviour take the touch code path rather than the mouse one.
+# `mobile: true` covers the viewport meta tag, overlay scrollbars and text autosizing — not
+# touch. Touch events need Emulation.setTouchEmulationEnabled, which nothing here calls, so
+# `ontouchstart in window` stays false: never read a spec passing under emulate_viewport as
+# evidence that a touch code path was exercised.
 module ViewportHelpers
   # Chrome will not render below roughly 367px wide even under a device metrics
   # override; a narrower request is silently widened. Since a spec that believes it is

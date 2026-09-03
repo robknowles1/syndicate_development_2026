@@ -5,9 +5,13 @@
 # failure only appears at seeds that order them that way, which is what makes it costly.
 RSpec.configure do |config|
   config.after(type: :system) do
-    Capybara.current_session.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
-  rescue StandardError
-    # No browser, or a driver without CDP: nothing to reset.
-    nil
+    driver = Capybara.current_session.driver
+    browser = driver.browser if driver.respond_to?(:browser)
+
+    # Deliberately unrescued. A driver with no CDP is asked nothing, but a CDP call that
+    # does fail leaves the override live for every later example — the corruption this hook
+    # exists to prevent — and a blanket rescue would resurface it as a baffling width
+    # failure in an unrelated spec instead of here.
+    browser.execute_cdp("Emulation.clearDeviceMetricsOverride") if browser.respond_to?(:execute_cdp)
   end
 end

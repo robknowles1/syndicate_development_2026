@@ -68,6 +68,10 @@ RSpec.describe "Admin auth flows", type: :system do
     # Act — request the reset from the login page
     visit admin_login_path
     click_link I18n.t("admin.login.forgot_password")
+    # Login and reset both label their email field "Email", so a fill_in that beats the
+    # click's navigation types into the login form and the page swap throws the value away.
+    # The submit that follows then meets an empty required field and never reaches the server.
+    expect(page).to have_content(I18n.t("admin.password_reset.heading"))
     fill_in I18n.t("admin.password_reset.email_label"), with: "forgetful@example.com"
     click_button I18n.t("admin.password_reset.submit")
 
