@@ -12,6 +12,13 @@ module MetaTagsHelper
   end
 
   def social_share_image_url
-    image_url(StructuredDataHelper::BUSINESS_IMAGE)
+    @social_share_image_url ||= begin
+      content = HomePageContent.first
+      if content&.published? && content.hero_image.attached?
+        rails_representation_url(content.social_share_variant)
+      else
+        image_url(StructuredDataHelper::BUSINESS_IMAGE)
+      end
+    end
   end
 end
