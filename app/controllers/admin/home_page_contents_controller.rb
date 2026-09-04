@@ -17,9 +17,11 @@ module Admin
 
     def update
       @home_page_content = HomePageContent.first_or_initialize
-      purge_slots_marked_for_removal
 
       if @home_page_content.update(home_page_content_params)
+        # Must stay below `update`: hoisting it destroys the blob even when validation
+        # then fails, leaving the admin a 422 saying nothing was saved and no image.
+        purge_slots_marked_for_removal
         process_newly_attached_variants
         flash[:notice] = I18n.t("admin.home_page_content.update_notice")
         redirect_to admin_home_page_content_path

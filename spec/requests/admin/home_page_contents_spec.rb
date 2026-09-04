@@ -541,6 +541,22 @@ RSpec.describe "Admin::HomePageContents", type: :request do
       expect(HomePageContent.first.hero_image.blob.filename.to_s).to eq("gallery_photo_large.jpg")
     end
 
+    it "keeps the saved image when the removal box is checked with no new file and the save fails (R15, AC-16, E5)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content, :with_hero_image)
+
+      # Act
+      patch admin_home_page_content_path,
+            params: { home_page_content: valid_home_page_content_params(hero_tagline: "", remove_hero_image: "1") }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(HomePageContent.first.hero_image.attached?).to be true
+      expect(HomePageContent.first.hero_image.blob.filename.to_s).to eq("gallery_photo.jpg")
+    end
+
     it "keeps the saved image when a checked box and a new file arrive together but the save fails (R15, AC-17)" do
       # Arrange
       admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
