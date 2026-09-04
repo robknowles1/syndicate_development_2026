@@ -2,6 +2,8 @@
 require "rubygems"
 require "bundler/setup"
 
-ARGV.unshift("--ensure-latest")
+# Do not restore the generator's --ensure-latest: it exits 5 without scanning
+# whenever a newer Brakeman is published, turning every upstream release into a
+# red build on every branch, with no scan running until the version bump lands.
 
 load Gem.bin_path("brakeman", "brakeman")

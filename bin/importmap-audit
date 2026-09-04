@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+
+require_relative "../config/application"
+require "importmap/npm"
+
+MAX_ATTEMPTS = 3
+BACKOFF_SECONDS = 5
+
+attempt = 1
+
+# Rescue the registry fetch only, and only for HTTPError. Widening either the
+# scope or the exception class would report "no vulnerable packages" for runs
+# that never managed to check, which is worse than the red build it replaces.
+vulnerable_packages = begin
+  Importmap::Npm.new.vulnerable_packages
+rescue Importmap::Npm::HTTPError => error
+  if attempt < MAX_ATTEMPTS
+    sleep BACKOFF_SECONDS * attempt
+    attempt += 1
+    retry
+  end
+
+  warn "::warning::importmap audit skipped: the npm registry was unreachable on all #{MAX_ATTEMPTS} attempts (#{error.message})"
+  exit 0
+end
+
+if vulnerable_packages.any?
+  vulnerable_packages.each do |package|
+    puts "#{package.name} (#{package.severity}): #{package.vulnerability} — vulnerable versions #{package.vulnerable_versions}"
+  end
+
+  abort "#{vulnerable_packages.size} vulnerable package(s) found"
+end
+
+puts "No vulnerable packages found"
