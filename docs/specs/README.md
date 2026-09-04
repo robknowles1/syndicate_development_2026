@@ -20,6 +20,7 @@ This directory contains feature specs produced by the PM agent following the spe
 | SPEC-012 | SEO/AEO Pass — Structured Data, Metadata, FAQ, and Contact Form Hardening | ready | high | [SPEC-012-seo-aeo.md](SPEC-012-seo-aeo.md) (branch `feature/spec-012-seo-aeo`, not yet merged to `main`) |
 | SPEC-013 | Home Page Hero and CTA Image Uploads — Admin-Replaceable Background Images | ready | medium | [SPEC-013-home-hero-cta-image-uploads.md](SPEC-013-home-hero-cta-image-uploads.md) |
 | SPEC-014 | Social Media Links — Admin-Managed Profile Icons | ready | medium | [SPEC-014-social-media-links.md](SPEC-014-social-media-links.md) |
+| SPEC-015 | Nav Bar Logo — Admin-Replaceable Site Branding | ready | medium | [SPEC-015-nav-logo-image-upload.md](SPEC-015-nav-logo-image-upload.md) (depends on research finding [SPEC-015-research-logo-transparency-conversion.md](SPEC-015-research-logo-transparency-conversion.md)) |
 
 *(Update this table as specs are added.)*
 
