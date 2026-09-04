@@ -39,8 +39,11 @@ jobs:
         with:
           bundler-cache: true
 
+      # `bin/importmap audit` exits non-zero both for a real advisory and for an
+      # unreachable npm registry. Do not inline it back here — bin/importmap-audit
+      # is what tells those two apart.
       - name: Scan for security vulnerabilities in JavaScript dependencies
-        run: bin/importmap audit
+        run: bin/importmap-audit
 
   lint:
     runs-on: ubuntu-latest
