@@ -67,6 +67,140 @@ RSpec.describe HomePageContent, type: :model do
     end
   end
 
+  describe "hero_image and cta_image attachments (SPEC-013 R1, R2)" do
+    it "is valid with neither slot attached — presence is not required (AT1, R2)" do
+      # Arrange
+      record = build(:home_page_content)
+
+      # Act
+      result = record.valid?
+
+      # Assert
+      expect(result).to be true
+      expect(record.errors[:hero_image]).to be_empty
+      expect(record.errors[:cta_image]).to be_empty
+    end
+
+    it "is valid with a JPEG attached to each slot (AT2, AT3, R1)" do
+      # Arrange
+      record = build(:home_page_content, :with_hero_image, :with_cta_image)
+
+      # Act
+      result = record.valid?
+
+      # Assert
+      expect(result).to be true
+      expect(record.hero_image).to be_attached
+      expect(record.cta_image).to be_attached
+    end
+
+    it "rejects an image/svg+xml content type on cta_image (AT11, R2, E5)" do
+      # Arrange
+      record = build(:home_page_content)
+      record.cta_image.attach(
+        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+        filename: "gallery_photo.svg",
+        content_type: "image/svg+xml"
+      )
+
+      # Act
+      record.valid?
+
+      # Assert
+      expect(record.errors[:cta_image]).to include(I18n.t("activerecord.errors.messages.invalid_content_type"))
+    end
+
+    it "rejects a hero_image exceeding 30 MB (AT12, R8, E6)" do
+      # Arrange
+      record = build(:home_page_content, :with_hero_image)
+      allow(record.hero_image.blob).to receive(:byte_size).and_return(31.megabytes)
+
+      # Act
+      record.valid?
+
+      # Assert
+      expect(record.errors[:hero_image]).to include(I18n.t("activerecord.errors.messages.file_too_large"))
+    end
+
+    it "accepts a hero_image at exactly 30 MB (AT13, R8)" do
+      # Arrange
+      record = build(:home_page_content, :with_hero_image)
+      allow(record.hero_image.blob).to receive(:byte_size).and_return(30.megabytes)
+
+      # Act
+      result = record.valid?
+
+      # Assert
+      expect(result).to be true
+      expect(record.errors[:hero_image]).to be_empty
+    end
+
+    it "leaves the other slot's validity unaffected when one slot is invalid (R6)" do
+      # Arrange
+      record = build(:home_page_content, :with_hero_image)
+      record.cta_image.attach(
+        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+        filename: "gallery_photo.svg",
+        content_type: "image/svg+xml"
+      )
+
+      # Act
+      record.valid?
+
+      # Assert
+      expect(record.errors[:hero_image]).to be_empty
+      expect(record.errors[:cta_image]).to be_present
+    end
+  end
+
+  describe "image variants (SPEC-013 R3, R4)" do
+    it "fits hero_display_variant inside 1200x1200 without cropping (R3)" do
+      # Arrange
+      record = build(:home_page_content, :with_hero_image)
+
+      # Act
+      transformations = record.hero_display_variant.variation.transformations
+
+      # Assert
+      expect(transformations).to include(resize_to_limit: [ 1200, 1200 ], saver: { quality: 80, keep: :icc })
+      expect(transformations).not_to have_key(:resize_to_fill)
+    end
+
+    it "fits cta_display_variant inside 1200x1200 without cropping (R3)" do
+      # Arrange
+      record = build(:home_page_content, :with_cta_image)
+
+      # Act
+      transformations = record.cta_display_variant.variation.transformations
+
+      # Assert
+      expect(transformations).to include(resize_to_limit: [ 1200, 1200 ], saver: { quality: 80, keep: :icc })
+      expect(transformations).not_to have_key(:resize_to_fill)
+    end
+
+    it "crops social_share_variant to the 1200x630 social aspect ratio from the hero slot (R4)" do
+      # Arrange
+      record = build(:home_page_content, :with_hero_image)
+
+      # Act
+      transformations = record.social_share_variant.variation.transformations
+
+      # Assert
+      expect(transformations).to include(resize_to_fill: [ 1200, 630 ], saver: { quality: 80, keep: :icc })
+      expect(transformations).not_to have_key(:resize_to_limit)
+    end
+  end
+
+  describe "alt text is deliberately absent (SPEC-013 R11, AC-24)" do
+    it "exposes no alt-text attribute for either background slot" do
+      # Arrange / Act
+      attribute_names = described_class.column_names + described_class.new.attributes.keys
+
+      # Assert
+      expect(attribute_names.grep(/alt/i)).to be_empty
+    end
+  end
+
   describe "published default (R10)" do
     it "defaults published to false for a new record" do
       # Arrange / Act

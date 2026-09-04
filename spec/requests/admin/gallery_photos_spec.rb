@@ -144,12 +144,12 @@ RSpec.describe "Admin::GalleryPhotos", type: :request do
       end
     end
 
-    context "when authenticated, with a file exceeding 15 MB" do
+    context "when authenticated, with a file exceeding 30 MB" do
       it "returns HTTP 422 with a file-size validation error and no new row (AT18, AC-19, E3)" do
         # Arrange
         admin = create(:admin_user)
         sign_in_admin(admin)
-        file = fixture_file_upload("gallery_photo_oversized.jpg", "image/jpeg")
+        file = padded_jpeg_upload(31.megabytes)
 
         # Act
         expect {
