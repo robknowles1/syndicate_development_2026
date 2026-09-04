@@ -12,6 +12,42 @@
       </div>
     <% end %>
 
+    <div>
+      <%= f.label :hero_image, t("admin.home_page_content.hero_image_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <% if image_preview_available?(@home_page_content.hero_image) %>
+        <%= image_tag @home_page_content.hero_display_variant,
+              alt: t("admin.home_page_content.hero_image_label"),
+              class: "w-full max-w-xs h-auto rounded mb-2" %>
+      <% else %>
+        <p class="text-sm text-gray-500 mb-2"><%= t("admin.home_page_content.using_default_image") %></p>
+      <% end %>
+      <%= f.file_field :hero_image, class: "w-full border border-gray-300 rounded px-3 py-2" %>
+      <p class="text-sm text-gray-500 mt-1"><%= t("admin.home_page_content.image_hint") %></p>
+      <label class="flex items-center gap-3 cursor-pointer py-3">
+        <%= f.check_box :remove_hero_image, class: "w-5 h-5 accent-red-600" %>
+        <span class="text-sm font-semibold"><%= t("admin.home_page_content.remove_hero_image_label") %></span>
+      </label>
+    </div>
+
+    <div>
+      <%= f.label :cta_image, t("admin.home_page_content.cta_image_label"),
+            class: "block text-sm font-semibold mb-1" %>
+      <% if image_preview_available?(@home_page_content.cta_image) %>
+        <%= image_tag @home_page_content.cta_display_variant,
+              alt: t("admin.home_page_content.cta_image_label"),
+              class: "w-full max-w-xs h-auto rounded mb-2" %>
+      <% else %>
+        <p class="text-sm text-gray-500 mb-2"><%= t("admin.home_page_content.using_default_image") %></p>
+      <% end %>
+      <%= f.file_field :cta_image, class: "w-full border border-gray-300 rounded px-3 py-2" %>
+      <p class="text-sm text-gray-500 mt-1"><%= t("admin.home_page_content.image_hint") %></p>
+      <label class="flex items-center gap-3 cursor-pointer py-3">
+        <%= f.check_box :remove_cta_image, class: "w-5 h-5 accent-red-600" %>
+        <span class="text-sm font-semibold"><%= t("admin.home_page_content.remove_cta_image_label") %></span>
+      </label>
+    </div>
+
     <%# Hero Tagline %>
     <div>
       <%= f.label :hero_tagline, t("admin.home_page_content.hero_tagline_label"),

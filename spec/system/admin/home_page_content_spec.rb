@@ -39,6 +39,47 @@ RSpec.describe "Admin home page content form", type: :system do
     end
   end
 
+  describe "hero and CTA image controls at 375 px viewport (AT24, R19, AC-25)" do
+    it "renders both file inputs full width with no horizontal scroll" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      emulate_viewport(width: 375, height: 812)
+      sign_in_admin(admin)
+
+      # Act
+      visit admin_home_page_content_path
+
+      # Assert
+      expect(page).to have_field(I18n.t("admin.home_page_content.hero_image_label"), type: "file")
+      expect(page).to have_field(I18n.t("admin.home_page_content.cta_image_label"), type: "file")
+      expect(page).to have_field(I18n.t("admin.home_page_content.remove_hero_image_label"), type: "checkbox")
+      expect(page).to have_field(I18n.t("admin.home_page_content.remove_cta_image_label"), type: "checkbox")
+
+      file_inputs = page.all("input[type='file']", visible: :all)
+      expect(file_inputs.map { |input| input[:class] }).to all(include("w-full"))
+
+      body_scroll_width = page.evaluate_script("document.body.scrollWidth")
+      viewport_width = page.evaluate_script("window.innerWidth")
+      expect(body_scroll_width).to be <= viewport_width
+    end
+
+    it "keeps an uploaded thumbnail inside the viewport (R19, AC-25)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      create(:home_page_content, :with_hero_image, :with_cta_image)
+      emulate_viewport(width: 375, height: 812)
+      sign_in_admin(admin)
+
+      # Act
+      visit admin_home_page_content_path
+
+      # Assert
+      body_scroll_width = page.evaluate_script("document.body.scrollWidth")
+      viewport_width = page.evaluate_script("window.innerWidth")
+      expect(body_scroll_width).to be <= viewport_width
+    end
+  end
+
   describe "restore defaults button attributes (AC-23, AT21)" do
     it "restore button has data-turbo-confirm, py-3 class, and targets restore_defaults path (AT21)" do
       # Arrange

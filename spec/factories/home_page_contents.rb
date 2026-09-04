@@ -9,5 +9,25 @@ FactoryBot.define do
     trait :published do
       published { true }
     end
+
+    trait :with_hero_image do
+      after(:build) do |content|
+        content.hero_image.attach(
+          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+          filename: "gallery_photo.jpg",
+          content_type: "image/jpeg"
+        )
+      end
+    end
+
+    trait :with_cta_image do
+      after(:build) do |content|
+        content.cta_image.attach(
+          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+          filename: "gallery_photo.jpg",
+          content_type: "image/jpeg"
+        )
+      end
+    end
   end
 end

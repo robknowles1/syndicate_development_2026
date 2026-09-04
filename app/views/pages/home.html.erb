@@ -3,9 +3,11 @@
 <% content_for :canonical_url, root_url %>
 
 <% content = @home_page_content&.published? ? @home_page_content : nil %>
+<% hero_background_url = content&.hero_image&.attached? ? url_for(content.hero_display_variant) : asset_path("gallery/m45a2849.jpg") %>
+<% cta_background_url = content&.cta_image&.attached? ? url_for(content.cta_display_variant) : asset_path("gallery/m45a2996.jpg") %>
 
 <section class="w-full h-screen bg-cover bg-center flex items-end pb-16 px-8"
-         style="background-image: url('<%= asset_path('gallery/m45a2849.jpg') %>');"
+         style="background-image: url('<%= hero_background_url %>');"
          >
   <div class="text-white">
     <h1 class="text-4xl md:text-7xl font-black tracking-widest uppercase break-words md:whitespace-nowrap"><%= t("pages.home.hero_heading") %></h1>
@@ -46,7 +48,7 @@
 <% end %>
 
 <section class="w-full h-screen bg-cover bg-center flex flex-col items-center justify-center text-center px-6"
-         style="background-image: url('<%= asset_path('gallery/m45a2996.jpg') %>');">
+         style="background-image: url('<%= cta_background_url %>');">
   <div class="text-white">
     <h1 class="text-4xl md:text-6xl font-black uppercase tracking-widest mb-8"><%= t("pages.home.cta_heading") %></h1>
     <%= link_to t("pages.home.cta_contact"), about_path,

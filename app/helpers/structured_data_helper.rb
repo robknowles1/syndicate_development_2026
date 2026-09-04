@@ -25,7 +25,7 @@ module StructuredDataHelper
       "@id" => "#{root_url}#business",
       "name" => BUSINESS_NAME,
       "url" => root_url,
-      "image" => image_url(BUSINESS_IMAGE),
+      "image" => social_share_image_url,
       "telephone" => content&.shop_phone_number || t("pages.about.shop_phone_number"),
       "address" => {
         "@type" => "PostalAddress",

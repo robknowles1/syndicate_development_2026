@@ -5,6 +5,16 @@ RSpec.describe "Admin::HomePageContents", type: :request do
     post admin_login_path, params: { email: admin.email, password: "securepassword123" }
   end
 
+  def valid_home_page_content_params(overrides = {})
+    {
+      hero_tagline: "Valid tagline",
+      mission_heading: "HEADING",
+      mission_subheading: "SUB",
+      mission_body: "Body.",
+      published: "false"
+    }.merge(overrides)
+  end
+
   describe "authentication guard" do
     it "redirects unauthenticated GET /admin/home_page_content to login" do
       # Act
@@ -346,6 +356,314 @@ RSpec.describe "Admin::HomePageContents", type: :request do
 
       # Assert
       expect(HomePageContent.count).to eq(1)
+    end
+  end
+
+  describe "GET /admin/home_page_content — hero and CTA image controls (AT19, R14, R16, AC-20)" do
+    it "includes both file inputs and both removal checkboxes" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+
+      # Act
+      get admin_home_page_content_path
+
+      # Assert
+      expect(response.body).to include("home_page_content[hero_image]")
+      expect(response.body).to include("home_page_content[cta_image]")
+      expect(response.body).to include("home_page_content[remove_hero_image]")
+      expect(response.body).to include("home_page_content[remove_cta_image]")
+    end
+
+    it "states the 30 MB limit in visible copy beside the file inputs (R10, AC-23)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+
+      # Act
+      get admin_home_page_content_path
+
+      # Assert
+      expect(response.body).to include(I18n.t("admin.home_page_content.image_hint"))
+      expect(I18n.t("admin.home_page_content.image_hint")).to include("30 MB")
+    end
+
+    it "indicates the bundled default is in use when a slot is unattached (R14)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content)
+
+      # Act
+      get admin_home_page_content_path
+
+      # Assert
+      expect(response.body).to include(I18n.t("admin.home_page_content.using_default_image"))
+    end
+
+    it "shows a thumbnail of the current image instead of the default notice once attached (R14)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content, :with_hero_image, :with_cta_image)
+
+      # Act
+      get admin_home_page_content_path
+
+      # Assert
+      expect(response.body).to include("/rails/active_storage/representations/")
+      expect(response.body).not_to include(I18n.t("admin.home_page_content.using_default_image"))
+    end
+  end
+
+  describe "PATCH /admin/home_page_content — image uploads (AT10, AT11, AT12, AT13, AT20)" do
+    it "attaches a valid hero_image and redirects with a flash (AT10, R1, R16, AC-11)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      file = fixture_file_upload("gallery_photo.jpg", "image/jpeg")
+
+      # Act
+      patch admin_home_page_content_path, params: { home_page_content: valid_home_page_content_params(hero_image: file) }
+
+      # Assert
+      expect(response).to redirect_to(admin_home_page_content_path)
+      expect(flash[:notice]).to eq(I18n.t("admin.home_page_content.update_notice"))
+      expect(HomePageContent.first.hero_image).to be_attached
+    end
+
+    it "rejects an image/svg+xml cta_image with HTTP 422 and no attachment (AT11, R2, AC-12, E5)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      file = fixture_file_upload("gallery_photo.svg", "image/svg+xml")
+
+      # Act
+      patch admin_home_page_content_path, params: { home_page_content: valid_home_page_content_params(cta_image: file) }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(HomePageContent.first&.cta_image&.attached?).to be_falsy
+      expect(response.body).to include(I18n.t("activerecord.errors.messages.invalid_content_type"))
+    end
+
+    it "rejects a hero_image over 30 MB and says so in the response (AT12, R8, R9, AC-13, E6)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      file = padded_jpeg_upload(31.megabytes)
+
+      # Act
+      patch admin_home_page_content_path, params: { home_page_content: valid_home_page_content_params(hero_image: file) }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include(I18n.t("activerecord.errors.messages.file_too_large"))
+      expect(response.body).to include("30 MB")
+    end
+
+    it "accepts a 29 MB hero_image that the old 15 MB cap would have rejected (AT13, R8, AC-14)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      file = padded_jpeg_upload(29.megabytes)
+
+      # Act
+      patch admin_home_page_content_path, params: { home_page_content: valid_home_page_content_params(hero_image: file) }
+
+      # Assert
+      expect(response).to redirect_to(admin_home_page_content_path)
+      expect(HomePageContent.first.hero_image).to be_attached
+      expect(HomePageContent.first.hero_image.blob.byte_size).to eq(29.megabytes)
+    end
+
+    it "replaces rather than accumulates the blob when hero_image is already attached (AT20, R15, AC-21, E9)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      home_page_content = create(:home_page_content, :with_hero_image)
+      new_file = fixture_file_upload("gallery_photo_large.jpg", "image/jpeg")
+
+      # Act
+      patch admin_home_page_content_path, params: { home_page_content: valid_home_page_content_params(hero_image: new_file) }
+
+      # Assert
+      attachment_count = ActiveStorage::Attachment.where(record: home_page_content, name: "hero_image").count
+      expect(attachment_count).to eq(1)
+      expect(home_page_content.reload.hero_image.blob.filename.to_s).to eq("gallery_photo_large.jpg")
+    end
+  end
+
+  describe "PATCH /admin/home_page_content — removal checkboxes (AT15, AT16, R15)" do
+    it "purges a slot when its removal box is checked with no new file (AT15, AC-16, E11)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content, :with_hero_image)
+
+      # Act
+      patch admin_home_page_content_path,
+            params: { home_page_content: valid_home_page_content_params(remove_hero_image: "1") }
+
+      # Assert
+      expect(response).to redirect_to(admin_home_page_content_path)
+      expect(HomePageContent.first.hero_image.attached?).to be false
+    end
+
+    it "leaves the other slot attached when only one removal box is checked (R6, R15)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content, :with_hero_image, :with_cta_image)
+
+      # Act
+      patch admin_home_page_content_path,
+            params: { home_page_content: valid_home_page_content_params(remove_hero_image: "1") }
+
+      # Assert
+      expect(HomePageContent.first.hero_image.attached?).to be false
+      expect(HomePageContent.first.cta_image.attached?).to be true
+    end
+
+    it "lets a simultaneous upload win over a checked removal box (AT16, R15, AC-17, E10)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content, :with_hero_image)
+      replacement = fixture_file_upload("gallery_photo_large.jpg", "image/jpeg")
+
+      # Act
+      patch admin_home_page_content_path,
+            params: { home_page_content: valid_home_page_content_params(hero_image: replacement, remove_hero_image: "1") }
+
+      # Assert
+      expect(HomePageContent.first.hero_image.attached?).to be true
+      expect(HomePageContent.first.hero_image.blob.filename.to_s).to eq("gallery_photo_large.jpg")
+    end
+
+    it "keeps the saved image when the removal box is checked with no new file and the save fails (R15, AC-16, E5)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content, :with_hero_image)
+
+      # Act
+      patch admin_home_page_content_path,
+            params: { home_page_content: valid_home_page_content_params(hero_tagline: "", remove_hero_image: "1") }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(HomePageContent.first.hero_image.attached?).to be true
+      expect(HomePageContent.first.hero_image.blob.filename.to_s).to eq("gallery_photo.jpg")
+    end
+
+    it "keeps the saved image when a checked box and a new file arrive together but the save fails (R15, AC-17)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content, :with_hero_image)
+      replacement = fixture_file_upload("gallery_photo_large.jpg", "image/jpeg")
+
+      # Act
+      patch admin_home_page_content_path,
+            params: { home_page_content: valid_home_page_content_params(hero_tagline: "", hero_image: replacement, remove_hero_image: "1") }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(HomePageContent.first.hero_image.attached?).to be true
+      expect(HomePageContent.first.hero_image.blob.filename.to_s).to eq("gallery_photo.jpg")
+    end
+
+    it "leaves an attached slot alone when its removal box is unchecked (R15)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content, :with_hero_image)
+
+      # Act
+      patch admin_home_page_content_path,
+            params: { home_page_content: valid_home_page_content_params(remove_hero_image: "0") }
+
+      # Assert
+      expect(HomePageContent.first.hero_image.attached?).to be true
+    end
+  end
+
+  describe "PATCH /admin/home_page_content — synchronous variant processing (AT25, R20, AC-26)" do
+    it "processes the hero display and social share variants before responding" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      file = fixture_file_upload("gallery_photo_large.jpg", "image/jpeg")
+
+      # Act
+      patch admin_home_page_content_path, params: { home_page_content: valid_home_page_content_params(hero_image: file) }
+
+      # Assert
+      blob = HomePageContent.first.hero_image.blob
+      expect(ActiveStorage::VariantRecord.where(blob_id: blob.id).count).to eq(2)
+    end
+
+    it "processes the CTA display variant before responding" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      file = fixture_file_upload("gallery_photo_large.jpg", "image/jpeg")
+
+      # Act
+      patch admin_home_page_content_path, params: { home_page_content: valid_home_page_content_params(cta_image: file) }
+
+      # Assert
+      blob = HomePageContent.first.cta_image.blob
+      expect(ActiveStorage::VariantRecord.where(blob_id: blob.id).count).to eq(1)
+    end
+  end
+
+  describe "PATCH /admin/home_page_content/restore_defaults — image purge (AT17, AT18, R17)" do
+    it "purges both slots while leaving published untouched (AT17, AC-18, E7)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content, :with_hero_image, :with_cta_image, hero_tagline: "My Custom Line", published: true)
+
+      # Act
+      patch restore_defaults_admin_home_page_content_path
+
+      # Assert
+      restored = HomePageContent.first
+      expect(response).to redirect_to(admin_home_page_content_path)
+      expect(flash[:notice]).to eq(I18n.t("admin.home_page_content.flash.restored"))
+      expect(restored.hero_image.attached?).to be false
+      expect(restored.cta_image.attached?).to be false
+      expect(restored.hero_tagline).to eq(I18n.t("pages.home.hero_tagline"))
+      expect(restored.mission_heading).to eq(I18n.t("pages.home.mission_heading"))
+      expect(restored.mission_subheading).to eq(I18n.t("pages.home.mission_subheading"))
+      expect(restored.mission_body).to eq(I18n.t("pages.home.mission_body"))
+      expect(restored.published?).to be true
+    end
+
+    it "completes normally when no slot is attached (AT18, AC-19, E8)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content)
+
+      # Act / Assert
+      expect { patch restore_defaults_admin_home_page_content_path }.not_to raise_error
+      expect(response).to redirect_to(admin_home_page_content_path)
+    end
+
+    it "leaves an unauthenticated caller's attachments intact (AT21, AC-22)" do
+      # Arrange
+      create(:home_page_content, :with_hero_image, hero_tagline: "My Custom Line")
+
+      # Act
+      patch restore_defaults_admin_home_page_content_path
+
+      # Assert
+      expect(response).to redirect_to(admin_login_path)
+      expect(HomePageContent.first.hero_image.attached?).to be true
+      expect(HomePageContent.first.hero_tagline).to eq("My Custom Line")
     end
   end
 

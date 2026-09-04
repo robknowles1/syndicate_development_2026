@@ -2,7 +2,7 @@ module ImageAttachmentValidatable
   extend ActiveSupport::Concern
 
   ALLOWED_IMAGE_TYPES = %w[image/jpeg image/png image/webp].freeze
-  MAX_IMAGE_SIZE = 15.megabytes
+  MAX_IMAGE_SIZE = 30.megabytes
 
   class_methods do
     def validates_image_attachment(*attachment_names)

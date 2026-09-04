@@ -42,7 +42,7 @@ RSpec.describe GalleryPhoto, type: :model do
           filename: "gallery_photo.jpg",
           content_type: "image/jpeg"
         )
-        allow(photo.image.blob).to receive(:byte_size).and_return(16.megabytes)
+        allow(photo.image.blob).to receive(:byte_size).and_return(31.megabytes)
 
         # Act
         photo.valid?
@@ -52,7 +52,27 @@ RSpec.describe GalleryPhoto, type: :model do
       end
     end
 
-    context "with a valid JPEG under 15 MB attached" do
+    context "with an attached image between the old 15 MB cap and the current one" do
+      it "is valid, confirming the shared cap was raised system-wide (AT14, AC-15, SPEC-013 R8)" do
+        # Arrange
+        photo = GalleryPhoto.new(position: 0)
+        photo.image.attach(
+          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+          filename: "gallery_photo.jpg",
+          content_type: "image/jpeg"
+        )
+        allow(photo.image.blob).to receive(:byte_size).and_return(20.megabytes)
+
+        # Act
+        result = photo.valid?
+
+        # Assert
+        expect(result).to be true
+        expect(photo.errors[:image]).to be_empty
+      end
+    end
+
+    context "with a valid JPEG under the maximum size attached" do
       it "is valid with no errors (AT11, AC-12, E1)" do
         # Arrange
         photo = GalleryPhoto.new(position: 0)
