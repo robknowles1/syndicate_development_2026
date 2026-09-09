@@ -47,7 +47,11 @@ RSpec.describe "SPEC-013 home page image copy and alt-text inspection" do
       home_view_source = Rails.root.join("app/views/pages/home.html.erb").read
 
       # Act
-      background_section_tags = home_view_source.scan(/<section[^>]*background-image[^>]*>/m)
+      # Narrowing this to `[^>]*` ends the match at the `>` of the ERB tag inside the style
+      # attribute, so nothing written after it reaches the grep and the example passes on
+      # any markup.
+      section_tags = home_view_source.scan(/<section\b(?:[^<>]|<%.*?%>)*?>/m)
+      background_section_tags = section_tags.grep(/background-image/)
 
       # Assert
       expect(background_section_tags.length).to eq(2)
@@ -59,7 +63,7 @@ RSpec.describe "SPEC-013 home page image copy and alt-text inspection" do
       admin_form_source = Rails.root.join("app/views/admin/home_page_contents/show.html.erb").read
 
       # Act
-      alt_field_references = admin_form_source.scan(/hero_alt|cta_alt|_alt_|alt_text/i)
+      alt_field_references = admin_form_source.scan(/_alt(?:\b|_)|alt_text/i)
 
       # Assert
       expect(alt_field_references).to be_empty
