@@ -20,8 +20,8 @@ class HomePageContent < ApplicationRecord
     cta_image.variant(resize_to_limit: [ 1200, 1200 ], saver: { quality: 80, keep: :icc })
   end
 
-  # resize_to_fill, not resize_to_limit: social scrapers crop a non-1.91:1 image
-  # unpredictably rather than letterboxing it, so the crop is made here (R4).
+  # Social scrapers crop a non-1.91:1 image unpredictably rather than letterboxing it, so
+  # the crop is made here (SPEC-013 R4).
   def social_share_variant
     hero_image.variant(resize_to_fill: [ 1200, 630 ], saver: { quality: 80, keep: :icc })
   end
