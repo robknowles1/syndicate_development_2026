@@ -2,7 +2,10 @@ class PagesController < ApplicationController
   before_action :check_services_published, only: :services
 
   def home
-    @home_page_content = HomePageContent.first
+    @home_page_content = HomePageContent
+      .with_attached_hero_image
+      .with_attached_cta_image
+      .first
     @faqs = Faq.order(:position).load
   end
 

@@ -4,6 +4,8 @@ module Admin
       home_page_content = HomePageContent.first_or_initialize
       home_page_content.assign_attributes(i18n_default_attributes)
       home_page_content.save!
+      home_page_content.hero_image.purge if home_page_content.hero_image.attached?
+      home_page_content.cta_image.purge if home_page_content.cta_image.attached?
       flash[:notice] = I18n.t("admin.home_page_content.flash.restored")
       redirect_to admin_home_page_content_path
     end
@@ -15,8 +17,17 @@ module Admin
 
     def update
       @home_page_content = HomePageContent.first_or_initialize
+
       if @home_page_content.update(home_page_content_params)
-        flash[:notice] = I18n.t("admin.home_page_content.update_notice")
+        # Must stay below `update`: hoisting it destroys the blob even when validation
+        # then fails, leaving the admin a 422 saying nothing was saved and no image.
+        purge_slots_marked_for_removal
+
+        if newly_attached_variants_processed?
+          flash[:notice] = I18n.t("admin.home_page_content.update_notice")
+        else
+          flash[:alert] = I18n.t("admin.home_page_content.image_processing_failed")
+        end
         redirect_to admin_home_page_content_path
       else
         render :show, status: :unprocessable_entity
@@ -34,13 +45,50 @@ module Admin
       }
     end
 
+    def new_file_submitted?(slot)
+      params.dig(:home_page_content, slot).respond_to?(:tempfile)
+    end
+
+    def removal_requested?(slot)
+      ActiveModel::Type::Boolean.new.cast(params.dig(:home_page_content, "remove_#{slot}"))
+    end
+
+    # Keep this rescue, and keep it broad. The record and its blob are committed by the time
+    # it runs, so any escaping error answers a save that did happen with a 500 that says it
+    # did not. Pre-warming only spares the first visitor the processing latency; the page
+    # still builds the variant lazily if this fails.
+    def newly_attached_variants_processed?
+      if new_file_submitted?(:hero_image)
+        @home_page_content.hero_display_variant.processed
+        @home_page_content.social_share_variant.processed
+      end
+      @home_page_content.cta_display_variant.processed if new_file_submitted?(:cta_image)
+      true
+    rescue StandardError => error
+      Rails.logger.error(error.full_message(highlight: false))
+      false
+    end
+
+    def purge_slots_marked_for_removal
+      %i[hero_image cta_image].each do |slot|
+        next unless removal_requested?(slot) && !new_file_submitted?(slot)
+
+        attachment = @home_page_content.public_send(slot)
+        attachment.purge if attachment.attached?
+      end
+    end
+
     def home_page_content_params
       params.require(:home_page_content).permit(
         :hero_tagline,
         :mission_heading,
         :mission_subheading,
         :mission_body,
-        :published
+        :published,
+        :hero_image,
+        :cta_image,
+        :remove_hero_image,
+        :remove_cta_image
       )
     end
   end

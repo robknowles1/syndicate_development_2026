@@ -106,11 +106,11 @@ RSpec.describe AboutPageContent, type: :model do
       expect(record.errors[:slideshow_image_3]).to be_empty
     end
 
-    it "is valid with a JPEG under 15 MB and pixel dimensions smaller than 400x400 attached (AT17, R12)" do
+    it "is valid with a JPEG under the size cap and pixel dimensions smaller than 400x400 attached (AT17, R12)" do
       # Arrange
       record = build(:about_page_content)
       record.slideshow_image_1.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+        io: image_fixture_io("gallery_photo.jpg"),
         filename: "gallery_photo.jpg",
         content_type: "image/jpeg"
       )
@@ -127,7 +127,7 @@ RSpec.describe AboutPageContent, type: :model do
       # Arrange
       record = build(:about_page_content)
       record.slideshow_image_2.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+        io: image_fixture_io("gallery_photo.svg"),
         filename: "gallery_photo.svg",
         content_type: "image/svg+xml"
       )
@@ -139,15 +139,15 @@ RSpec.describe AboutPageContent, type: :model do
       expect(record.errors[:slideshow_image_2]).to include(I18n.t("activerecord.errors.messages.invalid_content_type"))
     end
 
-    it "rejects a file exceeding 15 MB on slideshow_image_3 (AT7, R2, E5)" do
+    it "rejects a file exceeding 30 MB on slideshow_image_3 (AT7, R2, E5)" do
       # Arrange
       record = build(:about_page_content)
       record.slideshow_image_3.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+        io: image_fixture_io("gallery_photo.jpg"),
         filename: "gallery_photo.jpg",
         content_type: "image/jpeg"
       )
-      allow(record.slideshow_image_3.blob).to receive(:byte_size).and_return(16.megabytes)
+      allow(record.slideshow_image_3.blob).to receive(:byte_size).and_return(31.megabytes)
 
       # Act
       record.valid?
@@ -156,11 +156,29 @@ RSpec.describe AboutPageContent, type: :model do
       expect(record.errors[:slideshow_image_3]).to include(I18n.t("activerecord.errors.messages.file_too_large"))
     end
 
+    it "accepts a slideshow file between the old 15 MB cap and the current one (AT14, AC-15, SPEC-013 R8)" do
+      # Arrange
+      record = build(:about_page_content)
+      record.slideshow_image_3.attach(
+        io: image_fixture_io("gallery_photo.jpg"),
+        filename: "gallery_photo.jpg",
+        content_type: "image/jpeg"
+      )
+      allow(record.slideshow_image_3.blob).to receive(:byte_size).and_return(20.megabytes)
+
+      # Act
+      result = record.valid?
+
+      # Assert
+      expect(result).to be true
+      expect(record.errors[:slideshow_image_3]).to be_empty
+    end
+
     it "leaves the other 2 slots' validity unaffected when one slot is invalid" do
       # Arrange
       record = build(:about_page_content)
       record.slideshow_image_2.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+        io: image_fixture_io("gallery_photo.svg"),
         filename: "gallery_photo.svg",
         content_type: "image/svg+xml"
       )

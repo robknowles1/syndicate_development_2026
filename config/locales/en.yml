@@ -205,6 +205,13 @@ en:
       heading: "Home Page Content"
       hero_tagline_label: "Hero Tagline"
       hero_tagline_hint: "Maximum 50 characters"
+      hero_image_label: "Hero Background Image"
+      cta_image_label: "Bottom Banner Background Image"
+      image_hint: "JPEG, PNG, or WEBP. Maximum 30 MB. Leave blank to keep the current image."
+      using_default_image: "Currently using the original default image."
+      upload_not_saved: "That upload was not saved, so the image on your page has not changed."
+      remove_hero_image_label: "Remove the uploaded hero image and go back to the default"
+      remove_cta_image_label: "Remove the uploaded banner image and go back to the default"
       mission_heading_label: "Mission Heading"
       mission_subheading_label: "Mission Subheading"
       mission_body_label: "Mission Body"
@@ -216,8 +223,9 @@ en:
       status_unpublished: "Unpublished"
       save: "Save Changes"
       update_notice: "Home page content saved."
+      image_processing_failed: "Your changes were saved, but that image could not be prepared for display and may not appear on the page. Try uploading a different file."
       restore_defaults_label: "Restore Original Copy"
-      confirm_restore_defaults: "This will replace your current edits with the original default text. Continue?"
+      confirm_restore_defaults: "This will replace your current edits with the original default text and remove any uploaded hero/CTA images. Continue?"
       flash:
         restored: "Home page content has been restored to the original defaults."
     about_page_content:
@@ -237,7 +245,7 @@ en:
       slideshow_image_1_label: "Slideshow Image 1"
       slideshow_image_2_label: "Slideshow Image 2"
       slideshow_image_3_label: "Slideshow Image 3"
-      slideshow_image_hint: "JPEG, PNG, or WEBP. Maximum 15 MB. Leave blank to keep the current image."
+      slideshow_image_hint: "JPEG, PNG, or WEBP. Maximum 30 MB. Leave blank to keep the current image."
       published_label: "About page content is published (visible to the public)"
       published_hint: "When unchecked, your saved changes are hidden — visitors see the original default text, not a blank page."
       current_status_label: "Current status:"
@@ -293,7 +301,7 @@ en:
     gallery_photos:
       heading: "Gallery Photos"
       image_label: "Photo"
-      image_hint: "JPEG, PNG, or WEBP. Maximum 15 MB."
+      image_hint: "JPEG, PNG, or WEBP. Maximum 30 MB."
       save: "Upload Photo"
       drag_hint: "Drag and drop to reorder."
       delete: "Delete"
@@ -385,7 +393,7 @@ en:
               at_least_one_bullet: "Each service section must have at least one bullet item."
       messages:
         invalid_content_type: "must be a JPEG, PNG, or WEBP image"
-        file_too_large: "must be smaller than 15 MB"
+        file_too_large: "must be 30 MB or smaller"
 
   admin_mailer:
     invitation:

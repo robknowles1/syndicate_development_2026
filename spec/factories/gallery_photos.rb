@@ -4,7 +4,7 @@ FactoryBot.define do
 
     after(:build) do |photo|
       photo.image.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+        io: ImageFixtureUploads.image_fixture_io("gallery_photo.jpg"),
         filename: "gallery_photo.jpg",
         content_type: "image/jpeg"
       )
@@ -13,7 +13,7 @@ FactoryBot.define do
     trait :large do
       after(:build) do |photo|
         photo.image.attach(
-          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo_large.jpg")),
+          io: ImageFixtureUploads.image_fixture_io("gallery_photo_large.jpg"),
           filename: "gallery_photo_large.jpg",
           content_type: "image/jpeg"
         )
@@ -23,7 +23,7 @@ FactoryBot.define do
     trait :with_camera_metadata do
       after(:build) do |photo|
         photo.image.attach(
-          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo_with_metadata.jpg")),
+          io: ImageFixtureUploads.image_fixture_io("gallery_photo_with_metadata.jpg"),
           filename: "gallery_photo_with_metadata.jpg",
           content_type: "image/jpeg"
         )

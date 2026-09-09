@@ -308,11 +308,11 @@ RSpec.describe "Admin::AboutPageContents", type: :request do
       expect(response.body).to include(I18n.t("activerecord.errors.messages.invalid_content_type"))
     end
 
-    it "rejects a slideshow_image_3 file exceeding 15 MB with HTTP 422 (AT7, R2, E5, AC-7)" do
+    it "rejects a slideshow_image_3 file exceeding 30 MB with HTTP 422 (AT7, R2, E5, AC-7)" do
       # Arrange
       admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
       sign_in_admin(admin)
-      file = fixture_file_upload("gallery_photo_oversized.jpg", "image/jpeg")
+      file = padded_jpeg_upload(31.megabytes)
       params = { about_page_content: valid_about_page_content_params(slideshow_image_3: file) }
 
       # Act
