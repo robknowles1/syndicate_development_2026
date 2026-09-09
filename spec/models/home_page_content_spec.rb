@@ -98,7 +98,7 @@ RSpec.describe HomePageContent, type: :model do
       # Arrange
       record = build(:home_page_content)
       record.cta_image.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+        io: image_fixture_io("gallery_photo.svg"),
         filename: "gallery_photo.svg",
         content_type: "image/svg+xml"
       )
@@ -139,7 +139,7 @@ RSpec.describe HomePageContent, type: :model do
       # Arrange
       record = build(:home_page_content, :with_hero_image)
       record.cta_image.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+        io: image_fixture_io("gallery_photo.svg"),
         filename: "gallery_photo.svg",
         content_type: "image/svg+xml"
       )

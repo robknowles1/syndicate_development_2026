@@ -19,7 +19,7 @@ FactoryBot.define do
     trait :with_slideshow_image_1 do
       after(:build) do |content|
         content.slideshow_image_1.attach(
-          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+          io: ImageFixtureUploads.image_fixture_io("gallery_photo.jpg"),
           filename: "gallery_photo.jpg",
           content_type: "image/jpeg"
         )
@@ -29,7 +29,7 @@ FactoryBot.define do
     trait :with_slideshow_image_2 do
       after(:build) do |content|
         content.slideshow_image_2.attach(
-          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+          io: ImageFixtureUploads.image_fixture_io("gallery_photo.jpg"),
           filename: "gallery_photo.jpg",
           content_type: "image/jpeg"
         )
@@ -39,7 +39,7 @@ FactoryBot.define do
     trait :with_slideshow_image_3 do
       after(:build) do |content|
         content.slideshow_image_3.attach(
-          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+          io: ImageFixtureUploads.image_fixture_io("gallery_photo.jpg"),
           filename: "gallery_photo.jpg",
           content_type: "image/jpeg"
         )
@@ -49,7 +49,7 @@ FactoryBot.define do
     trait :with_camera_metadata_slideshow_image_1 do
       after(:build) do |content|
         content.slideshow_image_1.attach(
-          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo_with_metadata.jpg")),
+          io: ImageFixtureUploads.image_fixture_io("gallery_photo_with_metadata.jpg"),
           filename: "gallery_photo_with_metadata.jpg",
           content_type: "image/jpeg"
         )

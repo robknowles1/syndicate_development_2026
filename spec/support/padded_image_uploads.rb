@@ -12,7 +12,15 @@ module PaddedImageUploads
     unless path.exist?
       FileUtils.mkdir_p(path.dirname)
       source_bytes = Rails.root.join("spec/fixtures/files/gallery_photo.jpg").binread
-      path.binwrite(source_bytes + ("\0" * (byte_size - source_bytes.bytesize)))
+      minimum_byte_size = source_bytes.bytesize
+
+      if byte_size < minimum_byte_size
+        raise ArgumentError,
+          "Padding only grows a file, so #{byte_size} bytes is unreachable from the " \
+          "#{minimum_byte_size}-byte source JPEG. Ask for #{minimum_byte_size} bytes or more."
+      end
+
+      path.binwrite(source_bytes + ("\0" * (byte_size - minimum_byte_size)))
     end
 
     Rack::Test::UploadedFile.new(path, "image/jpeg")

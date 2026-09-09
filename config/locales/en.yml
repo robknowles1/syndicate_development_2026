@@ -391,7 +391,7 @@ en:
               at_least_one_bullet: "Each service section must have at least one bullet item."
       messages:
         invalid_content_type: "must be a JPEG, PNG, or WEBP image"
-        file_too_large: "must be smaller than 30 MB"
+        file_too_large: "must be 30 MB or smaller"
 
   admin_mailer:
     invitation:

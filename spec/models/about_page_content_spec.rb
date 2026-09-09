@@ -110,7 +110,7 @@ RSpec.describe AboutPageContent, type: :model do
       # Arrange
       record = build(:about_page_content)
       record.slideshow_image_1.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+        io: image_fixture_io("gallery_photo.jpg"),
         filename: "gallery_photo.jpg",
         content_type: "image/jpeg"
       )
@@ -127,7 +127,7 @@ RSpec.describe AboutPageContent, type: :model do
       # Arrange
       record = build(:about_page_content)
       record.slideshow_image_2.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+        io: image_fixture_io("gallery_photo.svg"),
         filename: "gallery_photo.svg",
         content_type: "image/svg+xml"
       )
@@ -143,7 +143,7 @@ RSpec.describe AboutPageContent, type: :model do
       # Arrange
       record = build(:about_page_content)
       record.slideshow_image_3.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+        io: image_fixture_io("gallery_photo.jpg"),
         filename: "gallery_photo.jpg",
         content_type: "image/jpeg"
       )
@@ -160,7 +160,7 @@ RSpec.describe AboutPageContent, type: :model do
       # Arrange
       record = build(:about_page_content)
       record.slideshow_image_3.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+        io: image_fixture_io("gallery_photo.jpg"),
         filename: "gallery_photo.jpg",
         content_type: "image/jpeg"
       )
@@ -178,7 +178,7 @@ RSpec.describe AboutPageContent, type: :model do
       # Arrange
       record = build(:about_page_content)
       record.slideshow_image_2.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+        io: image_fixture_io("gallery_photo.svg"),
         filename: "gallery_photo.svg",
         content_type: "image/svg+xml"
       )

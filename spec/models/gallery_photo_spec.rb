@@ -20,7 +20,7 @@ RSpec.describe GalleryPhoto, type: :model do
         # Arrange
         photo = GalleryPhoto.new(position: 0)
         photo.image.attach(
-          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.svg")),
+          io: image_fixture_io("gallery_photo.svg"),
           filename: "gallery_photo.svg",
           content_type: "image/svg+xml"
         )
@@ -38,7 +38,7 @@ RSpec.describe GalleryPhoto, type: :model do
         # Arrange
         photo = GalleryPhoto.new(position: 0)
         photo.image.attach(
-          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+          io: image_fixture_io("gallery_photo.jpg"),
           filename: "gallery_photo.jpg",
           content_type: "image/jpeg"
         )
@@ -57,7 +57,7 @@ RSpec.describe GalleryPhoto, type: :model do
         # Arrange
         photo = GalleryPhoto.new(position: 0)
         photo.image.attach(
-          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+          io: image_fixture_io("gallery_photo.jpg"),
           filename: "gallery_photo.jpg",
           content_type: "image/jpeg"
         )
@@ -77,7 +77,7 @@ RSpec.describe GalleryPhoto, type: :model do
         # Arrange
         photo = GalleryPhoto.new(position: 0)
         photo.image.attach(
-          io: File.open(Rails.root.join("spec/fixtures/files/gallery_photo.jpg")),
+          io: image_fixture_io("gallery_photo.jpg"),
           filename: "gallery_photo.jpg",
           content_type: "image/jpeg"
         )
