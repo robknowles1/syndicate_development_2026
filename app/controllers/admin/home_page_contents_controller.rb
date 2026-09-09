@@ -22,8 +22,12 @@ module Admin
         # Must stay below `update`: hoisting it destroys the blob even when validation
         # then fails, leaving the admin a 422 saying nothing was saved and no image.
         purge_slots_marked_for_removal
-        process_newly_attached_variants
-        flash[:notice] = I18n.t("admin.home_page_content.update_notice")
+
+        if newly_attached_variants_processed?
+          flash[:notice] = I18n.t("admin.home_page_content.update_notice")
+        else
+          flash[:alert] = I18n.t("admin.home_page_content.image_processing_failed")
+        end
         redirect_to admin_home_page_content_path
       else
         render :show, status: :unprocessable_entity
@@ -49,12 +53,20 @@ module Admin
       ActiveModel::Type::Boolean.new.cast(params.dig(:home_page_content, "remove_#{slot}"))
     end
 
-    def process_newly_attached_variants
+    # Keep this rescue, and keep it broad. The record and its blob are committed by the time
+    # it runs, so any escaping error answers a save that did happen with a 500 that says it
+    # did not. Pre-warming only spares the first visitor the processing latency; the page
+    # still builds the variant lazily if this fails.
+    def newly_attached_variants_processed?
       if new_file_submitted?(:hero_image)
         @home_page_content.hero_display_variant.processed
         @home_page_content.social_share_variant.processed
       end
       @home_page_content.cta_display_variant.processed if new_file_submitted?(:cta_image)
+      true
+    rescue StandardError => error
+      Rails.logger.error(error.full_message(highlight: false))
+      false
     end
 
     def purge_slots_marked_for_removal

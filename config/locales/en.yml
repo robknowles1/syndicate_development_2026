@@ -223,6 +223,7 @@ en:
       status_unpublished: "Unpublished"
       save: "Save Changes"
       update_notice: "Home page content saved."
+      image_processing_failed: "Your changes were saved, but that image could not be prepared for display and may not appear on the page. Try uploading a different file."
       restore_defaults_label: "Restore Original Copy"
       confirm_restore_defaults: "This will replace your current edits with the original default text and remove any uploaded hero/CTA images. Continue?"
       flash:

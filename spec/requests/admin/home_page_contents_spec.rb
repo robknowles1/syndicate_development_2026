@@ -447,6 +447,22 @@ RSpec.describe "Admin::HomePageContents", type: :request do
       expect(response.body).to include(I18n.t("activerecord.errors.messages.invalid_content_type"))
     end
 
+    it "reports a saved-but-unprocessable image as a warning, not a 500 (R20)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      undecodable = fixture_file_upload("gallery_photo_truncated.jpg", "image/jpeg")
+
+      # Act
+      patch admin_home_page_content_path, params: { home_page_content: valid_home_page_content_params(hero_image: undecodable) }
+
+      # Assert
+      expect(response).to redirect_to(admin_home_page_content_path)
+      expect(flash[:alert]).to eq(I18n.t("admin.home_page_content.image_processing_failed"))
+      expect(flash[:notice]).to be_nil
+      expect(HomePageContent.first.hero_image).to be_attached
+    end
+
     it "says the saved image survived a rejected upload rather than claiming the default is live (E5)" do
       # Arrange
       admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
