@@ -209,6 +209,7 @@ en:
       cta_image_label: "Bottom Banner Background Image"
       image_hint: "JPEG, PNG, or WEBP. Maximum 30 MB. Leave blank to keep the current image."
       using_default_image: "Currently using the original default image."
+      upload_not_saved: "That upload was not saved, so the image on your page has not changed."
       remove_hero_image_label: "Remove the uploaded hero image and go back to the default"
       remove_cta_image_label: "Remove the uploaded banner image and go back to the default"
       mission_heading_label: "Mission Heading"

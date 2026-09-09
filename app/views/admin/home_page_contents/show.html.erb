@@ -19,6 +19,8 @@
         <%= image_tag @home_page_content.hero_display_variant,
               alt: t("admin.home_page_content.hero_image_label"),
               class: "w-full max-w-xs h-auto rounded mb-2" %>
+      <% elsif unsaved_image_upload?(@home_page_content.hero_image) %>
+        <p class="text-sm text-gray-500 mb-2"><%= t("admin.home_page_content.upload_not_saved") %></p>
       <% else %>
         <p class="text-sm text-gray-500 mb-2"><%= t("admin.home_page_content.using_default_image") %></p>
       <% end %>
@@ -37,6 +39,8 @@
         <%= image_tag @home_page_content.cta_display_variant,
               alt: t("admin.home_page_content.cta_image_label"),
               class: "w-full max-w-xs h-auto rounded mb-2" %>
+      <% elsif unsaved_image_upload?(@home_page_content.cta_image) %>
+        <p class="text-sm text-gray-500 mb-2"><%= t("admin.home_page_content.upload_not_saved") %></p>
       <% else %>
         <p class="text-sm text-gray-500 mb-2"><%= t("admin.home_page_content.using_default_image") %></p>
       <% end %>

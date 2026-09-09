@@ -447,6 +447,36 @@ RSpec.describe "Admin::HomePageContents", type: :request do
       expect(response.body).to include(I18n.t("activerecord.errors.messages.invalid_content_type"))
     end
 
+    it "says the saved image survived a rejected upload rather than claiming the default is live (E5)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+      create(:home_page_content, :with_hero_image, :with_cta_image)
+      rejected = fixture_file_upload("gallery_photo.svg", "image/svg+xml")
+
+      # Act
+      patch admin_home_page_content_path, params: { home_page_content: valid_home_page_content_params(hero_image: rejected) }
+
+      # Assert
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include(I18n.t("admin.home_page_content.upload_not_saved"))
+      expect(response.body).not_to include(I18n.t("admin.home_page_content.using_default_image"))
+      expect(HomePageContent.first.hero_image.blob.filename.to_s).to eq("gallery_photo.jpg")
+    end
+
+    it "still reports the default image for a slot that has never been uploaded to (E1)" do
+      # Arrange
+      admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
+      sign_in_admin(admin)
+
+      # Act
+      get admin_home_page_content_path
+
+      # Assert
+      expect(response.body).to include(I18n.t("admin.home_page_content.using_default_image"))
+      expect(response.body).not_to include(I18n.t("admin.home_page_content.upload_not_saved"))
+    end
+
     it "rejects a hero_image over 30 MB and says so in the response (AT12, R8, R9, AC-13, E6)" do
       # Arrange
       admin = create(:admin_user, email: "admin@example.com", password: "securepassword123", password_confirmation: "securepassword123")
