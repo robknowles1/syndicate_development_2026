@@ -536,7 +536,7 @@ RSpec.describe "Admin::HomePageContents", type: :request do
       # Assert
       attachment_count = ActiveStorage::Attachment.where(record: home_page_content, name: "hero_image").count
       expect(attachment_count).to eq(1)
-      expect(home_page_content.reload.hero_image.blob.filename.to_s).to eq("gallery_photo_large.jpg")
+      expect(HomePageContent.first.hero_image.blob.filename.to_s).to eq("gallery_photo_large.jpg")
     end
   end
 
