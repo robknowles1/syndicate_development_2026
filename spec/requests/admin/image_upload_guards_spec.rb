@@ -64,6 +64,48 @@ RSpec.describe "Admin image upload guards", type: :request do
     end
   end
 
+  describe "the guards' single source of truth (AT2, R3, R15, AC-2)" do
+    it "re-renders all six inputs from the constants, not from a copy of today's values" do
+      # Arrange — a literal in a view would match the constants as they stand today, so
+      # only moving the constants can tell a derived value from a hardcoded one.
+      signed_in_admin
+      stub_const(
+        "ImageAttachmentValidatable::ALLOWED_IMAGE_TYPES",
+        ImageAttachmentValidatable::ALLOWED_IMAGE_TYPES + [ "image/avif" ]
+      )
+      stub_const("ImageAttachmentValidatable::MAX_IMAGE_SIZE", 7.megabytes)
+      pages = {
+        admin_home_page_content_path => %w[home_page_content[hero_image] home_page_content[cta_image]],
+        admin_about_page_content_path => (1..3).map { |i| "about_page_content[slideshow_image_#{i}]" },
+        admin_gallery_photos_path => %w[gallery_photo[image]]
+      }
+
+      # Act
+      rendered_guards = pages.flat_map { |path, names|
+        get path
+        document = Nokogiri::HTML(response.body)
+        names.map { |name|
+          wrapper = guard_wrapper(document, name)
+          {
+            accept: file_input(document, name)["accept"],
+            max_bytes: wrapper["data-image-upload-guard-max-bytes-value"],
+            allowed_types: wrapper["data-image-upload-guard-allowed-types-value"],
+            oversized_message: wrapper["data-image-upload-guard-oversized-message-value"]
+          }
+        }
+      }
+
+      # Assert
+      expect(rendered_guards.length).to eq(6)
+      expect(rendered_guards.map { |guard| guard[:accept] })
+        .to all(eq("image/jpeg,image/png,image/webp,image/avif,.jpg,.jpeg,.png,.webp"))
+      expect(rendered_guards.map { |guard| guard[:allowed_types] })
+        .to all(eq("image/jpeg,image/png,image/webp,image/avif"))
+      expect(rendered_guards.map { |guard| guard[:max_bytes] }).to all(eq(7.megabytes.to_s))
+      expect(rendered_guards.map { |guard| guard[:oversized_message] }).to all(include("7 MB"))
+    end
+  end
+
   describe "Guard 2 — the values handed to the Stimulus controller (R15)" do
     it "renders the size cap and type list from the server constants on the Gallery input" do
       # Arrange
