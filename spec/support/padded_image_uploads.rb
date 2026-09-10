@@ -9,6 +9,12 @@ module PaddedImageUploads
   SOURCE_JPEG = "spec/fixtures/files/gallery_photo.jpg".freeze
 
   def padded_jpeg_upload(byte_size)
+    Rack::Test::UploadedFile.new(padded_jpeg_path(byte_size), "image/jpeg")
+  end
+
+  # Capybara's attach_file takes a path, not an uploaded file, and a 30 MB file is worth
+  # handing over rather than copying into a tempfile first.
+  def padded_jpeg_path(byte_size)
     source_bytes = Rails.root.join(SOURCE_JPEG).binread
     minimum_byte_size = source_bytes.bytesize
 
@@ -28,7 +34,7 @@ module PaddedImageUploads
       path.binwrite(source_bytes + ("\0" * (byte_size - minimum_byte_size)))
     end
 
-    Rack::Test::UploadedFile.new(path, "image/jpeg")
+    path
   end
 end
 
