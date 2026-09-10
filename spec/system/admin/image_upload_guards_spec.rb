@@ -285,9 +285,10 @@ RSpec.describe "Admin image upload guards", type: :system do
       expect(content.slideshow_image_2.blob.id).to eq(existing_blob_id)
     end
 
-    it "creates no photo and offers the Gallery admin no success" do
+    it "creates no photo and shows the Gallery admin the presence error" do
       # Arrange
       signed_in_admin
+      blank_image_error = GalleryPhoto.new.tap(&:validate).errors.full_messages_for(:image).first
       visit admin_gallery_photos_path
       attach_file I18n.t("admin.gallery_photos.image_label"),
         padded_jpeg_path(ImageAttachmentValidatable::MAX_IMAGE_SIZE + 1)
@@ -296,10 +297,8 @@ RSpec.describe "Admin image upload guards", type: :system do
       # Act
       click_button I18n.t("admin.gallery_photos.save")
 
-      # Assert — do not "correct" this to expect the image_must_be_attached message. Rack
-      # drops a file part whose filename is empty, so a browser submission of this one-field
-      # form carries no gallery_photo key and 400s in params.require before the presence rule
-      # is reached. That is main's behavior too; the rule itself is pinned by the request spec.
+      # Assert
+      expect(page).to have_css("form li", text: blank_image_error)
       expect(page).to have_no_text(I18n.t("admin.gallery_photos.flash.uploaded"))
       expect(page).to have_text(I18n.t("admin.gallery_photos.empty_state"))
       expect(guard_state("gallery_photo[image]")).to include(attachedFileCount: 0)

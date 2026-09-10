@@ -162,7 +162,7 @@ RSpec.describe "Admin::GalleryPhotos", type: :request do
       end
     end
 
-    context "when authenticated, with no file selected" do
+    context "when authenticated, with a blank image under the gallery_photo key" do
       it "returns HTTP 422 with a presence validation error and no new row (AT19, AC-20, E4)" do
         # Arrange
         admin = create(:admin_user)
@@ -176,6 +176,24 @@ RSpec.describe "Admin::GalleryPhotos", type: :request do
         # Assert
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.body).to include("can&#39;t be blank").or include("can't be blank")
+      end
+    end
+
+    context "when authenticated and submitting with no file chosen, as a browser does" do
+      it "returns HTTP 422 with a presence validation error and no new row (AT17, AC-16, E7)" do
+        # Arrange
+        admin = create(:admin_user)
+        sign_in_admin(admin)
+        blank_image_error = GalleryPhoto.new.tap(&:validate).errors.full_messages_for(:image).first
+
+        # Act
+        expect {
+          post admin_gallery_photos_path, params: { commit: "Upload Photo" }
+        }.not_to change(GalleryPhoto, :count)
+
+        # Assert
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(Nokogiri::HTML(response.body).css("form li").map(&:text)).to include(blank_image_error)
       end
     end
 

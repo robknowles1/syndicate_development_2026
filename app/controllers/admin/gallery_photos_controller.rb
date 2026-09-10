@@ -67,6 +67,11 @@ module Admin
     end
 
     def gallery_photo_params
+      # Rack drops a file part whose filename is empty, so a no-file submit of this one-field
+      # form carries no gallery_photo key at all. Without this guard require raises and Turbo
+      # silently discards the resulting 400, leaving the admin no feedback whatsoever.
+      return {} unless params[:gallery_photo].is_a?(ActionController::Parameters)
+
       params.require(:gallery_photo).permit(:image)
     end
   end
