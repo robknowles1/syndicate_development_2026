@@ -53,14 +53,14 @@ self.byte_size    = io.size                          # ← only known here
 
 | File | Line (current) | Field | Guard 1 | Guard 2 |
 |---|---|---|---|---|
-| `app/views/admin/home_page_contents/show.html.erb` | n/a — see Dependencies | `:hero_image` | applies | applies |
-| `app/views/admin/home_page_contents/show.html.erb` | n/a — see Dependencies | `:cta_image` | applies | applies |
+| `app/views/admin/home_page_contents/show.html.erb` | 27 | `:hero_image` | applies | applies |
+| `app/views/admin/home_page_contents/show.html.erb` | 47 | `:cta_image` | applies | applies |
 | `app/views/admin/about_page_contents/show.html.erb` | 76 | `:slideshow_image_1` | applies | applies |
 | `app/views/admin/about_page_contents/show.html.erb` | 90 | `:slideshow_image_2` | applies | applies |
 | `app/views/admin/about_page_contents/show.html.erb` | 104 | `:slideshow_image_3` | applies | applies |
 | `app/views/admin/gallery_photos/index.html.erb` | 17 | `:image` | applies | applies |
 
-The `hero_image`/`cta_image` inputs do not exist in `main` as of this spec's authoring — see Dependencies. Their line numbers and markup shape are drawn from the open, unmerged SPEC-013 implementation (PR #81), which is where this spec's location table for those two rows was verified.
+All six locations were re-verified directly against `main` at `27ce0cd` (2026-09-09, after SPEC-013/PR #81 merged, which is what landed the `hero_image`/`cta_image` rows above). See R19 and Dependencies for that lineage.
 
 ### `ImageAttachmentValidatable` — New Presentation-Only Members
 
@@ -68,7 +68,7 @@ The `hero_image`/`cta_image` inputs do not exist in `main` as of this spec's aut
 module ImageAttachmentValidatable
   ALLOWED_IMAGE_TYPES = %w[image/jpeg image/png image/webp].freeze
   ALLOWED_IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .webp].freeze
-  MAX_IMAGE_SIZE = 15.megabytes # or 30.megabytes once SPEC-013 lands — unchanged by this spec either way
+  MAX_IMAGE_SIZE = 30.megabytes # unchanged by this spec — raised to 30 MB by SPEC-013
 
   def self.accept_attribute_value
     (ALLOWED_IMAGE_TYPES + ALLOWED_IMAGE_EXTENSIONS).join(",")
@@ -177,9 +177,9 @@ R17: All six new keys are looked up with explicit scoped calls — `t("admin.gal
 
 R18: This spec introduces no new server-side validation and modifies no existing one. `ImageAttachmentValidatable#validate_image_attachment`, `MAX_IMAGE_SIZE`'s value, `ALLOWED_IMAGE_TYPES`'s contents, and every `activerecord.errors.messages` string are unchanged by this spec. `accept` is a picker hint a user can override; the Stimulus controller is JavaScript a user can disable, and both are bypassable by drag-and-drop, a disabled-JS browser, or a non-browser client posting directly to the endpoint. A file that reaches the server despite both guards is rejected exactly as it is today, by the unchanged concern. A future reader must not read this spec as having made server-side validation redundant — it has not; it has only made the common, honest-mistake path faster.
 
-### Scope Contingency
+### Provenance — Home Inputs
 
-R19: `hero_image` and `cta_image` (Interfaces table rows 1-2) do not exist on `main` as of this spec's authoring — see Dependencies. Both guards apply to them in the identical shape described here once SPEC-013 (PR #81) merges. Until then, this spec's implementation covers the four inputs that exist today (`slideshow_image_1/2/3`, `gallery_photos:image`); the `admin.home_page_content.*` i18n keys and hero/cta view wiring are added in the same PR that rebases onto, or lands after, PR #81.
+R19: `hero_image` and `cta_image` (Interfaces table rows 1-2) were landed on `main` by SPEC-013 (PR #81, merged 2026-09-09), which also raised `MAX_IMAGE_SIZE` to 30 MB and introduced `spec/support/padded_image_uploads.rb`. Both guards apply to all six inputs uniformly and identically — there is no scope contingency remaining. This rule is retained, rather than folded away, only to record that lineage: a future reader diffing this spec's implementation against `ImageAttachmentValidatable` or the test helper it uses should not have to wonder why those artifacts trace back to a different spec.
 
 ---
 
@@ -201,7 +201,7 @@ E7: An admin selects an oversized file (rejected, input cleared) and then submit
 
 E8: An admin has unsaved edits in one or more text fields (e.g. `mission_body`, `bio_heading`) when an image selection is rejected by Guard 2. Per R13, those fields are never read or touched by the rejection handler — their values are exactly what the admin typed, unaffected.
 
-E9: The `hero_image`/`cta_image` inputs, before SPEC-013 (PR #81) lands. They do not exist; nothing in this spec applies to them yet. See R19.
+E9 (historical): Before SPEC-013 (PR #81) merged, `hero_image`/`cta_image` did not exist on `main` and neither guard had anything to apply to on those two rows. Resolved as of 2026-09-09 — both guards now apply to them identically to the other four inputs. See R19.
 
 E10: A request reaches `Admin::HomePageContentsController#update`, `Admin::AboutPageContentsController#update`, or `Admin::GalleryPhotosController#create` with an oversized or wrong-type file despite both guards (disabled JS, a hand-crafted request, or drag-and-drop past a stale/disabled `accept`). The server rejects it via the unchanged `ImageAttachmentValidatable` path — HTTP 422, the existing `file_too_large`/`invalid_content_type` messages — proving the guards added no gap.
 
@@ -217,7 +217,7 @@ AC-2: Given `ALLOWED_IMAGE_TYPES` gains or loses a member, when `accept_attribut
 
 AC-3: The rendered `f.file_field` at each of `about_page_contents:show` lines 76/90/104 and `gallery_photos:index` line 17 carries an `accept` attribute equal to `ImageAttachmentValidatable.accept_attribute_value`.
 
-AC-4: Once SPEC-013 (PR #81) has landed, the rendered `f.file_field` for `hero_image` and `cta_image` also carries that same `accept` attribute (contingent — see R19, Dependencies).
+AC-4: The rendered `f.file_field` for `hero_image` and `cta_image` (`app/views/admin/home_page_contents/show.html.erb` lines 27 and 47) also carries that same `accept` attribute.
 
 ### Guard 2 — Oversized Rejection
 
@@ -225,7 +225,7 @@ AC-5: Given the gallery photo upload field, when a file larger than `ImageAttach
 
 AC-6: Given an About slideshow image field (representative of all three), when a file larger than `MAX_IMAGE_SIZE` is selected, then the same clearing/message behavior occurs using `admin.about_page_content.oversized_image_alert`.
 
-AC-7: Given a Home hero/CTA image field (contingent on R19), when a file larger than `MAX_IMAGE_SIZE` is selected, then the same clearing/message behavior occurs using `admin.home_page_content.oversized_image_alert`.
+AC-7: Given a Home hero/CTA image field, when a file larger than `MAX_IMAGE_SIZE` is selected, then the same clearing/message behavior occurs using `admin.home_page_content.oversized_image_alert`.
 
 AC-8: Given a file exactly at `MAX_IMAGE_SIZE`, when selected on any of the six inputs, then it is accepted client-side — the field retains the file, and the message stays hidden.
 
@@ -293,8 +293,8 @@ When `GET /admin/gallery_photos` is rendered
 Then the `:image` file input carries the same `accept` value
 Covers: R3, AC-3
 
-AT5 (contingent on SPEC-013 / PR #81 landing — see Dependencies)
-Given the Home admin page, post-SPEC-013
+AT5
+Given the Home admin page
 When `GET /admin/home_page_content` is rendered
 Then the `hero_image` and `cta_image` file inputs each carry the same `accept` value
 Covers: R3, R19, AC-4
@@ -311,8 +311,8 @@ When a file larger than `MAX_IMAGE_SIZE` is attached to `slideshow_image_1`
 Then the same clearing/message behavior occurs with `admin.about_page_content.oversized_image_alert`
 Covers: R8, R9, AC-6
 
-AT8 (contingent on SPEC-013 / PR #81 landing)
-Given an authenticated admin on the Home form, post-SPEC-013
+AT8
+Given an authenticated admin on the Home form
 When a file larger than `MAX_IMAGE_SIZE` is attached to `hero_image`
 Then the same clearing/message behavior occurs with `admin.home_page_content.oversized_image_alert`
 Covers: R8, R9, R19, AC-7
@@ -415,11 +415,11 @@ Covers: R14, AC-21
 
 - **SPEC-008 (Gallery Photo Management)** — owns `ImageAttachmentValidatable`, `ALLOWED_IMAGE_TYPES`, `MAX_IMAGE_SIZE`, and the `gallery_photos:image` input this spec wraps unmodified except for R1's two additions.
 - **SPEC-009 (About Slideshow Image Uploads)** — owns the three `about_page_contents` slideshow inputs this spec wraps.
-- **SPEC-013 (Home Page Hero and CTA Image Uploads) — PR #81, `feature/spec-013-home-hero-cta-image-uploads`, OPEN as of this spec's authoring, not yet merged to `main`.** This is a hard dependency for two of the six inputs and for the test infrastructure this spec's system tests reuse:
-  - `hero_image`/`cta_image` and their surrounding view markup (R19, AC-4/AC-7, AT5/AT8) do not exist until PR #81 merges.
-  - `admin.home_page_content.image_hint` and the rest of that view's SPEC-013-introduced i18n keys, which this spec's new `admin.home_page_content.*` keys sit alongside, are also introduced by that PR.
-  - `spec/support/padded_image_uploads.rb` (the `padded_jpeg_upload(byte_size)` helper used by AT9/AT10 to build an oversized fixture at runtime without committing a large binary to the repo) is introduced by PR #81's commit `4a575f2`. This spec's test suite cannot run the boundary/oversized ATs until that file exists on whatever branch implements this spec — either because PR #81 has merged to `main`, or because this spec's branch is rebased onto it first.
-  - PR #81 also raises `ImageAttachmentValidatable::MAX_IMAGE_SIZE` from 15 MB to 30 MB. This spec's mechanism (R15) reads that constant directly rather than a literal, so it is correct at either value and requires no change regardless of merge order.
+- **SPEC-013 (Home Page Hero and CTA Image Uploads) — PR #81, `feature/spec-013-home-hero-cta-image-uploads`, merged to `main` 2026-09-09 (`27ce0cd`).** This spec builds on three things PR #81 landed:
+  - `hero_image`/`cta_image` and their surrounding view markup (R19, AC-4/AC-7, AT5/AT8), at `app/views/admin/home_page_contents/show.html.erb` lines 27 and 47.
+  - `admin.home_page_content.image_hint` and the rest of that view's SPEC-013-introduced i18n keys, which this spec's new `admin.home_page_content.*` keys sit alongside.
+  - `spec/support/padded_image_uploads.rb` (the `padded_jpeg_upload(byte_size)` helper used by AT9/AT10 to build an oversized fixture at runtime without committing a large binary to the repo), introduced by PR #81's commit `4a575f2`, present on `main` as of the same merge.
+  - PR #81 also raised `ImageAttachmentValidatable::MAX_IMAGE_SIZE` from 15 MB to 30 MB. This spec's mechanism (R15) reads that constant directly rather than a literal, so it was correct at either value and needed no change across the merge.
 - **ADR-005 (Photo Upload Data Model and Active Storage Strategy)** — governs `ImageAttachmentValidatable` as shared infrastructure; not re-derived here, only extended with two presentation-only members (R1).
 - No new gems. No new routes. No database migration.
 
@@ -432,7 +432,7 @@ Covers: R14, AC-21
 | T1 | `ImageAttachmentValidatable`: add `ALLOWED_IMAGE_EXTENSIONS`, `.accept_attribute_value`, and the R2 warning comment. | AC-1, AC-2, AC-19 | 1 |
 | T2 | New `image_upload_guard_controller.js` implementing the full `validate()` contract (R5-R14). | AC-5, AC-6, AC-8 – AC-14 | 3 |
 | T3 | Wire `accept` + the controller + message markup into the four existing inputs (About × 3, Gallery × 1); add their four new i18n keys. | AC-3, AC-5, AC-6, AC-10 – AC-16, AC-17, AC-18, AC-21 | 3 |
-| T4 | Same wiring for `hero_image`/`cta_image` once PR #81 has merged (or this branch is rebased onto it); add the two `admin.home_page_content.*` keys. | AC-4, AC-7 | 2 |
+| T4 | Same wiring for `hero_image`/`cta_image`; add the two `admin.home_page_content.*` keys. | AC-4, AC-7 | 2 |
 | T5 | Concern spec for `accept_attribute_value`; request spec proving server-side rejection is unchanged when both guards are bypassed. | AC-19, AC-20 | 2 |
 | T6 | System specs (Selenium headless) across all three admin forms: oversized/type rejection and messages, at-cap acceptance, unsaved-text-field preservation, re-selection recovery, 375px no-scroll. All AAA, inline variables, no `let`/`let!`. | AC-5 – AC-14, AC-21 | 3 |
 
@@ -445,6 +445,7 @@ Total estimated points: 14 (all tasks ≤ 3 points; no split-review flag require
 | Date | Change | Affected IDs | Rationale |
 |------|--------|-------------|-----------|
 | 2026-09-09 | Initial draft | All | Translates the repo owner's post-incident diagnosis (a 4 GB video absorbed and MD5-hashed in full by `ActiveStorage::Blob#unfurl` before being rejected) into two client-side, UX-only guards. Guard 1 restricts the file picker via a derived, drift-proof `accept` attribute (R1-R4). Guard 2 is a Stimulus controller that rejects oversized or wrong-type files at `change` time, before any submission, without disturbing any other field's state (R5-R14) — the mechanism that directly answers "what happens to unsaved text edits." Both guards bind to `ImageAttachmentValidatable`'s existing constants at render time rather than restating them (R15), and the new i18n copy interpolates the cap rather than hardcoding it (R16), so neither guard drifts the next time the cap changes. R18 restates, non-negotiably, that server-side validation is unchanged and remains sole authority. R19 records a real, discovered dependency: two of the six named inputs (`hero_image`/`cta_image`) do not yet exist on `main` — they are on open PR #81 (SPEC-013) — so this spec is implementable in full today for four of six inputs, with the remaining two following PR #81's merge. |
+| 2026-09-09 | Dependency resolved: SPEC-013 (PR #81) merged to `main` at `27ce0cd` | R19, E9, AC-4, AC-7, AT5, AT8, Dependencies, Interfaces | `hero_image`/`cta_image` (lines 27/47), `MAX_IMAGE_SIZE = 30.megabytes`, and `spec/support/padded_image_uploads.rb` are now all live on `main`. Re-verified all six file/line references directly against `27ce0cd` — none moved in the merge. Reworded R19, E9, AC-4, AC-7, AT5, AT8, the Dependencies SPEC-013 bullet, and task T4 from blocked/contingent framing to ordinary, unconditional statements, while keeping the SPEC-013 lineage on record rather than deleting it — a future reader should still be able to see that these six inputs' shared infrastructure traces to a different spec. No Rule, AC, or AT content changed in substance; only the "not yet landed" framing was removed. |
 
 ---
 
