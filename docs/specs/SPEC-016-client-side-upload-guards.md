@@ -96,7 +96,7 @@ static values = {
 }
 ```
 
-One public action, `validate(event)`, bound via `data-action="change->image-upload-guard#validate"` on the file input itself — the same wiring shape `icon_preview_controller.js` already uses for its `select`'s `change->icon-preview#change` (`app/views/admin/service_sections/_form.html.erb` line 28), not a listener attached in `connect()`.
+One public action, `validate()`, bound via `data-action="change->image-upload-guard#validate"` on the file input itself — the same wiring shape `icon_preview_controller.js` already uses for its `select`'s `change->icon-preview#change` (`app/views/admin/service_sections/_form.html.erb` line 28), not a listener attached in `connect()`.
 
 ### View Wiring (representative — applies identically at all six sites)
 
@@ -145,9 +145,9 @@ R4: The `accept` value combines MIME types and file extensions in one comma-sepa
 
 ### Guard 2 — Client-Side Size and Type Guard
 
-R5: A new Stimulus controller, `app/javascript/controllers/image_upload_guard_controller.js`, implements the contract in Interfaces (`targets: ["input", "message"]`, `values: { maxBytes, allowedTypes, oversizedMessage, invalidTypeMessage }`, one action `validate(event)`). It is picked up automatically by the existing `eagerLoadControllersFrom` call — no change to `app/javascript/controllers/index.js`.
+R5: A new Stimulus controller, `app/javascript/controllers/image_upload_guard_controller.js`, implements the contract in Interfaces (`targets: ["input", "message"]`, `values: { maxBytes, allowedTypes, oversizedMessage, invalidTypeMessage }`, one action `validate()`). It is picked up automatically by the existing `eagerLoadControllersFrom` call — no change to `app/javascript/controllers/index.js`.
 
-R6: `validate(event)` reads the newly selected file from `this.inputTarget.files[0]`. If no file is present (the picker was cancelled, or the field was cleared), the method hides the message target and returns — this is not a rejection.
+R6: `validate()` reads the newly selected file from `this.inputTarget.files[0]`. If no file is present (the picker was cancelled, or the field was cleared), the method hides the message target and returns — this is not a rejection.
 
 R7: Type is checked before size. If `file.type` is a non-empty string and is not included in `this.allowedTypesValue.split(",")`, the file is rejected with a type message (R9). This order is deliberate: a video selected by mistake — the exact incident that prompted this spec — is both the wrong type and (usually) oversized, and telling the admin "that's not an image" names the actual mistake more usefully than "that image is too large," which wrongly concedes the file was an image at all.
 
@@ -197,7 +197,7 @@ E5: A dragged or selected file's `file.type` is empty or unrecognized. Guard 2's
 
 E6: An admin selects an oversized file, is rejected, then selects a valid smaller file for the same input without reloading. The message hides (R10), the valid file is retained, and submission proceeds normally.
 
-E7: An admin selects an oversized file (rejected, input cleared) and then submits the form without selecting a replacement. For `home_page_content`/`about_page_content`, this is indistinguishable from leaving the field blank — the existing "leave blank to keep the current image" behavior applies unchanged. For `gallery_photos`, this fails server-side on `image_must_be_attached`, exactly as submitting the create form with no file ever selected already does today — this spec does not add or relax that presence check.
+E7: An admin selects an oversized file (rejected, input cleared) and then submits the form without selecting a replacement. For `home_page_content`/`about_page_content`, this is indistinguishable from leaving the field blank — the existing "leave blank to keep the current image" behavior applies unchanged. For `gallery_photos`, this fails server-side on `image_must_be_attached` — this is the **intended target behavior**, not a restatement of what `main` already did when this spec was written. At that time, Rack drops a multipart file part whose filename is empty, so a browser submission of the one-field Gallery form carried no `gallery_photo` key at all; `params.require(:gallery_photo)` raised `ParameterMissing`, the response was a plain 400, and Turbo silently discarded it — the admin saw nothing. The existing request spec had passed only because it posted `image: ""`, a shape no browser sends. PR #86 closed that gap by making a missing key fall through to the existing `image_must_be_attached` validation, so the behavior this edge case describes became true as of that fix. This spec does not add or relax the presence check itself — that claim was, and remains, correct.
 
 E8: An admin has unsaved edits in one or more text fields (e.g. `mission_body`, `bio_heading`) when an image selection is rejected by Guard 2. Per R13, those fields are never read or touched by the rejection handler — their values are exactly what the admin typed, unaffected.
 
@@ -247,7 +247,7 @@ AC-14: Given an oversized file was just rejected and the field cleared, when a v
 
 AC-15: Given an oversized file was rejected on an About or Home image field and no replacement is selected, when the form is submitted, then the submission succeeds and that field's existing image (or default) is unchanged — identical to submitting with the field left blank.
 
-AC-16: Given an oversized file was rejected on the Gallery upload field and no replacement is selected, when the form is submitted, then it fails with the existing `image_must_be_attached` presence error — unchanged from current behavior.
+AC-16: Given an oversized file was rejected on the Gallery upload field and no replacement is selected, when the form is submitted, then it fails with the existing `image_must_be_attached` presence error. (This became true only via PR #86's controller fix — see E7; it was not the behavior of `main` when this AC was written, and this AC does not describe pre-existing behavior.)
 
 ### i18n
 
@@ -368,7 +368,7 @@ Covers: R11, AC-15, E7
 AT17
 Given an oversized file was rejected on the Gallery upload field and no replacement is chosen
 When the form is submitted
-Then it fails with the existing `image_must_be_attached` presence error
+Then it fails with the existing `image_must_be_attached` presence error (true as of PR #86's controller fix — see E7; before that fix a missing file param raised `ParameterMissing` and produced a silent 400, not this validation error)
 Covers: AC-16, E7
 
 AT18
@@ -446,6 +446,7 @@ Total estimated points: 14 (all tasks ≤ 3 points; no split-review flag require
 |------|--------|-------------|-----------|
 | 2026-09-09 | Initial draft | All | Translates the repo owner's post-incident diagnosis (a 4 GB video absorbed and MD5-hashed in full by `ActiveStorage::Blob#unfurl` before being rejected) into two client-side, UX-only guards. Guard 1 restricts the file picker via a derived, drift-proof `accept` attribute (R1-R4). Guard 2 is a Stimulus controller that rejects oversized or wrong-type files at `change` time, before any submission, without disturbing any other field's state (R5-R14) — the mechanism that directly answers "what happens to unsaved text edits." Both guards bind to `ImageAttachmentValidatable`'s existing constants at render time rather than restating them (R15), and the new i18n copy interpolates the cap rather than hardcoding it (R16), so neither guard drifts the next time the cap changes. R18 restates, non-negotiably, that server-side validation is unchanged and remains sole authority. R19 records a real, discovered dependency: two of the six named inputs (`hero_image`/`cta_image`) do not yet exist on `main` — they are on open PR #81 (SPEC-013) — so this spec is implementable in full today for four of six inputs, with the remaining two following PR #81's merge. |
 | 2026-09-09 | Dependency resolved: SPEC-013 (PR #81) merged to `main` at `27ce0cd` | R19, E9, AC-4, AC-7, AT5, AT8, Dependencies, Interfaces | `hero_image`/`cta_image` (lines 27/47), `MAX_IMAGE_SIZE = 30.megabytes`, and `spec/support/padded_image_uploads.rb` are now all live on `main`. Re-verified all six file/line references directly against `27ce0cd` — none moved in the merge. Reworded R19, E9, AC-4, AC-7, AT5, AT8, the Dependencies SPEC-013 bullet, and task T4 from blocked/contingent framing to ordinary, unconditional statements, while keeping the SPEC-013 lineage on record rather than deleting it — a future reader should still be able to see that these six inputs' shared infrastructure traces to a different spec. No Rule, AC, or AT content changed in substance; only the "not yet landed" framing was removed. |
+| 2026-09-11 | Corrected AC-16, AT17, and E7's account of the Gallery no-file case, and the `validate` action's signature. AC-16/AT17/E7 asserted that submitting the Gallery form with no file selected "fails with the existing `image_must_be_attached` presence error... exactly as... already does today" — stated as pre-existing fact when this spec was written, but not true of `main` at the time: Rack drops a multipart file part with an empty filename, so the one-field form carried no `gallery_photo` key, `params.require` raised `ParameterMissing`, the response was a bare 400, and Turbo discarded it silently — the admin saw nothing. The existing request spec had passed only because it posted `image: ""`, a shape no browser sends. PR #86 (open, `feature/spec-016-upload-guards`) fixed the controller so a missing key now falls through to `image_must_be_attached` and the existing `render :index, status: :unprocessable_entity` branch — so AC-16 is true for the first time because the code changed to match the spec, not because the spec described reality. Amended the three to record that provenance; E7's separate claim that this spec does not add or relax the presence check was and remains correct, and is unchanged. Also corrected the Interfaces block, R5, and R6, all of which wrote the Stimulus action as `validate(event)` — the event parameter is unused (the controller reads `this.inputTarget.files[0]`), so the shipped method declares no parameter, matching the repo's other Stimulus controllers; signature corrected to `validate()` in all three places. | AC-16, AT17, E7, Interfaces (New Stimulus Controller), R5, R6 | Both were discovered during PR #86's implementation; the spec had described a bug as pre-existing behavior and a signature that never shipped, at risk of a future developer "fixing" correct code to match either. |
 
 ---
 

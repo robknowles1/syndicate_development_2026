@@ -151,7 +151,7 @@ Add under `admin.gallery_photos` in `config/locales/en.yml`:
 |-----|---------|
 | `heading` | Admin page heading |
 | `image_label` | Label for the upload file field |
-| `image_hint` | Permanently visible hint: allowed types and 15 MB max |
+| `image_hint` | Permanently visible hint: allowed types and 30 MB max |
 | `save` | Upload submit button text |
 | `drag_hint` | Permanently visible instructional text above the grid (e.g. "Drag and drop to reorder"), since dragging has no other on-screen affordance now that Move Up/Move Down buttons are gone |
 | `delete` | Delete button label (per-tile overlay control) |
@@ -168,7 +168,9 @@ Add under `activerecord.errors.messages` (top-level, sibling to `activerecord.er
 | Key | Value |
 |-----|-------|
 | `invalid_content_type` | "must be a JPEG, PNG, or WEBP image" |
-| `file_too_large` | "must be smaller than 15 MB" |
+| `file_too_large` | "must be smaller than 30 MB" |
+
+**Note (2026-09-11):** `file_too_large` and `image_hint` above originally specified 15 MB. SPEC-013 R8 (2026-09-02) raised the shared `ImageAttachmentValidatable::MAX_IMAGE_SIZE` constant these values derive from to 30 MB for all three photo-upload specs (Gallery, About, Home) — see SPEC-013's Change Log. Updated here to match; see this file's own Change Log for the correction.
 
 Add under `pages.gallery` in `config/locales/en.yml` (added by the lightbox fix — see Change Log 2026-07-21):
 
@@ -195,7 +197,7 @@ R6: `GalleryPhoto` includes `ImageAttachmentValidatable` and calls `validates_im
 
 R7: The content-type validation (via R6) rejects any attached image whose `blob.content_type` is not in `%w[image/jpeg image/png image/webp]` — deliberately excluding `image/svg+xml` — adding an `:invalid_content_type` error on `:image`.
 
-R8: The size validation (via R6) rejects any attached image whose `blob.byte_size` exceeds 15 megabytes, adding a `:file_too_large` error on `:image`.
+R8: The size validation (via R6) rejects any attached image whose `blob.byte_size` exceeds 30 megabytes, adding a `:file_too_large` error on `:image`. (Originally 15 megabytes; raised to 30 by SPEC-013 R8 — see Change Log 2026-09-11.)
 
 R9: The `:invalid_content_type` and `:file_too_large` error messages are defined once, at `activerecord.errors.messages.*` (not duplicated per-model), per the Interfaces section's i18n table.
 
@@ -279,11 +281,11 @@ R27: `Admin::GalleryPhotosController#move_up` and `#move_down`, their `member` r
 
 ## Edge Cases
 
-E1: A valid JPEG under 15 MB is uploaded. The record is valid and saves successfully.
+E1: A valid JPEG under 30 MB is uploaded. The record is valid and saves successfully.
 
 E2: An uploaded file has `content_type` `image/svg+xml` (or any type outside the allowlist). Validation rejects it (R7); HTTP 422 on `#create`.
 
-E3: An uploaded file's `blob.byte_size` exceeds 15 MB. Validation rejects it (R8); HTTP 422 on `#create`.
+E3: An uploaded file's `blob.byte_size` exceeds 30 MB. Validation rejects it (R8); HTTP 422 on `#create`.
 
 E4: `#create` is submitted with no file selected. `image_must_be_attached` (R5) rejects it; HTTP 422.
 
@@ -329,9 +331,9 @@ AC-9: Given a `GalleryPhoto` with no image attached, when validated, then it is 
 
 AC-10: Given a `GalleryPhoto` with an attached image whose `content_type` is `image/svg+xml`, when validated, then it is invalid with an error on `:image` whose message equals `t("activerecord.errors.messages.invalid_content_type")`.
 
-AC-11: Given a `GalleryPhoto` with an attached image whose `byte_size` exceeds 15 megabytes, when validated, then it is invalid with an error on `:image` whose message equals `t("activerecord.errors.messages.file_too_large")`.
+AC-11: Given a `GalleryPhoto` with an attached image whose `byte_size` exceeds 30 megabytes, when validated, then it is invalid with an error on `:image` whose message equals `t("activerecord.errors.messages.file_too_large")`.
 
-AC-12: Given a `GalleryPhoto` with a valid JPEG under 15 MB attached, when validated, then it is valid (no errors).
+AC-12: Given a `GalleryPhoto` with a valid JPEG under 30 MB attached, when validated, then it is valid (no errors).
 
 ### Admin Behavior
 
@@ -341,13 +343,13 @@ AC-14: Given admin is authenticated, when `GET /admin/gallery_photos`, then the 
 
 AC-15: Given admin is authenticated and zero `GalleryPhoto` rows exist, when `GET /admin/gallery_photos`, then HTTP 200, no error, and the response includes `t("admin.gallery_photos.empty_state")`.
 
-AC-16: Given admin is authenticated and zero prior `GalleryPhoto` rows exist, when `POST /admin/gallery_photos` with a valid JPEG under 15 MB, then a `GalleryPhoto` is created with `position: 0`, the response redirects to `admin_gallery_photos_path`, and `flash[:notice]` is present.
+AC-16: Given admin is authenticated and zero prior `GalleryPhoto` rows exist, when `POST /admin/gallery_photos` with a valid JPEG under 30 MB, then a `GalleryPhoto` is created with `position: 0`, the response redirects to `admin_gallery_photos_path`, and `flash[:notice]` is present.
 
 AC-17: Given admin is authenticated and one `GalleryPhoto` exists at `position: 0`, when `POST /admin/gallery_photos` with a second valid image, then the new row's `position` equals 1.
 
 AC-18: Given admin is authenticated, when `POST /admin/gallery_photos` with an `image/svg+xml` file, then HTTP 422, `GalleryPhoto.count` is unchanged, and the response body includes a content-type validation error.
 
-AC-19: Given admin is authenticated, when `POST /admin/gallery_photos` with a file exceeding 15 MB, then HTTP 422, `GalleryPhoto.count` is unchanged, and the response body includes a file-size validation error.
+AC-19: Given admin is authenticated, when `POST /admin/gallery_photos` with a file exceeding 30 MB, then HTTP 422, `GalleryPhoto.count` is unchanged, and the response body includes a file-size validation error.
 
 AC-20: Given admin is authenticated, when `POST /admin/gallery_photos` with no file selected, then HTTP 422, `GalleryPhoto.count` is unchanged, and the response body includes a presence validation error.
 
@@ -468,13 +470,13 @@ Then it is invalid and `errors[:image]` includes `t("activerecord.errors.message
 Covers: R6, R7, R9, AC-10, E2
 
 AT10
-Given a `GalleryPhoto` with an image attached whose blob `byte_size` exceeds 15 megabytes
+Given a `GalleryPhoto` with an image attached whose blob `byte_size` exceeds 30 megabytes
 When `valid?` is called
 Then it is invalid and `errors[:image]` includes `t("activerecord.errors.messages.file_too_large")`
 Covers: R6, R8, R9, AC-11, E3
 
 AT11
-Given a `GalleryPhoto` with a valid JPEG under 15 MB attached
+Given a `GalleryPhoto` with a valid JPEG under 30 MB attached
 When `valid?` is called
 Then it is valid (no errors)
 Covers: R4, R5, R7, R8, AC-12, E1
@@ -499,7 +501,7 @@ Covers: R13, AC-15
 
 AT15
 Given admin is authenticated and zero prior `GalleryPhoto` rows exist
-When `POST /admin/gallery_photos` with a valid JPEG under 15 MB
+When `POST /admin/gallery_photos` with a valid JPEG under 30 MB
 Then a `GalleryPhoto` is created with `position: 0`, the response redirects to `admin_gallery_photos_path`, and `flash[:notice]` is present
 Covers: R14, AC-16
 
@@ -517,7 +519,7 @@ Covers: R15, AC-18, E2
 
 AT18
 Given admin is authenticated
-When `POST /admin/gallery_photos` with a file exceeding 15 MB
+When `POST /admin/gallery_photos` with a file exceeding 30 MB
 Then HTTP 422, `GalleryPhoto.count` unchanged, and the response includes a file-size validation error
 Covers: R15, AC-19, E3
 
@@ -721,6 +723,7 @@ Total estimated points: 24 (all tasks ≤ 4 points; no split review required und
 | 2026-07-17 | Reversed the Gallery admin reordering mechanism from Move Up/Move Down buttons to drag-and-drop (SortableJS + a new `gallery_sort_controller.js` Stimulus controller), per ADR-005's 2026-07-17 addendum. Flipped the drag-and-drop Non-Goal to a Move-Up/Down-fallback Non-Goal; replaced the `gap-tolerant swap`/`stacked-card list pattern` Definitions with `responsive photo grid`/`SortableJS`/`gallery_sort_controller`/`reorder request`; replaced the `move_up`/`move_down` member routes and i18n keys with a `PATCH /admin/gallery_photos/reorder` collection route and `drag_hint`/`flash.reorder_failed` keys; added the Interfaces → Client-Side Reordering subsection specifying the `photo_ids` JSON request contract, CSRF header handling, and success/failure response codes; rewrote R13 (grid + drag admin view) and R17 (reorder validation/transaction/response contract) and R20 (grid-based mobile-first rules); added R23–R27 (SortableJS pin, Stimulus controller init, same-position no-op, CSRF header, removal of move_up/move_down); replaced E5/E6 with drag-specific edge cases and renumbered the backfill edge cases to E8/E9; rewrote AC-13, AC-22, AC-23, AC-24, AC-27 and added AC-33–AC-38 (AC-38 and its AT37 close a self-test gap: R26's CSRF-header requirement had no dedicated acceptance test); rewrote AT12, AT21, AT22, AT23, AT26 and added AT32–AT37; rewrote Task Breakdown T4/T5/T8 and added T9 for the new client-side dependency (total estimate 21→24; T9's AC list was corrected to the client-artifact ACs it actually produces — AC-22–AC-24 are endpoint-correctness ACs owned by T4, not T9); updated Dependencies to note ADR-002's swap pattern is no longer reused by `GalleryPhoto` and to flag the new `sortablejs` third-party JS dependency and its vendoring. Status remains `ready`; this revision targets PR #40 before merge — the underlying feature was already implemented, reviewed, and QA-passed with Move Up/Move Down, but not yet merged to `main`. | Non Goals, Definitions, Interfaces, R13, R17, R20, R23, R24, R25, R26, R27, E5, E6, E7, E8, E9, AC-13, AC-22, AC-23, AC-24, AC-27, AC-33, AC-34, AC-35, AC-36, AC-37, AC-38, AT12, AT21, AT22, AT23, AT26, AT32, AT33, AT34, AT35, AT36, AT37, T4, T5, T8, T9, Dependencies | Product/UX decision after using the shipped Move Up/Down implementation on PR #40 — reordering a photo collection via repeated taps was judged clunky by the product owner (Doug); ADR-005's 2026-07-17 addendum authorizes SortableJS-based drag-and-drop as the replacement mechanism. |
 | 2026-07-21 | Reviewer finding on the first drag-and-drop implementation: `Sortable.create` was missing touch-scroll-conflict guards, meaning a plain vertical swipe on the grid would have been hijacked into a drag on touch devices - the exact "scroll-vs-drag conflict" ADR-005's addendum cited as the reason for choosing SortableJS over native HTML5 drag-and-drop in the first place, left unaddressed by an incomplete options object. Added `delay: 150`, `delayOnTouchOnly: true` (press-and-hold required to start a drag on touch; mouse unaffected), and `filter: "[data-turbo-method='delete']"` / `preventOnFilter: false` (the per-tile Delete control cannot initiate a drag). Updated R24 and the Interfaces Client-Side Reordering section's `Sortable.create` options string and T9 to match. No AC/AT numbering changed - this refines R24's existing options-string requirement rather than adding new observable behavior; the existing static-inspection test for the controller's structure/wiring was not asserting the literal options string, so no test needed updating. Fixed before the product owner's first manual phone test, per reviewer recommendation. | R24, Interfaces (Client-Side Reordering), T9 | Reviewer finding - touch-drag would have conflicted with scrolling and with tapping Delete |
 | 2026-08-03 | Added `keep: :icc` to both variants' saver options. libvips copies the source's entire metadata block — EXIF, XMP, IPTC and Photoshop 8bim records — into every generated variant; measured at ~33 KB per image across the 18 camera originals in `app/assets/images/gallery/` that still carry it, charged on every variant of every photo. Measured through the Active Storage path on a metadata-carrying source: thumbnail 85,959 → 40,725 B. `keep: :icc` drops those records and retains the ICC profile; plain `strip: true` was rejected because it also drops the profile, leaving Adobe RGB data to be interpreted as sRGB (RMSE 3.2%, DSSIM 0.0052 — visibly flatter colour) in exchange for ~600 further bytes. Added regression examples to `spec/models/gallery_photo_spec.rb` asserting the ICC profile survives and the EXIF/XMP/IPTC records do not, on both variants; verified by mutation that substituting `strip: true` or dropping the option fails them. `keep:` requires libvips >= 8.15 — confirmed 8.16 on the deployed image before shipping; an older libvips rejects the option and raises `Vips::Error` from every `.processed` call, which the existing "processes without raising" examples catch in CI. No AC/AT numbering changed: this tunes R10's existing saver options rather than adding observable behaviour. SPEC-009 R3 is updated in lockstep, since it reuses these options by reference. | R10 | Measured payload finding — camera metadata was being copied into every served variant. |
+| 2026-09-11 | Updated every "15 MB"/"15 megabytes" figure to 30 MB — Interfaces' `image_hint` and `file_too_large` i18n entries, R8, E1, E3, AC-11, AC-12, AC-16, AC-19, AT10, AT11, AT15, AT18. | Interfaces (Required i18n Keys), R8, E1, E3, AC-11, AC-12, AC-16, AC-19, AT10, AT11, AT15, AT18 | SPEC-013 R8 (2026-09-02) raised the shared `ImageAttachmentValidatable::MAX_IMAGE_SIZE` constant from 15 MB to 30 MB; because `GalleryPhoto#image` uses that same constant, its cap rose too, but this spec's own already-finalized text kept saying 15 MB. Deferred twice; corrected now so this `ready` spec doesn't describe a stale limit as current behavior. |
 | 2026-08-03 | Split the single `:display` variant into two, after measuring what the live staging site actually serves. R10 previously mandated one 1200×1200 variant at every call site and explicitly forbade a second ("No second variant is defined") — correct for the lightbox, wrong for the grid, where a `aspect-square object-cover` tile renders at most 466 CSS px but was being sent a 1200×800, 205 KB image. Because the cost is per photo, a 30-photo gallery shipped ~6 MB of thumbnails. Added `#thumbnail_variant` (`resize_to_fill: [600, 600], saver: { quality: 80 }`, measured 116 KB against the same source) for both the public and admin grids; `#display_variant` is unchanged and still backs the lightbox, so full-size viewing is unaffected. `resize_to_fill` rather than `resize_to_limit` because the tile is square and `object-cover` already crops — filling server-side yields the identical centre crop without the browser upscaling a short landscape variant to cover the tile. Rewrote R10; relaxed AC-3/AT3, which asserted the lightbox param equalled the grid `<img>` `src` — true only while one variant served both, and false by design now; added AC-44/AT42 asserting the two URLs are the correct and distinct variants. `Admin::GalleryPhotosController#create` now warms both variants synchronously, preserving R14's intent that the first viewer after an upload pays no processing latency. No change to `ImageAttachmentValidatable`, the reorder/backfill paths, or SPEC-009. Status remains `ready`. | R10, AC-3, AC-44, AT3, AT42, R14 (call site only) | Measured page-weight regression on live staging — the grid was served lightbox-sized images, scaling linearly with photo count. |
 | 2026-07-21 | Reconciled R12/AC-3/AT3 with the public gallery lightbox implementation actually shipped on PR #40 (branch `feature/spec-008-photo-uploads`), which this spec's initial draft never described. R12 still specified wrapping each thumbnail in an `<a href>` pointing at the display-variant URL - the original `Dir.glob`-era behavior, carried over unchanged into this spec. In manual phone testing, clicking a photo under that pattern navigated the browser fully away from the site to a bare full-page image view with no in-page close control (only the back button) - a real, pre-existing UX bug found during testing, not a new feature request. It was fixed by replacing the `<a href>` with a `<button data-action="gallery-lightbox#open">` plus a new `gallery_lightbox_controller.js` Stimulus controller driving an in-page overlay (`role="dialog"`, hidden by default, `z-index: 1000` to clear the fixed nav's `z-index: 999`) with three close mechanisms - close button, backdrop click (exact `event.target` match), and Escape. `spec/requests/pages_gallery_spec.rb` was updated at implementation time to assert the new markup (including that `div.grid a` is now empty) and `spec/system/gallery_spec.rb` was added to cover the open/close interactions in a real browser, but this spec document was never updated to match - a reviewer pass on the otherwise-approved PR flagged the spec/code mismatch as the sole blocking issue. Rewrote R12 to describe the button/data-param structure, the overlay's default-hidden state, all three close mechanisms, and the z-index requirement; rewrote AC-3/AT3 to assert no `<a>` wraps the grid images and the button's data param carries the correct display-variant URL; added AC-39-AC-43 and AT38-AT41 covering the overlay's default-hidden state/dialog role and the three close mechanisms; added the two new `pages.gallery.lightbox_aria_label`/`lightbox_close_aria_label` i18n keys to the Interfaces i18n table; corrected Task Breakdown T3's stale `<a href>` reference to match. This is a spec-to-match-shipped-code reconciliation, not new work - no application code changed as part of this revision. Reordering/drag-and-drop, the backfill task, and SPEC-009 are unaffected and out of scope for this entry. Status remains `ready`. | R12, AC-3, AT3, AC-39, AC-40, AC-41, AC-42, AC-43, AT38, AT39, AT40, AT41, Interfaces (Required i18n Keys), T3 | Pre-existing UX bug found during manual phone testing (thumbnail click fully navigated away from the site with no in-page close control), fixed on PR #40 before merge; a reviewer pass flagged the resulting spec/code mismatch as the PR's sole blocking issue, requiring this reconciliation. |
 

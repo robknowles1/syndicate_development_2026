@@ -90,6 +90,7 @@ New, under `admin.home_page_content`:
 | `hero_image_label` | Label for the hero file input |
 | `cta_image_label` | Label for the CTA file input |
 | `image_hint` | Shared hint beneath each file input: allowed types, **30 MB** max, blank keeps the current image |
+| `using_default_image` | Shown in place of a thumbnail when a slot has no attached image (R14) |
 | `remove_hero_image_label` | Label for the hero "remove image" checkbox |
 | `remove_cta_image_label` | Label for the CTA "remove image" checkbox |
 
@@ -151,7 +152,16 @@ R13: `StructuredDataHelper#local_business_schema`'s `"image"` key is changed fro
 
 R14: The admin Home form (`app/views/admin/home_page_contents/show.html.erb`) gains, for each of the 2 slots: an `f.file_field`, a thumbnail preview of the current image (or a short "using default image" indicator when the slot is unattached), and a "remove image" checkbox. Positioned near the top of the form, before the 4 existing text fields, since the hero/CTA images are the first thing a visitor sees.
 
-R15: `Admin::HomePageContentsController#update` purges a slot when its removal checkbox is checked **unless** a new file was also submitted for that same slot in the same request — a simultaneous upload always wins over a simultaneous removal request, so the outcome of one form submission is never ambiguous. Implementation shape: purge checked-and-not-replaced slots first, then call `update` with the permitted params, so `has_one_attached=`'s own replace-and-purge-old-blob behavior (confirmed by ADR-005, reused unmodified from SPEC-009 R8) governs the "new file present" case without any extra code.
+R15: `Admin::HomePageContentsController#update` purges a slot when its removal checkbox is checked **unless** a new file was also submitted for that same slot in the same request — a simultaneous upload always wins over a simultaneous removal request, so the outcome of one form submission is never ambiguous. Implementation shape: call `update` with the permitted params **first**; only once that call succeeds does the controller purge checked-and-not-replaced slots. A removal is never applied ahead of a successful save, so a validation failure anywhere in the same request — on either slot's file or on the 4 text fields — leaves every previously-attached image exactly as it was; the request is all-or-nothing for image removal too, not only for the text fields (see E5).
+
+| Removal box | New file | Save result | Outcome |
+|---|---|---|---|
+| checked | none | succeeds | slot purged, reverts to bundled default |
+| checked | none | fails (422) | image survives |
+| checked | provided | succeeds | new file attached, purge does not run |
+| checked | provided | fails (422) | new file not persisted, existing image survives |
+
+`has_one_attached=`'s own replace-and-purge-old-blob behavior (confirmed by ADR-005, reused unmodified from SPEC-009 R8) still governs the "new file present, save succeeds" row without any extra code; it is unaffected by this ordering.
 
 R16: `home_page_content_params` permits `:hero_image, :cta_image, :remove_hero_image, :remove_cta_image` alongside the existing 4 text params and `:published`.
 
@@ -175,7 +185,7 @@ E3: `published: true`, only `hero_image` attached. Hero section renders the uplo
 
 E4: `published: true`, only `cta_image` attached. CTA section renders the uploaded image; hero section renders its static fallback; `og:image`/schema `image` **also fall back** to `BUSINESS_IMAGE` — the social/schema image is tied to the hero slot specifically, not "any uploaded home image" (R4, R12).
 
-E5: An upload to either slot is rejected (e.g. `image/svg+xml`). HTTP 422; no attachment persisted for that slot; because `#update` is a single whole-record call, none of the other submitted fields persist either (matches existing all-or-nothing `#update` behavior).
+E5: An upload to either slot is rejected (e.g. `image/svg+xml`). HTTP 422; no attachment persisted for that slot; because `#update` is a single whole-record call, none of the other submitted fields persist either (matches existing all-or-nothing `#update` behavior) — including a removal checkbox checked for the same or the other slot in the same request, since R15's purge only runs after `update` succeeds.
 
 E6: An upload to either slot exceeds 30 MB. HTTP 422; rejected by R8's raised size validation.
 
@@ -426,7 +436,7 @@ Covers: R19, AC-25
 ## Dependencies
 
 - **SPEC-008 (Gallery Photo Management)** — provides `active_storage:install`, `ruby-vips`, and `ImageAttachmentValidatable`, all reused unmodified except for the `MAX_IMAGE_SIZE` value itself (R8).
-- **SPEC-009 (About Slideshow Image Uploads)** — this spec's data-model, validation, variant, and admin-form shape are a direct extension of SPEC-009's precedent to a second singleton. **Consequence for SPEC-009 and SPEC-008's own text:** both specs' finalized Rules/ACs/ATs state the file-size limit as "15 MB" in prose (e.g. SPEC-009 AC-7/AT7, SPEC-008's equivalent). This spec's implementation makes those specific numbers stale — the underlying *behavior* they describe (reject files over the shared cap) stays correct, but the literal "15 MB" text in those already-`ready`/`done` spec files will no longer match the app once R8 ships. This spec does not edit SPEC-008/009 (out of this agent's scope to modify already-approved specs unprompted) — flagging here so whoever schedules this work updates those two files' prose in the same pass, or accepts the drift consciously.
+- **SPEC-009 (About Slideshow Image Uploads)** — this spec's data-model, validation, variant, and admin-form shape are a direct extension of SPEC-009's precedent to a second singleton. **Consequence for SPEC-009 and SPEC-008's own text:** both specs' finalized Rules/ACs/ATs state the file-size limit as "15 MB" in prose (e.g. SPEC-009 AC-7/AT7, SPEC-008's equivalent). This spec's implementation makes those specific numbers stale — the underlying *behavior* they describe (reject files over the shared cap) stays correct, but the literal "15 MB" text in those already-`ready`/`done` spec files will no longer match the app once R8 ships. This spec does not edit SPEC-008/009 (out of this agent's scope to modify already-approved specs unprompted) — flagging here so whoever schedules this work updates those two files' prose in the same pass, or accepts the drift consciously. **Resolved 2026-09-11** — both files' "15 MB" prose was updated to 30 MB; see their own Change Logs.
 - ADR-004 (Singleton Content Model and Publish Flag Placement) — governs the `published`-column-reuse decision (R7); not re-derived here.
 - ADR-005 (Photo Upload Data Model and Active Storage Strategy) — governs the data model, validation, and no-backfill decisions this spec extends to `HomePageContent`; not re-derived here.
 - SPEC-006 (Home Page Content Editing) — provides `HomePageContent`, `Admin::HomePageContentsController`, and the existing admin form this spec extends.
@@ -455,6 +465,7 @@ Total estimated points: 16 (all tasks ≤ 4 points; no split review required und
 | Date | Change | Affected IDs | Rationale |
 |------|--------|-------------|-----------|
 | 2026-09-02 | Initial draft | All | Translates the repo owner's post-staging-trial request into an implementation-ready spec, following SPEC-009's established pattern for a second `has_one_attached`-on-singleton image feature. Resolves the alt-text question explicitly (R11, decision (a)) rather than leaving it for the developer to guess. Raises the shared `MAX_IMAGE_SIZE` constant (R8) and identifies every existing i18n string that goes stale as a result (R9). Names, but explicitly defers, the multipart-upload/no-proxy-cap risk (R10) as a follow-up rather than in-scope work. Wires `og:image`/`twitter:image`/schema `image` to the uploaded hero through one shared resolution method (R12-R13) so the two can never independently drift. |
+| 2026-09-11 | Corrected R15, which had specified a data-losing purge order, and added a missing i18n key. As originally written, R15 purged a checked-and-not-replaced removal slot **before** calling `update`. A request that ticked "remove image," attached no replacement, and failed validation on an unrelated field (e.g. a blank required text field) therefore returned its 422 with the image already permanently gone — the response said nothing was saved while a real, irreversible deletion had already happened, contradicting the all-or-nothing behavior E5 already claimed for the rest of the form. Corrected to match the shipped implementation (PR #81, verified against `app/controllers/admin/home_page_contents_controller.rb`): `update` is called first, and the purge only runs after it succeeds, so a validation failure anywhere in the request — on a slot's own file or on any text field — now leaves every previously-attached image untouched. The upload-wins tie-break (removal checked + a new file also submitted) is unchanged; it was already correct, was never part of the ordering bug (a submitted file exempts that slot from the purge guard regardless of order), and is unaffected by this correction. R15 now states the full outcome as a table. Amended E5 to say explicitly that its all-or-nothing guarantee also covers a removal checkbox checked elsewhere in the same request — the exact case the old ordering violated. Checked AC-16, AC-17, E10, E11 and the rest of the spec for other assertions resting on the old ordering; found none — their outcomes were already ordering-independent, so only R15 and E5 needed correction. Also added the missing `admin.home_page_content.using_default_image` key to the Required i18n Keys table: R14 requires a "using default image" indicator when a slot is unattached, and the shipped implementation added this key (a hardcoded string would violate CLAUDE.md), but the table had only ever listed the other 5 new keys. | R15, E5, Interfaces (Required i18n Keys) | Both gaps were discovered and fixed in the shipped code (PR #81) without the spec being updated to match — deferred twice. By the time of this correction, this spec was describing a real data-loss bug as the intended design, at risk of a future developer "fixing" the corrected controller back to the lossy ordering to match the stale spec. |
 
 ---
 
