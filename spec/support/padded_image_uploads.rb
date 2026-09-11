@@ -12,8 +12,8 @@ module PaddedImageUploads
     Rack::Test::UploadedFile.new(padded_jpeg_path(byte_size), "image/jpeg")
   end
 
-  # Capybara's attach_file takes a path, not an uploaded file, and a 30 MB file is worth
-  # handing over rather than copying into a tempfile first.
+  # Capybara's attach_file takes a path, not an uploaded file, and these files are large
+  # enough that handing over the path beats copying into a tempfile first.
   def padded_jpeg_path(byte_size)
     source_bytes = Rails.root.join(SOURCE_JPEG).binread
     minimum_byte_size = source_bytes.bytesize
