@@ -98,7 +98,9 @@ Add under `admin.about_page_content` in `config/locales/en.yml` (all other keys 
 | `slideshow_image_1_label` | Label for the slot-1 file input |
 | `slideshow_image_2_label` | Label for the slot-2 file input |
 | `slideshow_image_3_label` | Label for the slot-3 file input |
-| `slideshow_image_hint` | Shared hint beneath each file input: allowed types, 15 MB max, and that leaving it blank keeps the current image |
+| `slideshow_image_hint` | Shared hint beneath each file input: allowed types, 30 MB max, and that leaving it blank keeps the current image |
+
+**Note (2026-09-11):** `slideshow_image_hint` above originally specified 15 MB. SPEC-013 R8 (2026-09-02) raised the shared `ImageAttachmentValidatable::MAX_IMAGE_SIZE` constant this value derives from to 30 MB for all three photo-upload specs (Gallery, About, Home) — see SPEC-013's Change Log. Updated here to match; see this file's own Change Log for the correction.
 
 **Update** the existing `confirm_restore_defaults` key (SPEC-007) to also mention images, since restore now has a destructive side effect it didn't have before (ADR-005 Risks):
 
@@ -187,7 +189,7 @@ E3: `published: true`, only `slideshow_image_1` is attached. Slot 1 renders the 
 
 E4: An upload to `slideshow_image_2` is rejected (e.g., `image/svg+xml` content type). HTTP 422; no attachment is persisted for slot 2; because `#update` is a single whole-record `update` call, none of the other fields submitted in the same request are persisted either (matches existing `#update` all-or-nothing behavior from SPEC-007 R12).
 
-E5: An upload to `slideshow_image_3` exceeds 15 MB. HTTP 422; rejected by the size validation (R2).
+E5: An upload to `slideshow_image_3` exceeds 30 MB. HTTP 422; rejected by the size validation (R2).
 
 E6: `restore_defaults` is called when 2 of 3 slots have attachments. Both attached slots are purged; the 10 text fields reset from i18n; `published` is unchanged; the already-unattached 3rd slot is unaffected (its `.attached?` guard prevents any error).
 
@@ -227,11 +229,11 @@ AC-4: Given `AboutPageContent` exists with `published: true` and all 3 slots att
 
 ### Admin Behavior
 
-AC-5: Given admin is authenticated, when `PATCH /admin/about_page_content` with a valid `slideshow_image_2` file (JPEG, under 15 MB) plus valid values for the existing required fields, then `AboutPageContent.first.slideshow_image_2.attached?` is `true`, and the response redirects with `flash[:notice]`.
+AC-5: Given admin is authenticated, when `PATCH /admin/about_page_content` with a valid `slideshow_image_2` file (JPEG, under 30 MB) plus valid values for the existing required fields, then `AboutPageContent.first.slideshow_image_2.attached?` is `true`, and the response redirects with `flash[:notice]`.
 
 AC-6: Given admin is authenticated, when `PATCH /admin/about_page_content` with `slideshow_image_2` as an `image/svg+xml` file, then HTTP 422, no attachment is persisted for slot 2, and the response body includes a content-type validation error.
 
-AC-7: Given admin is authenticated, when `PATCH /admin/about_page_content` with `slideshow_image_3` exceeding 15 MB, then HTTP 422 and the response body includes a file-size validation error.
+AC-7: Given admin is authenticated, when `PATCH /admin/about_page_content` with `slideshow_image_3` exceeding 30 MB, then HTTP 422 and the response body includes a file-size validation error.
 
 AC-8: Given admin is authenticated and `AboutPageContent` exists with all 3 slideshow slots attached, when `PATCH /admin/about_page_content/restore_defaults`, then all 3 `slideshow_image_N.attached?` are `false`, the 10 text fields equal their `I18n.t("pages.about.*")` originals, `published` is unchanged, and the response redirects with `flash[:notice]`.
 
@@ -311,7 +313,7 @@ Covers: R2, AC-6, E4
 
 AT7
 Given admin is authenticated
-When `PATCH /admin/about_page_content` with `slideshow_image_3` exceeding 15 MB
+When `PATCH /admin/about_page_content` with `slideshow_image_3` exceeding 30 MB
 Then HTTP 422 and the response includes a file-size validation error
 Covers: R2, AC-7, E5
 
@@ -370,7 +372,7 @@ Then the first `<img>` `alt` attribute equals "Custom alt text" — unchanged re
 Covers: R11, AC-4
 
 AT17
-Given a valid JPEG under 15 MB with pixel dimensions smaller than 400×400 attached to `slideshow_image_1`
+Given a valid JPEG under 30 MB with pixel dimensions smaller than 400×400 attached to `slideshow_image_1`
 When the `AboutPageContent` record is validated
 Then it is valid — no minimum-dimension validation is applied
 Covers: R12
@@ -468,6 +470,7 @@ Total estimated points: 16 (all tasks ≤ 4 points; no split review required und
 | Date | Change | Affected IDs | Rationale |
 |------|--------|-------------|-----------|
 | 2026-08-03 | Added `keep: :icc` to the R3 helper's saver options, tracking SPEC-008's same-day change to `GalleryPhoto#display_variant` — R3 and the Definitions table both define these options by reference to SPEC-008, so they must not drift. Without it libvips copies the source's EXIF/XMP/IPTC/8bim records into every generated variant (~33 KB per camera original), which on this page is charged once per attached slideshow slot. `strip: true` was rejected: it also drops the ICC profile, leaving Adobe RGB data to be read as sRGB (RMSE 3.2%). Added a regression example to `spec/models/about_page_content_spec.rb` asserting the ICC profile survives and the EXIF/XMP/IPTC records do not. Slots falling back to a bundled static file are unaffected — those never pass through Active Storage. No AC/AT numbering changed. | R3, Definitions (display variant) | Measured payload finding on SPEC-008; applied here to keep the shared variant options identical. |
+| 2026-09-11 | Updated every "15 MB" figure to 30 MB — Interfaces' `slideshow_image_hint` entry, E5, AC-5, AC-7, AT7, AT17. | Interfaces (Required i18n Keys), E5, AC-5, AC-7, AT7, AT17 | SPEC-013 R8 (2026-09-02) raised the shared `ImageAttachmentValidatable::MAX_IMAGE_SIZE` constant from 15 MB to 30 MB; because `AboutPageContent#slideshow_image_1/2/3` use that same constant, their cap rose too, but this spec's own already-finalized text kept saying 15 MB. Deferred twice; corrected now so this `ready` spec doesn't describe a stale limit as current behavior. |
 | 2026-07-14 | Initial draft | All | Translates ADR-005 (Decision 1, Decision 3, and the About-specific portions of Decisions 4–6, Implementation Notes 8–10) into implementation-ready spec format. Explicitly documents the SPEC-008 and SPEC-007/PR#38 blocking dependencies per ADR-005 Implementation Note 12. Resolves the ADR's "Handoff to Spec Agent" open items as they apply to About: confirmed the shared 1200×1200 quality-80 variant via a per-slot helper method; confirmed no soft minimum-dimension guard (consistent with SPEC-008); confirmed no per-slot alt-text change (SPEC-007 R20 unchanged); wrote the `confirm_restore_defaults` copy update and the 4 new admin i18n keys; wrote full acceptance criteria including content-type/size rejection request specs and a 375 px mobile-first system spec extension. |
 | 2026-07-21 | Added independent scope: persistent "back to dashboard" navigation link in the shared admin layout header (`app/views/layouts/admin.html.erb`) | R14–R18, E10–E12, AC-16–AC-20, AT18–AT22, T7 | Folded into this spec at explicit user request, to ship alongside the About-slideshow-image-uploads work in the same implementation pass — **not** derived from ADR-005 and unrelated to the slideshow scope above. Addresses a mobile-usability gap: every admin edit page (Home, About, Gallery, Services) was a navigational dead end with no way back to the dashboard except the browser's back button, which is unreliable on Doug's phone per CLAUDE.md's mobile-first mandate. Fixed once at the shared-layout level rather than per-view so all current and future admin pages get it automatically. |
 | 2026-07-27 | **Replaced** the single "back to dashboard" header link with a persistent five-destination admin nav bar (Dashboard / Home / About / Gallery / Services), added active-page marking, shortened `admin.layout.header`, extracted `app/helpers/admin_helper.rb`, and added phone-width system coverage | R14–R18 rewritten, E12 rewritten, E13–E15 added, AC-16–AC-20 rewritten, AC-21–AC-23 added, AT18–AT22 rewritten, AT23–AT24 added, T7 rewritten, Interfaces § rewritten | Manual QA finding: the as-shipped link was technically present and request-spec-verified, but at phone width the header crammed a long title, the link, and the logout button into one non-wrapping flex row — all three wrapped into unreadable two-line fragments and the link was effectively invisible, which is how the user reported it ("I don't see anything"). Two corrections: (1) the header was rebalanced and the nav moved to its own row, and (2) the destination set was widened from dashboard-only to all five sections, since the underlying need was to move between admin pages freely rather than only to retreat to the dashboard. The old R15/AC-17 rule hiding the link on the dashboard was dropped — with a full nav, a stable item count and position across every page matters more than avoiding one self-referential link. The root process gap was that AC-16–AC-20 were all assertable from markup alone; AC-21 and its system spec now pin the rendered geometry at 375/390/414px so a repeat regression fails CI instead of reaching the user, and that guard was verified to fail when the long header title is restored. Review also caught that the first cut used `current_page?`, which matches GET only, so the active marking vanished on every validation-failure re-render and on the service-section sub-pages; replaced with `admin_nav_current?` and covered by AC-22/AC-23. |
