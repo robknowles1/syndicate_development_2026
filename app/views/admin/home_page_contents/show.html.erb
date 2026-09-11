@@ -12,7 +12,11 @@
       </div>
     <% end %>
 
-    <div>
+    <div data-controller="image-upload-guard"
+         data-image-upload-guard-max-bytes-value="<%= ImageAttachmentValidatable::MAX_IMAGE_SIZE %>"
+         data-image-upload-guard-allowed-types-value="<%= ImageAttachmentValidatable::ALLOWED_IMAGE_TYPES.join(",") %>"
+         data-image-upload-guard-oversized-message-value="<%= t("admin.home_page_content.oversized_image_alert", max_mb: ImageAttachmentValidatable::MAX_IMAGE_SIZE / 1.megabyte) %>"
+         data-image-upload-guard-invalid-type-message-value="<%= t("admin.home_page_content.invalid_image_type_alert") %>">
       <%= f.label :hero_image, t("admin.home_page_content.hero_image_label"),
             class: "block text-sm font-semibold mb-1" %>
       <% if image_preview_available?(@home_page_content.hero_image) %>
@@ -24,15 +28,23 @@
       <% else %>
         <p class="text-sm text-gray-500 mb-2"><%= t("admin.home_page_content.using_default_image") %></p>
       <% end %>
-      <%= f.file_field :hero_image, class: "w-full border border-gray-300 rounded px-3 py-2" %>
+      <%= f.file_field :hero_image,
+            accept: ImageAttachmentValidatable.accept_attribute_value,
+            data: { "image-upload-guard-target" => "input", action: "change->image-upload-guard#validate" },
+            class: "w-full border border-gray-300 rounded px-3 py-2" %>
       <p class="text-sm text-gray-500 mt-1"><%= t("admin.home_page_content.image_hint") %></p>
+      <p data-image-upload-guard-target="message" class="hidden mt-1 text-sm text-red-600" role="alert"></p>
       <label class="flex items-center gap-3 cursor-pointer py-3">
         <%= f.check_box :remove_hero_image, class: "w-5 h-5 accent-red-600" %>
         <span class="text-sm font-semibold"><%= t("admin.home_page_content.remove_hero_image_label") %></span>
       </label>
     </div>
 
-    <div>
+    <div data-controller="image-upload-guard"
+         data-image-upload-guard-max-bytes-value="<%= ImageAttachmentValidatable::MAX_IMAGE_SIZE %>"
+         data-image-upload-guard-allowed-types-value="<%= ImageAttachmentValidatable::ALLOWED_IMAGE_TYPES.join(",") %>"
+         data-image-upload-guard-oversized-message-value="<%= t("admin.home_page_content.oversized_image_alert", max_mb: ImageAttachmentValidatable::MAX_IMAGE_SIZE / 1.megabyte) %>"
+         data-image-upload-guard-invalid-type-message-value="<%= t("admin.home_page_content.invalid_image_type_alert") %>">
       <%= f.label :cta_image, t("admin.home_page_content.cta_image_label"),
             class: "block text-sm font-semibold mb-1" %>
       <% if image_preview_available?(@home_page_content.cta_image) %>
@@ -44,8 +56,12 @@
       <% else %>
         <p class="text-sm text-gray-500 mb-2"><%= t("admin.home_page_content.using_default_image") %></p>
       <% end %>
-      <%= f.file_field :cta_image, class: "w-full border border-gray-300 rounded px-3 py-2" %>
+      <%= f.file_field :cta_image,
+            accept: ImageAttachmentValidatable.accept_attribute_value,
+            data: { "image-upload-guard-target" => "input", action: "change->image-upload-guard#validate" },
+            class: "w-full border border-gray-300 rounded px-3 py-2" %>
       <p class="text-sm text-gray-500 mt-1"><%= t("admin.home_page_content.image_hint") %></p>
+      <p data-image-upload-guard-target="message" class="hidden mt-1 text-sm text-red-600" role="alert"></p>
       <label class="flex items-center gap-3 cursor-pointer py-3">
         <%= f.check_box :remove_cta_image, class: "w-5 h-5 accent-red-600" %>
         <span class="text-sm font-semibold"><%= t("admin.home_page_content.remove_cta_image_label") %></span>
