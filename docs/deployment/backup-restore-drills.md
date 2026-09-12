@@ -34,7 +34,8 @@ The script restores into `restore_drill_YYYYMMDD` and drops it again on exit. It
 | **Operator** | devops-agent, on behalf of robknowles1 |
 | **Tier drilled** | staging — production does not exist yet (`KAMAL_PRODUCTION_HOST` unset, no production Postgres accessory has ever booted) |
 | **Artifact prefix** | `r2:syndicate-backups/staging/daily/2026-09-12` |
-| **Backup taken** | 2026-09-12T04:52:05Z, completed 04:52:11Z (6 s) |
+| **Backup taken** | 2026-09-12T15:34:26Z, 9 s wall, 29 MB peak RSS |
+| **Drill run twice** | Once against an earlier working copy (04:52 artifacts, PASS), then again against the committed scripts. Only the second is recorded as the gate — the artifacts it used are the ones in R2 now, and a drill that rehearses code which is not committed proves nothing durable. Both agreed on every figure below. |
 | **App image at backup time** | `ghcr.io/robknowles1/syndicate_development_2026:7070ea6d9090b55614c53e151a060a95cb4b9bf5` |
 | **`pg_dump` version** | 16.14 (from inside the accessory, matching the server) |
 | **Scratch database** | `restore_drill_20260912`, created in and dropped from `syndicate_development_2026-db-staging` |
@@ -43,6 +44,7 @@ The script restores into `restore_drill_YYYYMMDD` and drops it again on exit. It
 | **Row-count comparison** | 15 tables compared against `MANIFEST`, **0 mismatches** |
 | **Blob-presence check** | 45 blob rows checked, **0 missing files** |
 | **Cleanup** | scratch database dropped, `/var/tmp/syndicate-drill.*` removed, in-container dump removed — all verified afterwards |
+| **Box left clean** | no failed systemd units; all three staging containers (`-web-staging`, `-db-staging`, `kamal-proxy`) still `Up` and untouched throughout |
 | **Result** | **PASS** |
 
 Row counts, identical in `MANIFEST` and in the restored scratch database:
