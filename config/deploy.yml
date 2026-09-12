@@ -59,6 +59,11 @@ volumes:
 
 asset_path: /rails/public/assets
 
+# Each retained container pins its own ~1.4 GB image, and both destinations
+# share this one budget on a 38 GB disk — prune matches `service`, which
+# carries no destination. Raising it buys production no depth staging won't eat.
+retain_containers: 2
+
 builder:
   arch: amd64
 
