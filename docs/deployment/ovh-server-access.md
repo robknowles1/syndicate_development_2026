@@ -34,7 +34,7 @@ ssh -i ~/.ssh/id_ed25519 ubuntu@15.204.81.231
 | Key | `~/.ssh/id_ed25519` |
 | OS | Ubuntu 26.04 LTS (kernel 7.0.0) |
 | Resources | 2 vCPU · 3.7 GB RAM · 38 GB disk |
-| Hostname | `staging.syndicate-development.com` |
+| Hostname | `staging.syndicatedevelopment.com` (also answers `staging.syndicate-development.com` until SPEC-017 R32) |
 
 Key authentication works without a password. Verify with:
 
@@ -102,21 +102,39 @@ mismatch](#a-deploy-fails-with-a-host-key-fingerprint-mismatch).
 
 ## DNS
 
-The domain is registered at **Squarespace**, which also serves DNS (nameservers are
-`ns-cloud-*.googledomains.com`, inherited from Google Domains). DNS records are edited
-in the Squarespace panel, not at OVH.
+Two domains are in play. `syndicatedevelopment.com` — the **new** domain, and the one the
+site is moving to — is on Cloudflare nameservers (`art.ns.cloudflare.com`,
+`veronica.ns.cloudflare.com`) and its records are edited in the Cloudflare dashboard.
+`syndicate-development.com` — the **old** domain, retiring but registered and redirecting
+through 2027 — is still registered at Squarespace on Google nameservers
+(`ns-cloud-*.googledomains.com`) and is still edited there until SPEC-017 R30 migrates that
+zone to Cloudflare.
 
-The apex currently resolves to `147.182.199.74` — a **DigitalOcean** host serving the
-existing live site. Staging must therefore use a subdomain; repointing the apex would
-take the current site down.
+| Name | Zone | Record | Cloud | Serves |
+|---|---|---|---|---|
+| `syndicatedevelopment.com` | Cloudflare (new) | A → `15.204.81.231` | **grey** | Rails production, after Phase 5 |
+| `www.syndicatedevelopment.com` | Cloudflare (new) | A → `192.0.2.1` | orange | 301 → apex |
+| `staging.syndicatedevelopment.com` | Cloudflare (new) | A → `15.204.81.231` | **grey** | Rails staging |
+| `syndicate-development.com` | Squarespace/Google (old) | A → `147.182.199.74` | n/a | the old static React site, until cutover |
+| `www.syndicate-development.com` | Squarespace/Google (old) | CNAME → apex | n/a | as above |
+| `staging.syndicate-development.com` | Squarespace/Google (old) | A → `15.204.81.231` | n/a | Rails staging, transitional — dropped at R32 |
+| `mail.syndicate-development.com` | Squarespace/Google (old) | SPF/DKIM/MX | n/a | Resend sending domain |
 
-Resend sends from the verified subdomain `mail.syndicate-development.com`, whose
-SPF/DKIM/MX records are already live in Squarespace DNS.
+**Every record that reaches this box stays grey-clouded — permanently, not just during
+certificate issuance.** Orange-clouding one breaks two things at once: the HTTP-01 challenge
+stops reliably reaching kamal-proxy, so the certificate never issues; and because
+Cloudflare's edge addresses are public and absent from `trusted_proxies` in
+`config/environments/production.rb`, every visitor collapses onto one apparent IP and the
+contact form's per-IP rate limiting throttles the whole internet as a single caller.
+Reversing that needs Cloudflare's ranges added to `trusted_proxies` **and** the zone set to
+Full (strict) — `Flexible` puts kamal-proxy into an infinite redirect loop.
 
 **DNS must be pointed before the first deploy, not after.** The `proxy:` block sets
-`ssl: true`, which makes kamal-proxy request a Let's Encrypt certificate for
-`proxy.host`. That requires the name to already resolve to this server and port 443 to
-be reachable from the internet.
+`ssl: true`, which makes kamal-proxy request a Let's Encrypt certificate for every name in
+`proxy.host`. Each requires the name to already resolve to this server and port 443 to be
+reachable from the internet. Let's Encrypt rate-limits per name set per week, so a failed
+issuance is diagnosed with `bin/kamal proxy logs` and fixed in DNS — **never** by looping
+`bin/kamal deploy`.
 
 ---
 
@@ -160,9 +178,10 @@ if they are missing. Each traces to a specific review finding.
   the environment variable is currently mandatory.
 - **`STAGING_DATABASE_PASSWORD`** — staging does not fall back to production's.
 - **Host authorization is active.** Any `Host` header not in `config.hosts` gets a 403.
-  Production lists `www.syndicate-development.com` and the apex; staging lists
-  `staging.syndicate-development.com`. DNS must match one of these, and `APP_HOST` must
-  match `proxy.host` in the Kamal config.
+  Production lists exactly one name — `APP_HOST`, i.e. `syndicatedevelopment.com` — because
+  every redirect to it is answered by Cloudflare and never reaches Rails. Staging lists two
+  while the rename is in flight: `APP_HOST` plus `staging.syndicate-development.com`. DNS
+  must match one of these, and `APP_HOST` must match `proxy.host` in the Kamal config.
 - **`CONTACT_RECIPIENT_EMAIL` needs no value on either tier.**
   `config/mail_settings.rb` returns the developer address for every non-production
   environment regardless of what is set, and falls back to the shop address in
