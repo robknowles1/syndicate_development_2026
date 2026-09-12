@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+#
+# Weekly independent check that the nightly backup is actually running.
+# SPEC-017 R18. Runbook: docs/deployment/ovh-server-access.md#backups.
+set -euo pipefail
+
+CONFIG_FILE="${BACKUP_CONFIG:-/etc/syndicate-backup/backup.env}"
+ALERT_FILE="${ALERT_ENV:-/etc/syndicate-backup/alert.env}"
+export RCLONE_CONFIG="${RCLONE_CONFIG:-/etc/syndicate-backup/rclone.conf}"
+
+MAX_AGE_HOURS="${MAX_AGE_HOURS:-48}"
+
+problems=()
+
+note_problem() {
+  printf 'syndicate-backup-verify: %s\n' "$*" >&2
+  problems+=("$*")
+}
+
+[[ -r "$CONFIG_FILE" ]] || { printf 'config not readable: %s\n' "$CONFIG_FILE" >&2; exit 1; }
+# shellcheck source=/dev/null
+. "$CONFIG_FILE"
+
+for required in BACKUP_DESTINATION R2_REMOTE R2_BUCKET; do
+  [[ -n "${!required:-}" ]] || { printf '%s is unset in %s\n' "$required" "$CONFIG_FILE" >&2; exit 1; }
+done
+
+REMOTE_DAILY="${R2_REMOTE}:${R2_BUCKET}/${BACKUP_DESTINATION}/daily"
+
+if listing="$(rclone lsjson --recursive --files-only "$REMOTE_DAILY" 2>&1)"; then
+  newest_modtime="$(jq -r 'map(.ModTime) | max // ""' <<< "$listing")"
+else
+  newest_modtime=""
+  note_problem "cannot list ${REMOTE_DAILY}: ${listing}"
+fi
+
+if [[ -z "$newest_modtime" ]]; then
+  note_problem "no backup objects found under ${REMOTE_DAILY}"
+else
+  age_hours=$(( ( $(date -u +%s) - $(date -u -d "$newest_modtime" +%s) ) / 3600 ))
+  if (( age_hours > MAX_AGE_HOURS )); then
+    note_problem "newest object under ${REMOTE_DAILY} is ${age_hours}h old (limit ${MAX_AGE_HOURS}h)"
+  else
+    printf 'newest backup object is %sh old\n' "$age_hours"
+  fi
+fi
+
+systemctl is-enabled --quiet syndicate-backup.timer \
+  || note_problem "syndicate-backup.timer is not enabled"
+
+if systemctl is-failed --quiet syndicate-backup.service; then
+  note_problem "syndicate-backup.service is in a failed state"
+fi
+
+# An unpopulated alert credential is silent by construction: the OnFailure unit
+# would fail with nothing to send it through. This is the only scheduled thing
+# that looks at it.
+if [[ -r "$ALERT_FILE" ]] && grep -Eq '^RESEND_API_KEY=re_[A-Za-z0-9_-]+$' "$ALERT_FILE"; then
+  :
+else
+  note_problem "${ALERT_FILE} holds no usable RESEND_API_KEY — failure alerts cannot send"
+fi
+
+if (( ${#problems[@]} > 0 )); then
+  printf 'syndicate-backup-verify: %s problem(s) found\n' "${#problems[@]}" >&2
+  exit 1
+fi
+
+echo "syndicate-backup-verify: ok"

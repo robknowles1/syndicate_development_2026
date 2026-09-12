@@ -1,0 +1,47 @@
+Syndicate Development backup system — SPEC-017 Phase 2
+======================================================
+
+Source of truth: deploy/backup/ in the application repository. Everything in
+/usr/local/bin and /etc/systemd/system here is installed by deploy/backup/install.sh.
+Edit the repo, re-run the installer; do not hand-edit the installed copies.
+
+Full documentation: docs/deployment/ovh-server-access.md, "Backups" section.
+
+Files
+-----
+  /usr/local/bin/syndicate-backup          nightly dump + archive + upload
+  /usr/local/bin/syndicate-backup-verify   weekly "is this still running" check
+  /usr/local/bin/syndicate-backup-alert    OnFailure= handler, emails via Resend
+  /usr/local/bin/syndicate-backup-drill    restore rehearsal into a scratch database
+  /etc/syndicate-backup/backup.env         which tier is backed up (no credentials)
+  /etc/syndicate-backup/alert.env          Resend key + from/to addresses
+  /etc/syndicate-backup/rclone.conf        R2 token, installed by hand
+
+Everyday commands
+-----------------
+  systemctl list-timers 'syndicate-backup*'
+  journalctl -u syndicate-backup.service -n 50
+  systemctl start syndicate-backup.service        # run one now
+  syndicate-backup-drill                          # rehearse a restore
+
+Installing rclone.conf by hand
+------------------------------
+The R2 token is never committed and never placed in a Docker volume. Create it in
+the Cloudflare dashboard scoped to Object Read & Write on the syndicate-backups
+bucket only, then:
+
+  sudo install -d -m 0700 /etc/syndicate-backup
+  sudo install -m 0600 -o root -g root /dev/stdin /etc/syndicate-backup/rclone.conf <<'EOF'
+  [r2]
+  type = s3
+  provider = Cloudflare
+  access_key_id = <access key id>
+  secret_access_key = <secret access key>
+  endpoint = https://<account id>.r2.cloudflarestorage.com
+  region = auto
+  acl = private
+  no_check_bucket = true
+  EOF
+
+no_check_bucket is required, not optional: a bucket-scoped token cannot HeadBucket,
+and rclone's default pre-flight check would fail every upload with AccessDenied.

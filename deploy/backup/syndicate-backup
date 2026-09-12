@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+#
+# Nightly database dump + Active Storage archive, uploaded to Cloudflare R2.
+# SPEC-017 R10-R16. Runbook: docs/deployment/ovh-server-access.md#backups.
+set -euo pipefail
+
+CONFIG_FILE="${BACKUP_CONFIG:-/etc/syndicate-backup/backup.env}"
+export RCLONE_CONFIG="${RCLONE_CONFIG:-/etc/syndicate-backup/rclone.conf}"
+
+die() {
+  printf 'syndicate-backup: %s\n' "$*" >&2
+  exit 1
+}
+
+[[ -r "$CONFIG_FILE" ]] || die "config not readable: $CONFIG_FILE"
+# shellcheck source=/dev/null
+. "$CONFIG_FILE"
+
+for required in BACKUP_DESTINATION PG_CONTAINER PG_DATABASE PG_USER STORAGE_VOLUME \
+                WEB_CONTAINER_PREFIX ARCHIVE_IMAGE R2_REMOTE R2_BUCKET \
+                DAILY_RETENTION_DAYS MONTHLY_RETENTION_DAYS; do
+  [[ -n "${!required:-}" ]] || die "$required is unset in $CONFIG_FILE"
+done
+
+if ! [[ "$DAILY_RETENTION_DAYS" =~ ^[0-9]+$ ]] || (( DAILY_RETENTION_DAYS < 7 )); then
+  die "DAILY_RETENTION_DAYS must be an integer >= 7"
+fi
+if ! [[ "$MONTHLY_RETENTION_DAYS" =~ ^[0-9]+$ ]] || (( MONTHLY_RETENTION_DAYS < 90 )); then
+  die "MONTHLY_RETENTION_DAYS must be an integer >= 90"
+fi
+
+STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+DAY="$(date -u +%F)"
+MONTH="$(date -u +%Y-%m)"
+DAY_OF_MONTH="$(date -u +%d)"
+
+REMOTE_ROOT="${R2_REMOTE}:${R2_BUCKET}/${BACKUP_DESTINATION}"
+REMOTE_DAILY="${REMOTE_ROOT}/daily"
+REMOTE_MONTHLY="${REMOTE_ROOT}/monthly"
+
+WORKDIR="$(mktemp -d /var/tmp/syndicate-backup.XXXXXXXX)"
+trap 'rm -rf "$WORKDIR"' EXIT
+chmod 700 "$WORKDIR"
+
+psql_query() {
+  docker exec "$PG_CONTAINER" sh -c \
+    'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -h 127.0.0.1 -U "$1" -d "$2" -At -c "$3"' \
+    syndicate-backup "$PG_USER" "$PG_DATABASE" "$1"
+}
+
+running_container_id() {
+  docker ps --quiet --filter "name=^/${1}" --filter status=running | head -n 1
+}
+
+[[ -n "$(running_container_id "$PG_CONTAINER")" ]] \
+  || die "postgres container '$PG_CONTAINER' is not running"
+
+echo "==> dumping ${PG_DATABASE} from ${PG_CONTAINER}"
+docker exec "$PG_CONTAINER" sh -c \
+  'PGPASSWORD="$POSTGRES_PASSWORD" exec pg_dump -h 127.0.0.1 -U "$1" -d "$2" -Fc' \
+  syndicate-backup "$PG_USER" "$PG_DATABASE" > "${WORKDIR}/db.dump"
+
+DUMP_BYTES="$(stat -c %s "${WORKDIR}/db.dump")"
+(( DUMP_BYTES > 1024 )) || die "db.dump is ${DUMP_BYTES} bytes — refusing to upload it"
+docker exec -i "$PG_CONTAINER" pg_restore --list < "${WORKDIR}/db.dump" > /dev/null \
+  || die "db.dump is not a readable pg_restore archive"
+
+echo "==> reading row counts and blob keys"
+UNION_SQL="$(psql_query "SELECT string_agg(format('SELECT %L::text AS table_name, count(*)::bigint AS row_count FROM %I', tablename, tablename), ' UNION ALL ' ORDER BY tablename) FROM pg_tables WHERE schemaname = 'public'")"
+[[ -n "$UNION_SQL" ]] || die "found no tables in the public schema of ${PG_DATABASE}"
+ROW_COUNTS_JSON="$(psql_query "SELECT jsonb_object_agg(table_name, row_count) FROM (${UNION_SQL}) counts")"
+psql_query "SELECT key FROM active_storage_blobs ORDER BY key" | sort -u > "${WORKDIR}/blob-keys.txt"
+BLOB_COUNT="$(wc -l < "${WORKDIR}/blob-keys.txt" | tr -d ' ')"
+
+# The `:ro` mount is what keeps a mistyped archive path from writing into the
+# live Active Storage volume. Do not drop it to "simplify" the invocation.
+echo "==> archiving volume ${STORAGE_VOLUME}"
+docker run --rm \
+  -v "${STORAGE_VOLUME}:/data:ro" \
+  -v "${WORKDIR}:/out" \
+  "$ARCHIVE_IMAGE" tar czf /out/storage.tar.gz -C /data .
+
+tar tzf "${WORKDIR}/storage.tar.gz" \
+  | awk -F/ '$NF != "" { print $NF }' | sort -u > "${WORKDIR}/archive-keys.txt"
+ARCHIVE_FILE_COUNT="$(wc -l < "${WORKDIR}/archive-keys.txt" | tr -d ' ')"
+
+MISSING_KEYS="$(comm -23 "${WORKDIR}/blob-keys.txt" "${WORKDIR}/archive-keys.txt")"
+MISSING_COUNT="$(printf '%s' "$MISSING_KEYS" | grep -c . || true)"
+if (( MISSING_COUNT > 0 )); then
+  printf 'syndicate-backup: %s blob rows have no file in the archive:\n%s\n' \
+    "$MISSING_COUNT" "$MISSING_KEYS" >&2
+  die "refusing to upload a backup that would restore broken images"
+fi
+
+APP_IMAGE="$(docker ps --filter "name=^/${WEB_CONTAINER_PREFIX}" --filter status=running \
+  --format '{{.Image}}' | head -n 1)"
+PG_DUMP_VERSION="$(docker exec "$PG_CONTAINER" pg_dump --version | awk '{ print $3 }')"
+
+echo "==> writing MANIFEST"
+jq -n \
+  --arg destination "$BACKUP_DESTINATION" \
+  --arg started_at "$STARTED_AT" \
+  --arg completed_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg day "$DAY" \
+  --arg database "$PG_DATABASE" \
+  --arg storage_volume "$STORAGE_VOLUME" \
+  --arg app_image "${APP_IMAGE:-none-running}" \
+  --arg pg_dump_version "$PG_DUMP_VERSION" \
+  --arg db_sha256 "$(sha256sum "${WORKDIR}/db.dump" | awk '{ print $1 }')" \
+  --arg storage_sha256 "$(sha256sum "${WORKDIR}/storage.tar.gz" | awk '{ print $1 }')" \
+  --argjson db_bytes "$DUMP_BYTES" \
+  --argjson storage_bytes "$(stat -c %s "${WORKDIR}/storage.tar.gz")" \
+  --argjson row_counts "$ROW_COUNTS_JSON" \
+  --argjson active_storage_blobs "$BLOB_COUNT" \
+  --argjson archive_file_count "$ARCHIVE_FILE_COUNT" \
+  '{
+     destination: $destination,
+     day: $day,
+     started_at_utc: $started_at,
+     completed_at_utc: $completed_at,
+     database: $database,
+     storage_volume: $storage_volume,
+     app_image: $app_image,
+     pg_dump_version: $pg_dump_version,
+     row_counts: $row_counts,
+     active_storage_blobs: $active_storage_blobs,
+     archive_file_count: $archive_file_count,
+     blobs_missing_files: 0,
+     artifacts: {
+       "db.dump":        { bytes: $db_bytes,      sha256: $db_sha256 },
+       "storage.tar.gz": { bytes: $storage_bytes, sha256: $storage_sha256 }
+     }
+   }' > "${WORKDIR}/MANIFEST"
+
+rm -f "${WORKDIR}/blob-keys.txt" "${WORKDIR}/archive-keys.txt"
+
+echo "==> uploading to ${REMOTE_DAILY}/${DAY}"
+rclone copy --checksum "$WORKDIR" "${REMOTE_DAILY}/${DAY}"
+
+UPLOADED="$(rclone lsjson "${REMOTE_DAILY}/${DAY}" | jq -r '.[] | "\(.Name) \(.Size)"' | sort)"
+for artifact in db.dump storage.tar.gz MANIFEST; do
+  expected="$artifact $(stat -c %s "${WORKDIR}/${artifact}")"
+  grep -Fxq "$expected" <<< "$UPLOADED" \
+    || die "R2 does not hold '${expected}' after upload — got: ${UPLOADED//$'\n'/, }"
+done
+
+if [[ "$DAY_OF_MONTH" == "01" ]]; then
+  echo "==> promoting to ${REMOTE_MONTHLY}/${MONTH}"
+  rclone copy --checksum "$WORKDIR" "${REMOTE_MONTHLY}/${MONTH}"
+fi
+
+echo "==> pruning daily older than ${DAILY_RETENTION_DAYS}d, monthly older than ${MONTHLY_RETENTION_DAYS}d"
+rclone delete --min-age "${DAILY_RETENTION_DAYS}d" "$REMOTE_DAILY"
+rclone delete --min-age "${MONTHLY_RETENTION_DAYS}d" "$REMOTE_MONTHLY"
+
+echo "==> done: ${BACKUP_DESTINATION} ${DAY}, ${BLOB_COUNT} blobs, ${ARCHIVE_FILE_COUNT} files archived"

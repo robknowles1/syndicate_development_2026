@@ -16,7 +16,7 @@ prerequisite for that job, or what to do by hand when it is not the right tool.
   [Secrets](#secrets) · [Deploying](#deploying)
 - [The database accessory](#the-database-accessory) ·
   [The Solid Queue supervisor](#the-solid-queue-supervisor) ·
-  [Recovery](#recovery)
+  [Backups](#backups) · [Recovery](#recovery)
 
 ---
 
@@ -471,6 +471,148 @@ and gallery uploads are a routine admin action rather than a rare one.
 When that stops being acceptable: add a `job:` role under `servers:` with
 `cmd: bin/jobs`, tag the job host `solid_queue`, and drop the tag from web. Moving one
 tag is the whole change.
+
+---
+
+## Backups
+
+SPEC-017 Phase 2. Source of truth is [`deploy/backup/`](../../deploy/backup) in this
+repository; everything on the box is installed from it by `deploy/backup/install.sh`.
+**Edit the repo and re-run the installer — do not hand-edit the installed copies**, they
+are overwritten without warning on the next install.
+
+### What runs, and when
+
+| Unit | Schedule | Does |
+|---|---|---|
+| `syndicate-backup.timer` → `.service` | `*-*-* 09:17 UTC`, `Persistent=true`, ±5 min jitter | Dumps the primary database, archives the Active Storage volume, uploads both plus a `MANIFEST` to R2, prunes old artifacts |
+| `syndicate-backup-verify.timer` → `.service` | Mondays `10:07 UTC`, `Persistent=true`, ±10 min jitter | Fails if the newest `daily/` object is over 48 h old, if the nightly timer is disabled or failed, or if the alert credential is unpopulated |
+| `syndicate-backup-alert@.service` | `OnFailure=` of both units above | Emails the failing unit name and its last 40 journal lines via Resend |
+
+The two timers cover **different** failures and neither substitutes for the other.
+`OnFailure=` only fires when the job runs and fails. The classic disaster is the job not
+running at all — a timer disabled by an upgrade, a unit file lost, a `systemctl enable`
+never issued — and nothing but the weekly verifier detects that. A box that is entirely
+dead is still uncovered; that gap wants a third-party dead-man's switch and is tracked in
+SPEC-017's Open Questions.
+
+```bash
+systemctl list-timers 'syndicate-backup*'
+journalctl -u syndicate-backup.service -n 50
+sudo systemctl start syndicate-backup.service    # run one now
+sudo syndicate-backup-drill                      # rehearse a restore
+```
+
+### On-box layout
+
+| Path | Owner / mode | Holds |
+|---|---|---|
+| `/usr/local/bin/syndicate-backup{,-verify,-alert,-drill}` | root, 0700 | The four scripts |
+| `/usr/local/bin/rclone` | root, 0755 | Pinned v1.75.1, SHA-256-verified by the installer, not apt-managed |
+| `/etc/syndicate-backup/backup.env` | root, 0600 | Which tier is backed up. **No credentials.** |
+| `/etc/syndicate-backup/rclone.conf` | root, 0600 | The R2 token. Installed by hand, never committed |
+| `/etc/syndicate-backup/alert.env` | root, 0600 | Resend key and the from/to addresses |
+| `/etc/syndicate-backup/README` | root, 0644 | Pointer back here, plus the `rclone.conf` recipe |
+
+No database password is stored anywhere in the above. The backup reads
+`POSTGRES_PASSWORD` out of the running Postgres container's own environment, so there is
+no second copy to leak and none to go stale when it is rotated.
+
+### R2
+
+Bucket `syndicate-backups`, one prefix per tier:
+
+```
+<destination>/daily/YYYY-MM-DD/{db.dump,storage.tar.gz,MANIFEST}
+<destination>/monthly/YYYY-MM/{db.dump,storage.tar.gz,MANIFEST}     # taken on the 1st
+```
+
+Dailies are kept 30 days, monthlies 400, by `rclone delete --min-age` inside the script —
+no bucket lifecycle rule is involved, so the retention policy is in the same file as the
+upload and is reviewed with it.
+
+SPEC-017's Interfaces section writes the layout as `daily/…` with no tier prefix, because
+it was written when only production would ever be backed up. The prefix exists so that
+repointing the job at production does not overwrite staging's artifacts and so the weekly
+verifier can tell which tier went stale.
+
+The R2 API token is scoped to **Object Read & Write on `syndicate-backups` only** —
+verified 2026-09-11 by confirming that `ListBuckets` returns `AccessDenied`. It can delete,
+which the `--min-age` retention needs. `no_check_bucket = true` in `rclone.conf` is
+required *because* of that scoping: rclone's default pre-flight `HeadBucket` fails with a
+bucket-scoped token and would fail every upload.
+
+### Pointing it at production
+
+Phase 5 is a configuration change, not a rewrite. Edit
+`/etc/syndicate-backup/backup.env` and uncomment the production block already in it:
+
+| Key | Staging | Production |
+|---|---|---|
+| `BACKUP_DESTINATION` | `staging` | `production` |
+| `PG_CONTAINER` | `syndicate_development_2026-db-staging` | `syndicate_development_2026-db` |
+| `PG_DATABASE` | `syndicate_development_2026_staging` | `syndicate_development_2026_production` |
+| `STORAGE_VOLUME` | `syndicate_development_2026_staging_storage` | `syndicate_development_2026_storage` |
+| `WEB_CONTAINER_PREFIX` | `syndicate_development_2026-web-staging` | `syndicate_development_2026-web` |
+
+Then run one backup by hand and one drill before relying on it. The scripts, units and
+timers do not change.
+
+### Consistency guarantee — what this backup does and does not promise
+
+State it honestly, because the failure it does not cover is invisible in a row count.
+
+**Does promise.** `db.dump` is internally consistent: `pg_dump` reads in a single
+repeatable-read snapshot. Every blob row in the dump had its file present in the archive —
+the script checks that before uploading and **fails the run rather than uploading a backup
+that would restore broken images**.
+
+**Does not promise.** The database dump and the file archive are not one atomic snapshot;
+they are taken seconds apart. The ordering (dump first, archive second) makes the common
+race fail safely: an upload landing between them leaves a file with no row, which is a
+harmless orphan. The opposite ordering would leave a row with no file, which renders a
+broken image on a live page and passes every row-count check. A *deletion* landing in that
+window still fails the unsafe way — the dump holds the row, the archive no longer holds the
+file — and the pre-upload check is what catches it, at the cost of failing that night's
+run. At 09:17 UTC (03:17 in Pocatello) the window is effectively never occupied.
+
+`MANIFEST`'s row counts are read immediately after the dump rather than from inside its
+snapshot, so a write in that same window shows up as a drill mismatch rather than as silent
+drift. That is the intended direction: a loud drill failure, not a quiet bad restore.
+
+### Restore drills
+
+Recorded in [`backup-restore-drills.md`](backup-restore-drills.md), append-only. The first
+passing drill gates SPEC-017 Phase 6; quarterly thereafter, and again after any change to
+`deploy/backup/`. `syndicate-backup-drill` restores into `restore_drill_YYYYMMDD` inside
+the existing accessory and drops it on exit.
+
+The check that matters is not the row counts — it is that every restored
+`active_storage_blobs` row has a file at the Disk service's path for its key. A database
+restored without its files passes every row count and renders broken images on every page.
+
+### Finishing the alert channel
+
+`/etc/syndicate-backup/alert.env` ships with `RESEND_API_KEY=REPLACE_ME`. Until it is
+populated the `OnFailure=` handler fires, fails, and emails nobody — deliberately loud in
+`systemctl --failed`, but not loud in an inbox. **This is the one manual step between the
+backup system being installed and being trustworthy.**
+
+Use the same Resend key Kamal already injects into the app container. It is copied here
+because systemd runs on the host, outside that container.
+
+```bash
+sudo install -m 600 -o root -g root /dev/stdin /etc/syndicate-backup/alert.env <<'EOF'
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
+ALERT_FROM_ADDRESS="Syndicate Backups <noreply@mail.syndicate-development.com>"
+ALERT_TO_ADDRESS=robknowles105@gmail.com
+EOF
+sudo systemctl start syndicate-backup-verify.service   # should now pass
+```
+
+`ALERT_FROM_ADDRESS` is a variable and not derived from `config/mail_settings.rb` on
+purpose: SPEC-017 Phase 4 retires `mail.syndicate-development.com`, and alerting must
+follow by editing one line rather than by a deploy.
 
 ---
 
