@@ -41,7 +41,7 @@ Rails.application.configure do
   # Same delivery path as production, so an SMTP or DNS problem surfaces here first.
   config.action_mailer.raise_delivery_errors = true
   config.action_mailer.default_url_options = {
-    host: ENV.fetch("APP_HOST", "staging.syndicate-development.com"),
+    host: ENV.fetch("APP_HOST", "staging.syndicatedevelopment.com"),
     protocol: "https"
   }
   config.x.mail.resend_api_key = MailSettings.resend_api_key(override: ENV["RESEND_API_KEY"]) do
@@ -61,6 +61,12 @@ Rails.application.configure do
 
   # Staging is not for the public. Without this any hostname pointed at the server
   # would serve the site, including one that indexes it.
-  config.hosts << ENV.fetch("APP_HOST", "staging.syndicate-development.com")
+  config.hosts << ENV.fetch("APP_HOST", "staging.syndicatedevelopment.com")
+
+  # Pairs with the second name in config/deploy.staging.yml's proxy.host: kamal-proxy
+  # routes that name here, and without this line Rails answers it with a 403. The two
+  # go together, at SPEC-017 R32 — dropping either alone is what breaks staging.
+  config.hosts << "staging.syndicate-development.com"
+
   config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 end

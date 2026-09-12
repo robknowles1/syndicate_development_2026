@@ -107,7 +107,7 @@ Rails.application.configure do
   # Set host to be used by links generated in mailer templates. Must be the real host —
   # password reset and invitation links are built from it.
   config.action_mailer.default_url_options = {
-    host: ENV.fetch("APP_HOST", "www.syndicate-development.com"),
+    host: ENV.fetch("APP_HOST", "syndicatedevelopment.com"),
     protocol: "https"
   }
 
@@ -134,12 +134,12 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
-  # A Host header not listed here is rejected with 403, so every name that can
-  # reach the app must appear. The apex is listed alongside APP_HOST because
-  # either name may be pointed at this server; APP_HOST additionally sets the
-  # canonical host used for mailer links.
-  config.hosts << ENV.fetch("APP_HOST", "www.syndicate-development.com")
-  config.hosts << "syndicate-development.com"
+  # Exactly one name reaches Rails; the retiring domain's 301 is answered by
+  # Cloudflare and never arrives here. Moving that redirect into Rails middleware
+  # needs the old name added back to this list FIRST — host authorization runs
+  # before routing, so the redirect would 403 on the domain carrying the search
+  # ranking rather than ever running.
+  config.hosts << ENV.fetch("APP_HOST", "syndicatedevelopment.com")
 
   # Skip DNS rebinding protection for the default health check endpoint.
   config.host_authorization = { exclude: ->(request) { request.path == "/up" } }

@@ -17,7 +17,7 @@ servers:
 # X-Forwarded-* under `ssl: true` lets a client spoof them.
 proxy:
   ssl: true
-  host: www.syndicate-development.com
+  host: syndicatedevelopment.com
 
 registry:
   server: ghcr.io
@@ -36,7 +36,7 @@ env:
   # it. SOLID_QUEUE_IN_PUMA is absent for that reason and must stay absent — it
   # is scoped to the production host by the tag below.
   clear:
-    APP_HOST: www.syndicate-development.com
+    APP_HOST: syndicatedevelopment.com
 
     RAILS_LOG_LEVEL: info
 
