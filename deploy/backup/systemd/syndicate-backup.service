@@ -1,0 +1,12 @@
+[Unit]
+Description=Syndicate Development nightly backup to Cloudflare R2
+Documentation=file:///etc/syndicate-backup/README
+Requires=docker.service
+After=docker.service network-online.target
+OnFailure=syndicate-backup-alert@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/syndicate-backup
+Nice=10
+TimeoutStartSec=3600

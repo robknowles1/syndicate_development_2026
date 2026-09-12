@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+#
+# Restore rehearsal: pulls a night's artifacts back out of R2, restores them into
+# a dated throwaway database, and checks them against that night's MANIFEST.
+# SPEC-017 R19. Record the output per R20 in docs/deployment/backup-restore-drills.md.
+#
+# Usage: syndicate-backup-drill [YYYY-MM-DD]   (default: the newest daily prefix)
+set -euo pipefail
+
+CONFIG_FILE="${BACKUP_CONFIG:-/etc/syndicate-backup/backup.env}"
+export RCLONE_CONFIG="${RCLONE_CONFIG:-/etc/syndicate-backup/rclone.conf}"
+
+die() {
+  printf 'syndicate-backup-drill: %s\n' "$*" >&2
+  exit 1
+}
+
+[[ -r "$CONFIG_FILE" ]] || die "config not readable: $CONFIG_FILE"
+# shellcheck source=/dev/null
+. "$CONFIG_FILE"
+
+for required in BACKUP_DESTINATION PG_CONTAINER PG_DATABASE PG_USER R2_REMOTE R2_BUCKET; do
+  [[ -n "${!required:-}" ]] || die "$required is unset in $CONFIG_FILE"
+done
+
+REMOTE_DAILY="${R2_REMOTE}:${R2_BUCKET}/${BACKUP_DESTINATION}/daily"
+
+DAY="${1:-$(rclone lsf --dirs-only "$REMOTE_DAILY" | tr -d '/' | sort | tail -n 1)}"
+[[ "$DAY" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die "no usable daily prefix (got '${DAY}')"
+
+SCRATCH_DB="restore_drill_$(tr -d '-' <<< "$DAY")"
+# The dated name is the guard. `pg_restore -d syndicate_development_2026_production`
+# is one careless edit away and it destroys the live database.
+[[ "$SCRATCH_DB" =~ ^restore_drill_[0-9]{8}$ ]] || die "refusing scratch name '${SCRATCH_DB}'"
+[[ "$SCRATCH_DB" != "$PG_DATABASE" ]] || die "scratch name collides with the live database"
+
+SCRATCH_DIR="$(mktemp -d /var/tmp/syndicate-drill.XXXXXXXX)"
+chmod 700 "$SCRATCH_DIR"
+
+IN_CONTAINER_DUMP="/tmp/${SCRATCH_DB}.dump"
+
+cleanup() {
+  docker exec "$PG_CONTAINER" rm -f "$IN_CONTAINER_DUMP" 2>/dev/null || true
+  docker exec "$PG_CONTAINER" sh -c \
+    'PGPASSWORD="$POSTGRES_PASSWORD" exec dropdb --if-exists -h 127.0.0.1 -U "$1" "$2"' \
+    syndicate-backup-drill "$PG_USER" "$SCRATCH_DB" 2>/dev/null || true
+  rm -rf "$SCRATCH_DIR"
+}
+trap cleanup EXIT
+
+scratch_query() {
+  docker exec "$PG_CONTAINER" sh -c \
+    'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -h 127.0.0.1 -U "$1" -d "$2" -At -c "$3"' \
+    syndicate-backup-drill "$PG_USER" "$SCRATCH_DB" "$1"
+}
+
+echo "==> drill target: ${REMOTE_DAILY}/${DAY} -> ${SCRATCH_DB}"
+rclone copy "${REMOTE_DAILY}/${DAY}" "$SCRATCH_DIR"
+
+for artifact in db.dump storage.tar.gz MANIFEST; do
+  [[ -s "${SCRATCH_DIR}/${artifact}" ]] || die "${artifact} did not come back from R2"
+done
+
+echo "==> checking artifact checksums against MANIFEST"
+for artifact in db.dump storage.tar.gz; do
+  expected="$(jq -r --arg a "$artifact" '.artifacts[$a].sha256' "${SCRATCH_DIR}/MANIFEST")"
+  actual="$(sha256sum "${SCRATCH_DIR}/${artifact}" | awk '{ print $1 }')"
+  [[ "$expected" == "$actual" ]] || die "${artifact} checksum mismatch: manifest ${expected}, downloaded ${actual}"
+done
+
+echo "==> creating ${SCRATCH_DB}"
+docker exec "$PG_CONTAINER" sh -c \
+  'PGPASSWORD="$POSTGRES_PASSWORD" exec createdb -h 127.0.0.1 -U "$1" "$2"' \
+  syndicate-backup-drill "$PG_USER" "$SCRATCH_DB"
+
+echo "==> pg_restore"
+docker cp "${SCRATCH_DIR}/db.dump" "${PG_CONTAINER}:${IN_CONTAINER_DUMP}"
+restore_status=0
+docker exec "$PG_CONTAINER" sh -c \
+  'PGPASSWORD="$POSTGRES_PASSWORD" exec pg_restore -h 127.0.0.1 -U "$1" -d "$2" --no-owner --exit-on-error "$3"' \
+  syndicate-backup-drill "$PG_USER" "$SCRATCH_DB" "$IN_CONTAINER_DUMP" || restore_status=$?
+[[ "$restore_status" -eq 0 ]] || die "pg_restore exited ${restore_status}"
+
+echo "==> comparing row counts against MANIFEST"
+UNION_SQL="$(scratch_query "SELECT string_agg(format('SELECT %L::text AS table_name, count(*)::bigint AS row_count FROM %I', tablename, tablename), ' UNION ALL ' ORDER BY tablename) FROM pg_tables WHERE schemaname = 'public'")"
+RESTORED_COUNTS="$(scratch_query "SELECT jsonb_object_agg(table_name, row_count) FROM (${UNION_SQL}) counts")"
+
+COUNT_DIFF="$(jq -n \
+  --argjson expected "$(jq -c '.row_counts' "${SCRATCH_DIR}/MANIFEST")" \
+  --argjson actual "$RESTORED_COUNTS" \
+  '[ ($expected | keys_unsorted[]) as $t
+     | select($expected[$t] != ($actual[$t] // null))
+     | { table: $t, manifest: $expected[$t], restored: ($actual[$t] // null) } ]')"
+
+TABLES_CHECKED="$(jq -r '.row_counts | length' "${SCRATCH_DIR}/MANIFEST")"
+COUNT_MISMATCHES="$(jq -r 'length' <<< "$COUNT_DIFF")"
+
+echo "==> untarring storage archive"
+mkdir -p "${SCRATCH_DIR}/storage"
+tar xzf "${SCRATCH_DIR}/storage.tar.gz" -C "${SCRATCH_DIR}/storage"
+
+echo "==> checking every restored blob has its file"
+blobs_checked=0
+blobs_missing=0
+missing_keys=""
+while IFS= read -r key; do
+  [[ -n "$key" ]] || continue
+  blobs_checked=$(( blobs_checked + 1 ))
+  if [[ ! -f "${SCRATCH_DIR}/storage/${key:0:2}/${key:2:2}/${key}" ]]; then
+    blobs_missing=$(( blobs_missing + 1 ))
+    missing_keys+="${key}"$'\n'
+  fi
+done < <(scratch_query "SELECT key FROM active_storage_blobs ORDER BY key")
+
+cat <<REPORT
+
+--- drill report ---
+destination:        ${BACKUP_DESTINATION}
+artifact prefix:    ${BACKUP_DESTINATION}/daily/${DAY}
+scratch database:   ${SCRATCH_DB}
+manifest taken at:  $(jq -r '.started_at_utc' "${SCRATCH_DIR}/MANIFEST")
+app image:          $(jq -r '.app_image' "${SCRATCH_DIR}/MANIFEST")
+checksums:          db.dump and storage.tar.gz match MANIFEST
+pg_restore exit:    ${restore_status}
+row counts:         ${TABLES_CHECKED} tables compared, ${COUNT_MISMATCHES} mismatched
+mismatches:         $(jq -c '.' <<< "$COUNT_DIFF")
+blob files:         ${blobs_checked} checked, ${blobs_missing} missing
+missing keys:       ${missing_keys:-(none)}
+--- end drill report ---
+
+REPORT
+
+(( COUNT_MISMATCHES == 0 )) || die "row counts diverged from MANIFEST"
+(( blobs_missing == 0 )) || die "${blobs_missing} restored blob rows have no file"
+(( blobs_checked > 0 )) || die "the restored database contains no blobs — check the dump"
+
+echo "syndicate-backup-drill: PASS"

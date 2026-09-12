@@ -1,0 +1,8 @@
+[Unit]
+Description=Send a failure alert for %i
+Documentation=file:///etc/syndicate-backup/README
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/syndicate-backup-alert %i
+TimeoutStartSec=120

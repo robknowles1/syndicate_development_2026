@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#
+# OnFailure= handler: emails the failing unit name and its last journal lines.
+# SPEC-017 R17. Runbook: docs/deployment/ovh-server-access.md#backups.
+set -euo pipefail
+
+ALERT_FILE="${ALERT_ENV:-/etc/syndicate-backup/alert.env}"
+FAILED_UNIT="${1:?usage: syndicate-backup-alert <failed-unit-name>}"
+JOURNAL_LINES="${JOURNAL_LINES:-40}"
+
+die() {
+  printf 'syndicate-backup-alert: %s\n' "$*" >&2
+  exit 1
+}
+
+[[ -r "$ALERT_FILE" ]] || die "alert credential file is missing: ${ALERT_FILE}"
+# shellcheck source=/dev/null
+. "$ALERT_FILE"
+
+[[ "${RESEND_API_KEY:-}" =~ ^re_[A-Za-z0-9_-]+$ ]] \
+  || die "${ALERT_FILE} holds no usable RESEND_API_KEY — populate it, see the runbook"
+[[ -n "${ALERT_FROM_ADDRESS:-}" ]] || die "ALERT_FROM_ADDRESS is unset in ${ALERT_FILE}"
+[[ -n "${ALERT_TO_ADDRESS:-}" ]] || die "ALERT_TO_ADDRESS is unset in ${ALERT_FILE}"
+
+HOST="$(hostname)"
+BODY="$(printf 'Unit %s failed on %s at %s UTC.\n\nLast %s journal lines:\n\n%s\n' \
+  "$FAILED_UNIT" "$HOST" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$JOURNAL_LINES" \
+  "$(journalctl -u "$FAILED_UNIT" -n "$JOURNAL_LINES" --no-pager -o short-iso 2>&1)")"
+
+# The bearer token goes through a 0600 file, not `-H "Authorization: ..."`:
+# an inline header puts the key in the process table for every user on the box.
+HEADER_FILE="$(mktemp)"
+trap 'rm -f "$HEADER_FILE"' EXIT
+chmod 600 "$HEADER_FILE"
+printf 'Authorization: Bearer %s\n' "$RESEND_API_KEY" > "$HEADER_FILE"
+
+response="$(jq -n \
+  --arg from "$ALERT_FROM_ADDRESS" \
+  --arg to "$ALERT_TO_ADDRESS" \
+  --arg subject "[syndicate-backup] FAILED: ${FAILED_UNIT} on ${HOST}" \
+  --arg text "$BODY" \
+  '{ from: $from, to: [$to], subject: $subject, text: $text }' \
+  | curl -fsS -X POST https://api.resend.com/emails \
+      -H "@${HEADER_FILE}" \
+      -H "Content-Type: application/json" \
+      --data @-)" || die "Resend rejected the alert for ${FAILED_UNIT}"
+
+printf 'syndicate-backup-alert: sent for %s (resend id %s)\n' \
+  "$FAILED_UNIT" "$(jq -r '.id // "unknown"' <<< "$response")"
