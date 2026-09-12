@@ -21,6 +21,7 @@ This directory contains feature specs produced by the PM agent following the spe
 | SPEC-013 | Home Page Hero and CTA Image Uploads — Admin-Replaceable Background Images | ready | medium | [SPEC-013-home-hero-cta-image-uploads.md](SPEC-013-home-hero-cta-image-uploads.md) |
 | SPEC-014 | Social Media Links — Admin-Managed Profile Icons | ready | medium | [SPEC-014-social-media-links.md](SPEC-014-social-media-links.md) |
 | SPEC-016 | Client-Side Upload Guards for Admin Image Inputs | ready | medium | [SPEC-016-client-side-upload-guards.md](SPEC-016-client-side-upload-guards.md) (builds on SPEC-013's `MAX_IMAGE_SIZE` and `padded_jpeg_upload` test helper) |
+| SPEC-017 | Production Deployment, Domain Migration and Backups | ready | high | [SPEC-017-production-deployment-domain-migration-backups.md](SPEC-017-production-deployment-domain-migration-backups.md) (runbook: 7 sequenced phases executed against the live OVH box; cross-references [`docs/deployment/ovh-server-access.md`](../deployment/ovh-server-access.md)) |
 
 *(Update this table as specs are added.)*
 
@@ -52,4 +53,5 @@ IDs: `SPEC-001`, `SPEC-002`, ... (sequential, never reused)
 
 | Date | Change | Affected IDs | Rationale |
 |------|--------|-------------|-----------|
+| 2026-09-11 | Added the SPEC-017 index row (Production Deployment, Domain Migration and Backups). Note the numbering gap: SPEC-015 was never allocated, and IDs are never reused. | SPEC-017 (Index) | New spec. |
 | 2026-09-11 | Corrected the SPEC-007 and SPEC-012 index rows, which claimed open, unmerged PRs/branches. SPEC-007 merged via PR #38 on 2026-07-17. SPEC-012 merged via PR #58 (the spec's own docs branch) on 2026-08-05, with implementation landing across PR #61-#64 by 2026-08-06. Also updated the SPEC-009 row, whose "blocked on SPEC-008 and SPEC-007/PR#38" note was stale on both counts — both blockers landed, and SPEC-009 itself merged via PR #43 on 2026-07-28. | SPEC-007, SPEC-009, SPEC-012 (Index) | These rows were left unedited after the PRs they described merged, so the index told a developer three landed specs were still pending review. Statuses (`ready`/`done`) are intentionally left untouched here — that column is the QA agent's call, not this correction's. |
