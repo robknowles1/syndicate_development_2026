@@ -63,11 +63,11 @@ RSpec.describe MailSettings do
     end
 
     it "defaults when no override is set" do
-      expect(described_class.from_address(override: nil)).to eq("noreply@mail.syndicate-development.com")
+      expect(described_class.from_address(override: nil)).to eq("noreply@mail.syndicatedevelopment.com")
     end
 
     it "defaults when the override is set but empty" do
-      expect(described_class.from_address(override: "")).to eq("noreply@mail.syndicate-development.com")
+      expect(described_class.from_address(override: "")).to eq("noreply@mail.syndicatedevelopment.com")
     end
   end
 

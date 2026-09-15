@@ -3,7 +3,7 @@ module MailSettings
 
   SHOP_RECIPIENT = "haskettd@live.com"
   DEVELOPER_RECIPIENT = "robknowles105@gmail.com"
-  DEFAULT_FROM_ADDRESS = "noreply@mail.syndicate-development.com"
+  DEFAULT_FROM_ADDRESS = "noreply@mail.syndicatedevelopment.com"
   SMTP_ADDRESS = "smtp.resend.com"
   SMTP_PORT = 587
   SMTP_USER_NAME = "resend"

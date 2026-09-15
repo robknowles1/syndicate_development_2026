@@ -115,10 +115,11 @@ zone to Cloudflare.
 | `syndicatedevelopment.com` | Cloudflare (new) | A → `15.204.81.231` | **grey** | Rails production, after Phase 5 |
 | `www.syndicatedevelopment.com` | Cloudflare (new) | A → `192.0.2.1` | orange | 301 → apex |
 | `staging.syndicatedevelopment.com` | Cloudflare (new) | A → `15.204.81.231` | **grey** | Rails staging |
+| `mail.syndicatedevelopment.com` | Cloudflare (new) | SPF/DKIM/MX | n/a | Resend sending domain, from Phase 4 |
 | `syndicate-development.com` | Squarespace/Google (old) | A → `147.182.199.74` | n/a | the old static React site, until cutover |
 | `www.syndicate-development.com` | Squarespace/Google (old) | CNAME → apex | n/a | as above |
 | `staging.syndicate-development.com` | Squarespace/Google (old) | A → `15.204.81.231` | n/a | Rails staging, transitional — dropped at R32 |
-| `mail.syndicate-development.com` | Squarespace/Google (old) | SPF/DKIM/MX | n/a | Resend sending domain |
+| `mail.syndicate-development.com` | Squarespace/Google (old) | SPF/DKIM/MX | n/a | Resend, previous sending domain — **kept verified, do not delete** (SPEC-017 R36) |
 
 **Every record that reaches this box stays grey-clouded — permanently, not just during
 certificate issuance.** Orange-clouding one breaks two things at once: the HTTP-01 challenge
@@ -623,15 +624,23 @@ because systemd runs on the host, outside that container.
 ```bash
 sudo install -m 600 -o root -g root /dev/stdin /etc/syndicate-backup/alert.env <<'EOF'
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
-ALERT_FROM_ADDRESS="Syndicate Backups <noreply@mail.syndicate-development.com>"
+ALERT_FROM_ADDRESS="Syndicate Backups <noreply@mail.syndicatedevelopment.com>"
 ALERT_TO_ADDRESS=robknowles105@gmail.com
 EOF
 sudo systemctl start syndicate-backup-verify.service   # should now pass
 ```
 
 `ALERT_FROM_ADDRESS` is a variable and not derived from `config/mail_settings.rb` on
-purpose: SPEC-017 Phase 4 retires `mail.syndicate-development.com`, and alerting must
-follow by editing one line rather than by a deploy.
+purpose: the app's sending domain moves by deploy, alerting moves by editing one line on
+the box. The two are allowed to lag each other.
+
+A box installed before SPEC-017 Phase 4 still holds the old sending domain, and
+`install.sh` will not overwrite it. Rewrite it in place:
+
+```bash
+sudo sed -i 's/mail\.syndicate-development\.com/mail.syndicatedevelopment.com/' /etc/syndicate-backup/alert.env
+sudo systemctl start syndicate-backup-verify.service
+```
 
 ---
 

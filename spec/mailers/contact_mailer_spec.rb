@@ -24,7 +24,7 @@ RSpec.describe ContactMailer, type: :mailer do
     end
 
     it "sends from the verified no-reply address, not the Rails placeholder" do
-      expect(enquiry_email.from).to eq([ "noreply@mail.syndicate-development.com" ])
+      expect(enquiry_email.from).to eq([ "noreply@mail.syndicatedevelopment.com" ])
     end
 
     it "sets reply-to to the sender's email" do
