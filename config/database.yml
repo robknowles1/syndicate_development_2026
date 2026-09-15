@@ -104,6 +104,13 @@ production:
     database: syndicate_development_2026_production
     username: syndicate_development_2026
     password: <%= ENV["SYNDICATE_DEVELOPMENT_2026_DATABASE_PASSWORD"] %>
+    # Neither this line nor its default is removable. With no host the pg adapter does
+    # not fall back to localhost — it connects over a Unix socket that does not exist
+    # inside the app container, and db:prepare fails with an error naming a path rather
+    # than the missing setting. The default is the accessory's name on the shared `kamal`
+    # network, derived as "<service>-<name>" with no destination suffix, and nothing sets
+    # PRODUCTION_DATABASE_HOST — so the default is the value production actually runs on.
+    host: <%= ENV.fetch("PRODUCTION_DATABASE_HOST", "syndicate_development_2026-db") %>
   # The three databases below are created and loaded by `bin/rails db:prepare` from
   # db/cache_schema.rb, db/queue_schema.rb and db/cable_schema.rb, which Rails resolves
   # by convention from the connection name (<name>_schema.rb).
