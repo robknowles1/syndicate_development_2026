@@ -98,3 +98,84 @@ Row counts, identical in `MANIFEST` and in the restored scratch database:
   `/etc/syndicate-backup/backup.env` at production in Phase 5 is a configuration change,
   not a rewrite — but it is a change, and Phase 6's gate is a drill against *production's*
   artifacts, not this one.
+
+---
+
+## 2026-09-15 — first production drill, PASS
+
+Closes the gate the entry above left open: this is a drill against *production's* own
+artifacts, holding Doug's real content.
+
+| | |
+|---|---|
+| **Operator** | devops-agent, on behalf of robknowles1 |
+| **Tier drilled** | production — live, serving real content |
+| **Artifact prefix** | `r2:syndicate-backups/production/daily/2026-09-15` |
+| **Backup taken** | 2026-09-15T04:51:04Z, completed 04:51:12Z — 12.6 s wall, 118 MB peak RSS, via `systemctl start syndicate-backup.service` |
+| **App image at backup time** | `ghcr.io/robknowles1/syndicate_development_2026:67126023c8a1f35ea22083075ba852a321e46a59` |
+| **`pg_dump` version** | 16.14 (from inside the accessory, matching the server) |
+| **Scratch database** | `restore_drill_20260915`, created in and dropped from `syndicate_development_2026-db` |
+| **Artifact checksums** | `db.dump` (47 823 B) and `storage.tar.gz` (84 584 606 B) downloaded from R2 matched the SHA-256 recorded in `MANIFEST` |
+| **`pg_restore` exit status** | 0 |
+| **Row-count comparison** | 15 tables compared against `MANIFEST`, **0 mismatches** |
+| **Blob-presence check** | 49 blob rows checked, **0 missing files** |
+| **Archive file count** | 50 files for 49 blobs — the extra is `storage/.keep`, as on staging |
+| **Cleanup** | scratch database dropped, `/var/tmp/syndicate-drill.*` removed, in-container dump removed — all verified afterwards |
+| **Box left clean** | no failed systemd units; all five containers (`-web`, `-web-staging`, `-db`, `-db-staging`, `kamal-proxy`) still `Up`; production and staging both answered 200 over HTTPS after the drill |
+| **Production data untouched** | row counts and the 50-file storage volume identical before and after; the drill wrote only to its own scratch database and to `/var/tmp` |
+| **Result** | **PASS** |
+
+Row counts, identical in `MANIFEST` and in the restored scratch database:
+
+| Table | Rows |
+|---|---|
+| `about_page_contents` | 1 |
+| `active_storage_attachments` | 49 |
+| `active_storage_blobs` | 49 |
+| `active_storage_variant_records` | 38 |
+| `admin_users` | 3 |
+| `ar_internal_metadata` | 2 |
+| `business_hours` | 1 |
+| `faqs` | 6 |
+| `gallery_photos` | 9 |
+| `home_page_contents` | 1 |
+| `schema_migrations` | 16 |
+| `service_bullets` | 15 |
+| `service_sections` | 3 |
+| `site_settings` | 1 |
+| `social_media_links` | 2 |
+
+### Things that had to be fixed or clarified
+
+- **The prefix already held artifacts, and they were not drillable.** R44's one-off dump had
+  written `production/daily/2026-09-15/` at 04:28 from a freshly-seeded database: 2 admin
+  users, 0 gallery photos, 0 blobs, and a 123-byte `storage.tar.gz` — an empty tarball. A
+  drill against those would have died at the `blobs_checked > 0` guard having proven nothing
+  about restoring real content. The nightly run re-wrote the same dated prefix with the live
+  dataset first, and the drill used that. **A passing drill against a seeded dump is worth
+  nothing; check `MANIFEST`'s row counts look like production before trusting a PASS.**
+- **The nightly job was repointed by consolidating onto one config, not by adding a second.**
+  `/etc/syndicate-backup/backup.production.env` — created ad hoc for R44 and referenced by no
+  unit or script — was deleted, and `backup.env` now carries the production values.
+  `syndicate-backup`, `syndicate-backup-verify` and `syndicate-backup-drill` all read that one
+  file, so the verifier cannot drift from what is actually being backed up.
+- **Staging's artifacts were deleted, not left to expire.** Expiry was not on offer: the
+  retention prune runs `rclone delete --min-age` against the *configured destination's* prefix
+  only, so with the job on production nothing would ever have removed `staging/` again.
+  231 MiB across three nights, of a tier that is reproducible from production.
+- **The verifier was checked against its prefix explicitly**, not assumed:
+  `sudo env MAX_AGE_HOURS=-1 /usr/local/bin/syndicate-backup-verify` forces the staleness
+  branch, which names the prefix it watches — `r2:syndicate-backups/production/daily`. It then
+  passed a normal run *after* `staging/` had been purged, which it could not have done had it
+  still been pointed there.
+
+### Not proven by this drill
+
+- **Only the primary database is dumped.** The production cluster also holds
+  `…_production_cache`, `…_production_queue` and `…_production_cable`. Solid Cache/Queue/Cable
+  rebuild themselves from an empty schema, so this is by design and matches what the runbook
+  claims — but nothing here restores or verifies them, and a restore leaves them empty.
+- **The timer firing unattended.** This run came from `systemctl start` on the same unit and
+  code path the timer triggers, not from the 09:17 timer itself.
+- **The alert channel** was not exercised. The verifier confirms the credential is present and
+  well-formed on every run, which is not the same as a delivered message.
