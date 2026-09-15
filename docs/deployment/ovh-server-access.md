@@ -553,8 +553,9 @@ upload and is reviewed with it.
 
 SPEC-017's Interfaces section writes the layout as `daily/…` with no tier prefix, because
 it was written when only production would ever be backed up. The prefix exists so that
-repointing the job at production does not overwrite staging's artifacts and so the weekly
-verifier can tell which tier went stale.
+repointing the job at production did not overwrite staging's artifacts, and so the weekly
+verifier can tell which tier went stale. Only `production/` is populated now — see
+[Which tier is backed up](#which-tier-is-backed-up).
 
 The R2 API token is scoped to **Object Read & Write on `syndicate-backups` only** —
 verified 2026-09-11 by confirming that `ListBuckets` returns `AccessDenied`. It can delete,
@@ -562,21 +563,38 @@ which the `--min-age` retention needs. `no_check_bucket = true` in `rclone.conf`
 required *because* of that scoping: rclone's default pre-flight `HeadBucket` fails with a
 bucket-scoped token and would fail every upload.
 
-### Pointing it at production
+### Which tier is backed up
 
-Phase 5 is a configuration change, not a rewrite. Edit
-`/etc/syndicate-backup/backup.env` and uncomment the production block already in it:
+Production, and only production, since 2026-09-15. Staging is deliberately not backed up —
+it is reproducible from production — and its artifacts were removed from R2 at the same
+time rather than left to expire. Leaving them was not actually an option: the retention
+prune runs `rclone delete --min-age` against the *configured destination's* prefix only, so
+once the job pointed at production nothing would ever have deleted `staging/` again.
 
-| Key | Staging | Production |
+`/etc/syndicate-backup/backup.env` is the single answer to which tier that is. The nightly
+backup, the weekly verifier and the drill all read it, so the verifier necessarily checks
+the tier that is actually being backed up. **Do not add a second per-tier file and select it
+with `BACKUP_CONFIG=` on one unit.** The verifier would go on checking whichever tier it was
+left pointing at and would keep reporting ok while the backed-up tier silently went stale —
+the precise failure this verifier exists to catch, inverted into a false pass.
+
+The tier values, for reference if the target ever has to move again:
+
+| Key | Production | Staging |
 |---|---|---|
-| `BACKUP_DESTINATION` | `staging` | `production` |
-| `PG_CONTAINER` | `syndicate_development_2026-db-staging` | `syndicate_development_2026-db` |
-| `PG_DATABASE` | `syndicate_development_2026_staging` | `syndicate_development_2026_production` |
-| `STORAGE_VOLUME` | `syndicate_development_2026_staging_storage` | `syndicate_development_2026_storage` |
-| `WEB_CONTAINER_PREFIX` | `syndicate_development_2026-web-staging` | `syndicate_development_2026-web` |
+| `BACKUP_DESTINATION` | `production` | `staging` |
+| `PG_CONTAINER` | `syndicate_development_2026-db` | `syndicate_development_2026-db-staging` |
+| `PG_DATABASE` | `syndicate_development_2026_production` | `syndicate_development_2026_staging` |
+| `STORAGE_VOLUME` | `syndicate_development_2026_storage` | `syndicate_development_2026_staging_storage` |
+| `WEB_CONTAINER_PREFIX` | `syndicate_development_2026-web` | `syndicate_development_2026-web-staging` |
 
-Then run one backup by hand and one drill before relying on it. The scripts, units and
-timers do not change.
+Moving it is a configuration change, not a rewrite — the scripts, units and timers do not
+change. Run one backup by hand and one drill against the new target before relying on it,
+and confirm the verifier names the new prefix:
+
+```bash
+sudo env MAX_AGE_HOURS=-1 /usr/local/bin/syndicate-backup-verify   # prints the prefix it watches
+```
 
 ### Consistency guarantee — what this backup does and does not promise
 
@@ -613,10 +631,11 @@ restored without its files passes every row count and renders broken images on e
 
 ### Finishing the alert channel
 
-`/etc/syndicate-backup/alert.env` ships with `RESEND_API_KEY=REPLACE_ME`. Until it is
-populated the `OnFailure=` handler fires, fails, and emails nobody — deliberately loud in
-`systemctl --failed`, but not loud in an inbox. **This is the one manual step between the
-backup system being installed and being trustworthy.**
+`/etc/syndicate-backup/alert.env` ships from `install.sh` with `RESEND_API_KEY=REPLACE_ME`.
+Until it is populated the `OnFailure=` handler fires, fails, and emails nobody — deliberately
+loud in `systemctl --failed`, but not loud in an inbox. **On a fresh box this is the one
+manual step between the backup system being installed and being trustworthy.** It is
+populated on the current box, and the weekly verifier rechecks it on every run.
 
 Use the same Resend key Kamal already injects into the app container. It is copied here
 because systemd runs on the host, outside that container.
