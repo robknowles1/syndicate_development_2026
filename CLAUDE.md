@@ -6,7 +6,7 @@ This file is automatically loaded by Claude Code. All agents (developer, reviewe
 
 ## Project Overview
 
-Syndicate Development is the public-facing marketing and portfolio site for Doug Haskett's custom performance motocross/supercross motorcycle shop in Pocatello, ID (www.syndicate-development.com). The site is a Rails 8.1 MVC application with static content pages (Home, About, Gallery), a contact form that emails the shop, and a planned Services page. No user authentication or dynamic data layer is required.
+Syndicate Development is the public-facing marketing and portfolio site for Doug Haskett's custom performance motocross/supercross motorcycle shop in Pocatello, ID (syndicatedevelopment.com). The site is a Rails 8.1 MVC application with static content pages (Home, About, Gallery), a contact form that emails the shop, and a planned Services page. No user authentication or dynamic data layer is required.
 
 ---
 
@@ -159,8 +159,8 @@ Workflow file: `.github/workflows/ci.yml`
 - `lint` — RuboCop
 - `scan_ruby` — Brakeman + bundler-audit
 - `scan_js` — importmap audit
-- `test` — **⚠️ currently runs Minitest (`bin/rails ... test`) — needs to be updated to `bundle exec rspec`**
-- `system-test` — same issue
+- `test` — `bundle exec rspec`, excluding `spec/system`
+- `system-test` — `bundle exec rspec spec/system`
 
 Both `test` and `system-test` require a `postgres:16` service container and `DATABASE_URL` env var.
 
