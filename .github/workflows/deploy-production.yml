@@ -1,0 +1,225 @@
+name: Deploy production
+
+# Do not add push, schedule or workflow_run triggers: production deploys are a
+# deliberate human action. Runbook: docs/deployment/ovh-server-access.md
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Full 40-character commit SHA to deploy (rollback). Leave blank to deploy main."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy_production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    environment:
+      name: production
+      url: https://syndicatedevelopment.com
+
+    # Shared with deploy_staging in ci.yml on purpose: the two destinations hold
+    # DIFFERENT Kamal locks, and each deploy's prune is destination-blind, so a
+    # staging deploy running alongside this one can delete production's image.
+    # Do not rename this group, and keep cancel-in-progress false — killing a
+    # deploy mid-flight can strand the box between releases.
+    concurrency:
+      group: deploy-ovh-box
+      cancel-in-progress: false
+
+    env:
+      KAMAL_PRODUCTION_HOST: 15.204.81.231
+      IMAGE: ghcr.io/robknowles1/syndicate_development_2026
+
+    steps:
+      - name: Require the main branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Production deploys run only from main. Choose 'Branch: main' under 'Use workflow from'; to deploy an earlier commit, enter its SHA instead."
+          exit 1
+
+      - name: Verify deploy secrets are usable
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
+          KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+          PRODUCTION_DATABASE_PASSWORD: ${{ secrets.PRODUCTION_DATABASE_PASSWORD }}
+        run: |
+          fail=0
+
+          # Keep the `return 0` — see the matching function in ci.yml.
+          require_present() {
+            if [ -z "${!1}" ]; then
+              echo "::error::$1 is unset or empty. Set it under Settings > Environments > production, or as a repository secret."
+              fail=1
+            fi
+            return 0
+          }
+
+          for secret_name in \
+            DEPLOY_SSH_PRIVATE_KEY \
+            RAILS_MASTER_KEY \
+            KAMAL_REGISTRY_PASSWORD \
+            RESEND_API_KEY \
+            ADMIN_SEED_PASSWORD \
+            PRODUCTION_DATABASE_PASSWORD
+          do
+            require_present "$secret_name"
+          done
+
+          # A fourth encoding of AdminUser::MINIMUM_PASSWORD_LENGTH and bcrypt's
+          # limit, mirroring ci.yml's deploy_staging. Characters for the minimum,
+          # bytes for the maximum — do not collapse them onto one `wc` flag.
+          if [ -n "$ADMIN_SEED_PASSWORD" ]; then
+            seed_password_chars=$(printf '%s' "$ADMIN_SEED_PASSWORD" | LC_ALL=C.UTF-8 wc -m)
+            seed_password_bytes=$(printf '%s' "$ADMIN_SEED_PASSWORD" | wc -c)
+
+            if [ "$seed_password_chars" -lt 12 ]; then
+              echo "::error::ADMIN_SEED_PASSWORD is shorter than AdminUser::MINIMUM_PASSWORD_LENGTH (12 characters)."
+              fail=1
+            elif [ "$seed_password_bytes" -gt 72 ]; then
+              echo "::error::ADMIN_SEED_PASSWORD is longer than 72 bytes, which bcrypt rejects."
+              fail=1
+            fi
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Pre-flight failed. Fix the secrets named above and re-run; no values were printed."
+            exit 1
+          fi
+
+          echo "All six production deploy secrets are present."
+
+      - name: Resolve the commit to deploy
+        id: target
+        env:
+          REQUESTED_SHA: ${{ inputs.sha }}
+          MAIN_SHA: ${{ github.sha }}
+        run: |
+          requested=$(printf '%s' "$REQUESTED_SHA" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+
+          if [ -z "$requested" ]; then
+            sha="$MAIN_SHA"
+            echo "No SHA given; deploying the head of main."
+          elif printf '%s' "$requested" | grep -Eq '^[0-9a-f]{40}$'; then
+            sha="$requested"
+          else
+            echo "::error::The sha input must be a full 40-character commit SHA (images are tagged with the full SHA). Copy it from the commit page on GitHub."
+            exit 1
+          fi
+
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Target commit: $sha"
+
+      - name: Require green CI and a staging deploy for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          run_json=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${SHA}&event=push&branch=main&per_page=1" \
+            --jq '.workflow_runs[0] // empty')
+
+          if [ -z "$run_json" ]; then
+            echo "::error::No CI run on a push to main exists for ${SHA}. Only commits pushed to main are tested and have an image; production cannot deploy anything else."
+            exit 1
+          fi
+
+          run_id=$(printf '%s' "$run_json" | jq -r '.id')
+          status=$(printf '%s' "$run_json" | jq -r '.status')
+          conclusion=$(printf '%s' "$run_json" | jq -r '.conclusion')
+          run_url=$(printf '%s' "$run_json" | jq -r '.html_url')
+
+          if [ "$status" != "completed" ]; then
+            echo "::error::CI for ${SHA} is still ${status} (${run_url}). Wait for it and the staging deploy to finish, then run this again."
+            exit 1
+          fi
+
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI for ${SHA} concluded '${conclusion}' (${run_url}). Refusing to deploy an untested commit."
+            exit 1
+          fi
+
+          staging=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs" \
+            --jq '[.jobs[] | select(.name == "deploy_staging") | .conclusion] | first // "missing"')
+
+          if [ "$staging" != "success" ]; then
+            echo "::error::deploy_staging for ${SHA} is '${staging}' (${run_url}). Production only promotes an image staging has already run."
+            exit 1
+          fi
+
+          echo "CI and the staging deploy succeeded for ${SHA}: ${run_url}"
+
+      - name: Require the image in ghcr.io
+        env:
+          KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD }}
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          printf '%s' "$KAMAL_REGISTRY_PASSWORD" | docker login ghcr.io -u robknowles1 --password-stdin > /dev/null
+
+          if ! docker manifest inspect "${IMAGE}:${SHA}" > /dev/null; then
+            echo "::error::${IMAGE}:${SHA} is not in ghcr.io. It may have been deleted by a package retention policy; it cannot be deployed without a rebuild, which production never does."
+            exit 1
+          fi
+
+          echo "${IMAGE}:${SHA} is present."
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      # MUST stay ahead of the ssh-agent step, and must never be loosened to get
+      # past a fingerprint mismatch. Same key as ci.yml's `Pin staging host key` —
+      # rotate both files together. Procedure: docs/deployment/ovh-server-access.md.
+      - name: Pin production host key
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo '15.204.81.231 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO7d8CnD/k4Jd9hcsDTuPzFPYEk986iWyKwNlxtGUrtK' >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh-keygen -lF 15.204.81.231 -f ~/.ssh/known_hosts \
+            | grep -q 'SHA256:nuYrtS7SlRAtC7Eoa0XsIZvM+EQC9bDCn/McENOBIPo'
+
+      - name: Add SSH deploy key
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+      # Keep `deploy --skip-push --version=`. Dropping --skip-push rebuilds an
+      # image CI never tested; `kamal setup` is first-run provisioning only
+      # (SPEC-017 R39); `kamal rollback` fails once a staging prune has removed
+      # production's old container (R42).
+      - name: Deploy to production with Kamal
+        env:
+          RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
+          KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+          PRODUCTION_DATABASE_PASSWORD: ${{ secrets.PRODUCTION_DATABASE_PASSWORD }}
+          SHA: ${{ steps.target.outputs.sha }}
+        run: bin/kamal deploy --skip-push --version="$SHA"
+
+      - name: Check https://syndicatedevelopment.com/up
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --retry 5 --retry-delay 5 --max-time 15 \
+            https://syndicatedevelopment.com/up || true)
+
+          if [ "$code" != "200" ]; then
+            echo "::error::https://syndicatedevelopment.com/up returned '${code}', expected 200. To roll back, run this workflow again with the previous SHA."
+            exit 1
+          fi
+
+          echo "https://syndicatedevelopment.com/up returned 200."
