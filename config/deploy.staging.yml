@@ -11,10 +11,7 @@ servers:
 
 proxy:
   ssl: true
-  # Two names, comma-separated — Kamal splits this into a list. The old name is the
-  # rollback for the rename and stays until SPEC-017 R32 retires it; collapsing this
-  # to the new name alone strands anything still pointed at the old one.
-  host: staging.syndicatedevelopment.com,staging.syndicate-development.com
+  host: staging.syndicatedevelopment.com
 
 env:
   secret:

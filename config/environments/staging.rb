@@ -63,10 +63,5 @@ Rails.application.configure do
   # would serve the site, including one that indexes it.
   config.hosts << ENV.fetch("APP_HOST", "staging.syndicatedevelopment.com")
 
-  # Pairs with the second name in config/deploy.staging.yml's proxy.host: kamal-proxy
-  # routes that name here, and without this line Rails answers it with a 403. The two
-  # go together, at SPEC-017 R32 — dropping either alone is what breaks staging.
-  config.hosts << "staging.syndicate-development.com"
-
   config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 end

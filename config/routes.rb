@@ -78,4 +78,15 @@ Rails.application.routes.draw do
     end
     resource :business_hours, only: [ :show, :update ]
   end
+
+  # Not dead code: the retired syndicate-development.com site's paths, still reached
+  # through its backlinks and Cloudflare's path-preserving redirect (SPEC-017).
+  legacy_redirect = ->(target) do
+    redirect(status: 301) { |_params, request| [ target, request.query_string.presence ].compact.join("?") }
+  end
+  get "/projects(/*rest)", to: legacy_redirect.call("/gallery"), format: false
+  get "/engine",           to: legacy_redirect.call("/services")
+  get "/suspension",       to: legacy_redirect.call("/services")
+  get "/techtips(/*rest)", to: legacy_redirect.call("/"), format: false
+  get "/auth",             to: legacy_redirect.call("/admin/login")
 end

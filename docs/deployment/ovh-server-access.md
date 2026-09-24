@@ -34,7 +34,7 @@ ssh -i ~/.ssh/id_ed25519 ubuntu@15.204.81.231
 | Key | `~/.ssh/id_ed25519` |
 | OS | Ubuntu 26.04 LTS (kernel 7.0.0) |
 | Resources | 2 vCPU · 3.7 GB RAM · 38 GB disk |
-| Hostname | `staging.syndicatedevelopment.com` (also answers `staging.syndicate-development.com` until SPEC-017 R32) |
+| Hostname | `staging.syndicatedevelopment.com` |
 
 Key authentication works without a password. Verify with:
 
@@ -180,9 +180,9 @@ if they are missing. Each traces to a specific review finding.
 - **`STAGING_DATABASE_PASSWORD`** — staging does not fall back to production's.
 - **Host authorization is active.** Any `Host` header not in `config.hosts` gets a 403.
   Production lists exactly one name — `APP_HOST`, i.e. `syndicatedevelopment.com` — because
-  every redirect to it is answered by Cloudflare and never reaches Rails. Staging lists two
-  while the rename is in flight: `APP_HOST` plus `staging.syndicate-development.com`. DNS
-  must match one of these, and `APP_HOST` must match `proxy.host` in the Kamal config.
+  every redirect to it is answered by Cloudflare and never reaches Rails. Staging likewise
+  lists only `APP_HOST`, i.e. `staging.syndicatedevelopment.com`. DNS must match it, and
+  `APP_HOST` must match `proxy.host` in the Kamal config.
 - **`CONTACT_RECIPIENT_EMAIL` needs no value on either tier.**
   `config/mail_settings.rb` returns the developer address for every non-production
   environment regardless of what is set, and falls back to the shop address in
