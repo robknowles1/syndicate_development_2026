@@ -182,8 +182,10 @@ jobs:
 
     # cancel-in-progress MUST stay false: killing a deploy mid-flight can strand
     # the box between releases, which is worse than making the next merge wait.
+    # The group is shared with deploy-production.yml — do not rename it back to a
+    # staging-only name; see the note there.
     concurrency:
-      group: deploy-staging
+      group: deploy-ovh-box
       cancel-in-progress: false
 
     steps:

@@ -6,9 +6,12 @@ deliberately excluded.
 
 **Last verified:** 2026-07-28
 
-Staging runs on a single OVH box and is deployed automatically by the `deploy_staging`
-job in `.github/workflows/ci.yml` on every push to `main`. Everything below is either a
-prerequisite for that job, or what to do by hand when it is not the right tool.
+Staging and production share a single OVH box. Staging is deployed automatically by the
+`deploy_staging` job in `.github/workflows/ci.yml` on every push to `main`; production is
+deployed only by hand, with the **Deploy production** workflow
+(`.github/workflows/deploy-production.yml`) — see [Production deploys](#production-deploys).
+Everything below is either a prerequisite for those jobs, or what to do by hand when they
+are not the right tool.
 
 - [Connecting](#connecting) · [Why `ubuntu` and not `root`](#why-ubuntu-and-not-root) ·
   [Rebuilt or replacement server](#establishing-access-on-a-rebuilt-or-replacement-server)
@@ -235,7 +238,7 @@ done
 ```
 
 ```bash
-# production — bin/kamal deploy, no destination (not provisioned yet)
+# production — bin/kamal deploy, no destination (also export KAMAL_PRODUCTION_HOST)
 for v in KAMAL_REGISTRY_PASSWORD RESEND_API_KEY ADMIN_SEED_PASSWORD \
          PRODUCTION_DATABASE_PASSWORD; do
   [ -n "${!v}" ] && echo "$v set" || echo "$v MISSING"
@@ -245,7 +248,7 @@ done
 `RAILS_MASTER_KEY` is absent from both loops on purpose. On a workstation,
 `.kamal/secrets-common` reads `config/master.key` and the variable is not needed. In CI
 that file does not exist (`.gitignore` excludes `config/*.key`) and the variable is
-mandatory — which is why the deploy job checks it alongside the other five.
+mandatory — which is why both deploy jobs check it alongside the other five.
 
 `KAMAL_REGISTRY_PASSWORD` is needed even to boot the Postgres accessory, not only to
 deploy the app: `Kamal::Cli::Accessory#prepare` runs `docker login` against the **root**
@@ -303,6 +306,23 @@ locale, hence the explicit `LC_ALL` on that one line. The numbers there are a th
 encoding of one rule and must be updated whenever `AdminUser::MINIMUM_PASSWORD_LENGTH`
 changes. No secret value, prefix, or length is ever printed.
 
+The production workflow needs the same secrets with `PRODUCTION_DATABASE_PASSWORD` in
+place of `STAGING_DATABASE_PASSWORD`, and runs the same pre-flight. Its job declares
+`environment: production`, so it reads secrets from the **`production` GitHub
+Environment** (Settings → Environments → production) first and falls back to repository
+secrets for any name the environment does not define:
+
+| Secret | Where | Why there |
+|---|---|---|
+| `PRODUCTION_DATABASE_PASSWORD` | `production` environment | Only a job that declares `environment: production` can read it, so `deploy_staging` and pull-request CI cannot. It must be the password production's Postgres accessory was **initialised** with — initdb reads it only on first boot, so a different value locks the app out of the existing database rather than changing its password. |
+| `ADMIN_SEED_PASSWORD` | `production` environment (recommended) | Shadows the repository value, so production never holds staging's admin password (SPEC-017 R41). Seeding runs only when `db:prepare` creates a database, so on the live box this value is dormant — but it is what a rebuilt production database would be seeded with. |
+| the other four | repository | Shared with staging. |
+
+The environment's **deployment branch rule** should allow `main` only. The workflow also
+refuses to run from any other ref, but that check lives in the workflow file, which a
+branch could edit; the environment rule is enforced by GitHub and withholds the
+production secrets from any other branch.
+
 ---
 
 ## Deploying
@@ -310,9 +330,14 @@ changes. No secret value, prefix, or length is ever printed.
 ### Routine deploys
 
 Merging to `main` deploys staging. CI runs `bin/kamal deploy -d staging` after
-`scan_ruby`, `scan_js`, `lint`, `test` and `system-test` are all green. Deploys are
-serialised by a `deploy-staging` concurrency group with `cancel-in-progress: false`,
-because killing a deploy mid-flight can strand the box between releases.
+`scan_ruby`, `scan_js`, `lint`, `test` and `system-test` are all green. That build is
+also the one production later promotes: Kamal tags it
+`ghcr.io/robknowles1/syndicate_development_2026:<full commit SHA>`.
+
+Staging and production deploys are serialised by one shared `deploy-ovh-box`
+concurrency group with `cancel-in-progress: false`, because killing a deploy mid-flight
+can strand the box between releases. See
+[Why staging and production share one queue](#why-staging-and-production-share-one-queue).
 
 To deploy the same thing by hand:
 
@@ -320,13 +345,96 @@ To deploy the same thing by hand:
 bin/kamal deploy -d staging
 ```
 
-### Production is not provisioned via Kamal yet
+### Production deploys
 
-`config/deploy.yml` defaults the production host to the RFC 2606 placeholder
-`production-not-provisioned.invalid`, overridable with `KAMAL_PRODUCTION_HOST`. That name
-does not resolve, so `kamal config` still renders while an accidental `bin/kamal deploy`
-with no destination fails immediately at DNS rather than deploying production onto the
-staging box. Replace it — or export the variable — when production is provisioned.
+Production never deploys automatically. To release what is on `main`:
+
+1. Wait for the CI run on that `main` commit to go green, **including `deploy_staging`**,
+   and check it on `https://staging.syndicatedevelopment.com`.
+2. **Actions → Deploy production → Run workflow**. Leave *Use workflow from* on
+   `Branch: main` and the SHA box empty. This works from the GitHub mobile site or app.
+
+The run, in order:
+
+- refuses to start from any ref but `main`;
+- checks that all six secrets are non-empty (SPEC-017 R38);
+- resolves the target commit — the `main` head the run was started on, or the SHA you
+  typed;
+- **refuses unless the CI run for that exact SHA, on a push to `main`, concluded
+  `success` and its `deploy_staging` job succeeded** — so only a commit whose tests
+  passed and whose image staging has already run can reach production;
+- **refuses unless `ghcr.io/robknowles1/syndicate_development_2026:<sha>` exists**;
+- runs `bin/kamal deploy --skip-push --version=<sha>` with
+  `KAMAL_PRODUCTION_HOST=15.204.81.231`, which pulls that image rather than building one;
+- fails unless `https://syndicatedevelopment.com/up` returns 200.
+
+If CI for `main`'s head is still running, the run fails with a message saying so; wait
+and press the button again.
+
+`config/deploy.yml` still defaults the production host to the RFC 2606 placeholder
+`production-not-provisioned.invalid`. That is a guard, not an unfinished edit: an
+accidental `bin/kamal deploy` with no destination and no `KAMAL_PRODUCTION_HOST` fails at
+DNS instead of deploying. The workflow sets the variable in its job environment; the
+committed default stays.
+
+`kamal setup` is for provisioning a box with no production accessory (SPEC-017 R39), and
+the workflow never runs it.
+
+#### Rolling production back
+
+Run **Deploy production** again and paste the **full 40-character SHA** of the last
+good commit into the SHA box (the copy button on a commit page gives the full SHA; the
+7-character short form is rejected because images are tagged with the full one). The
+same CI and image checks apply, so you can only roll back to a commit that passed CI and
+reached staging.
+
+This is the SPEC-017 R42 rollback path. Do **not** use `bin/kamal rollback` for
+production: prune filters on the `service` label, which staging and production share, so
+a few staging deploys can remove production's previous container, and `rollback` then
+declines to do anything. Redeploying by SHA pulls from ghcr.io and does not depend on
+what is still on the box.
+
+A rollback swaps the **app image only**. `config/deploy.yml`, `.kamal/secrets` and the
+workflow itself come from current `main`. It does not undo migrations either: the older
+code runs against the newer schema, which is why migrations must be backwards-compatible.
+Roll the database forward with a new migration.
+
+#### Local fallback
+
+If GitHub Actions is unavailable, deploy from a workstation on an up-to-date `main`
+checkout. Export the secrets, then run the production loop under
+[Verify the values are present](#verify-the-values-are-present-before-deploying):
+
+```bash
+export KAMAL_PRODUCTION_HOST=15.204.81.231
+# plus KAMAL_REGISTRY_PASSWORD, RESEND_API_KEY, ADMIN_SEED_PASSWORD and
+# PRODUCTION_DATABASE_PASSWORD; RAILS_MASTER_KEY comes from config/master.key
+bin/kamal deploy --skip-push --version=<full sha>
+curl -sS -o /dev/null -w '%{http_code}\n' https://syndicatedevelopment.com/up   # 200
+```
+
+Nothing locally checks CI for you: confirm on GitHub that the SHA's CI run, including
+`deploy_staging`, is green before running it. Also make sure no staging deploy is
+running — the local command is outside the concurrency group described next.
+
+#### Why staging and production share one queue
+
+Kamal's deploy lock is **per destination** — `.kamal/lock-syndicate_development_2026`
+for production, `.kamal/lock-syndicate_development_2026-staging` for staging — so it does
+not stop the two from running at once. They must not: every deploy ends with a prune
+that filters on the shared `service` label and removes any image no container is using.
+A staging deploy finishing while production is between pulling its image and starting
+the container can delete that image out from under it.
+
+Both jobs therefore sit in one `deploy-ovh-box` concurrency group. A production deploy
+started during a staging deploy waits for it, and a merge during a production deploy
+queues its staging deploy behind it.
+
+GitHub keeps at most **one** waiting run per group, and a newer one cancels the older.
+In practice: if a staging deploy is running, a production run is waiting, and another
+merge's staging deploy then arrives, the waiting production run shows **cancelled** and
+has to be started again. Nothing is half-deployed when that happens — the cancelled run
+never began.
 
 ### First deploy on a fresh box
 
@@ -364,6 +472,8 @@ bin/kamal dbc     -d staging   # rails dbconsole
 ```
 
 ### Rollback
+
+For production see [Rolling production back](#rolling-production-back). For staging:
 
 ```bash
 bin/kamal app containers -d staging   # find the previous version tag
@@ -709,7 +819,8 @@ workstation there is no such early check and the seed guard is the only backstop
 
 ### A deploy fails with a host-key fingerprint mismatch
 
-The `Pin staging host key` step in `.github/workflows/ci.yml` writes the server's public
+The `Pin staging host key` step in `.github/workflows/ci.yml`, and the `Pin production
+host key` step in `.github/workflows/deploy-production.yml`, write the server's public
 host key into the runner's `known_hosts` before the SSH agent is loaded. Kamal leaves
 net-ssh's `verify_host_key` unset, which net-ssh maps to a verifier that accepts
 whatever key an *unknown* host offers. Every GitHub runner is fresh, so without the pin
@@ -745,8 +856,9 @@ a red build go away.** That restores the exact hole it closes. Rotate deliberate
    Both must print the same SHA256. **If they disagree, stop** — that is the
    interception case, not a rebuild.
 
-3. Update **both** lines in the `Pin staging host key` step: the `known_hosts` line and
-   the `SHA256:` in the guard below it. They are two encodings of one key and must
+3. Update **both** lines in the `Pin staging host key` step **and** in the `Pin
+   production host key` step — one server, two workflow files: the `known_hosts` line
+   and the `SHA256:` in the guard below it. They are two encodings of one key and must
    agree. The guard is not redundant — a mistyped `known_hosts` entry does not error,
    because net-ssh skips the unparseable line, finds no keys for the host, and quietly
    reverts to accept-new.
