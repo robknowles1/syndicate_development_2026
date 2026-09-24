@@ -55,10 +55,10 @@ install -d -m 0700 -o root -g root "$CONF_DIR"
 install -m 0644 -o root -g root "${SOURCE_DIR}/README" "${CONF_DIR}/README"
 
 if [[ -f "${CONF_DIR}/backup.env" ]]; then
-  echo "    backup.env exists — left alone (edit it to repoint the destination)"
+  echo "    backup.env exists — left alone, targets '$(grep -E '^BACKUP_DESTINATION=' "${CONF_DIR}/backup.env" | cut -d= -f2-)'"
 else
   install -m 0600 -o root -g root "${SOURCE_DIR}/backup.env.example" "${CONF_DIR}/backup.env"
-  echo "    backup.env seeded from the example"
+  echo "    backup.env seeded from the example — targets production"
 fi
 
 if [[ -f "${CONF_DIR}/alert.env" ]]; then

@@ -17,6 +17,18 @@ Files
   /etc/syndicate-backup/alert.env          Resend key + from/to addresses
   /etc/syndicate-backup/rclone.conf        R2 token, installed by hand
 
+Which tier is backed up
+-----------------------
+Production, and only production. Staging is deliberately not backed up — it is
+reproducible from production.
+
+backup.env is the single answer to that question: the nightly backup, the weekly
+verifier and the drill all read it, which is what keeps the verifier watching the
+tier that is actually being backed up. Do not add a second per-tier file and
+select it with BACKUP_CONFIG= on one unit — the verifier would go on checking
+whichever tier it was left pointing at, and would keep reporting ok while the
+backed-up tier silently went stale.
+
 Everyday commands
 -----------------
   systemctl list-timers 'syndicate-backup*'
