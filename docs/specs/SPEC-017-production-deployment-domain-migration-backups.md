@@ -42,8 +42,11 @@ this spec makes false.
 - **A second server.** Staging and production co-host on `15.204.81.231` (owner decision). The
   memory and image-retention consequences of that are in scope (R4-R9); splitting the tiers onto
   two boxes is not.
-- **A production deploy job in CI.** Production deploys stay manual (owner decision). CI keeps
-  auto-deploying staging on push to `main` and gains nothing here. See R3.
+- **Automatic production deploys.** Production never deploys on a `push`, `schedule`, or
+  `workflow_run` trigger — only `workflow_dispatch`, a human pressing **Run workflow**, starts one.
+  The owner reversed the *mechanism* (a workstation command → a manually triggered CI workflow,
+  2026-09-27 — see Change Log) but not this property: CI still auto-deploys staging only, on push
+  to `main`. See R3, R68.
 - **Zero-downtime or blue/green cutover.** The new domain has no existing traffic and the old
   domain is redirected at DNS/edge level; there is no window during which one request must be
   served by two systems. A load balancer in front of both boxes would add a failure mode to buy
@@ -183,8 +186,12 @@ No migration. No schema change. No new gem.
 
 ### Environment variables
 
-Required in the **deploying operator's shell** for any production Kamal command. None of these
-belongs in CI — production deploys are manual (R3).
+Required either in `.github/workflows/deploy-production.yml`'s job environment, which supplies them
+itself as `env:` and `${{ secrets.* }}` — the normal path for a production Kamal command (R3,
+R68-R76) — or in the **deploying operator's shell**, for the workstation fallback R3 documents.
+`PRODUCTION_DATABASE_PASSWORD` is the one exception to "same secrets as staging": it is stored on
+the `production` GitHub environment, not the repository, so only a job that declares
+`environment: production` can read it (R71). *(Changed 2026-09-27 — see Change Log.)*
 
 | Variable | Purpose | Example value |
 |---|---|---|
@@ -225,9 +232,17 @@ exact output to expect, or the exact screen to look at and what it must say. No 
 invents an RSpec example for something RSpec cannot observe. The Acceptance Tests section marks
 every such item `MANUAL`.
 
-R3: **No production deploy job is added to `.github/workflows/ci.yml`.** The `deploy_staging` job
-and its six repository secrets are unchanged. Production is deployed by an operator from a
-workstation, from a clean checkout, with the Interfaces-section variables exported.
+R3: **Production deploys run from a manually triggered GitHub Actions workflow, not from
+`.github/workflows/ci.yml`.** `.github/workflows/deploy-production.yml` is a second, separate
+workflow file, triggered only by `workflow_dispatch`; `deploy_staging` and its six repository
+secrets are unchanged by it. Its required behaviour is R68-R76. An operator can still deploy
+production by hand from a workstation, from a clean checkout, with the Interfaces-section variables
+exported — that path remains the documented fallback for when GitHub Actions itself is
+unavailable, not the normal route.
+
+*Changed 2026-09-27 — originally "no production deploy job is added to CI; production is deployed
+by an operator from a workstation." The owner reversed the mechanism, not the "a human decides"
+property it protects: see Change Log.*
 
 ### Phase 1 — Host housekeeping
 
@@ -676,10 +691,16 @@ address arrives with SPF and DKIM passing in the received headers.
 
 ### Phase 5 — Production deploy
 
-R37: Export `KAMAL_PRODUCTION_HOST=15.204.81.231` in the deploying shell. `config/deploy.yml`
-defaults it to `production-not-provisioned.invalid`, which does not resolve — so an accidental
-`bin/kamal deploy` without it fails at DNS instead of deploying production onto the staging box.
-That default is a guard; do not replace it with the IP in the committed file.
+R37: `KAMAL_PRODUCTION_HOST=15.204.81.231` must be set wherever a production Kamal command runs.
+`.github/workflows/deploy-production.yml` sets it directly in the deploy job's `env:` — it is a
+fixed fact about this box, not a secret, so it is not routed through GitHub secrets at all; an
+operator using the R3 workstation fallback exports it in the deploying shell instead.
+`config/deploy.yml` defaults it to `production-not-provisioned.invalid`, which does not resolve —
+so any production Kamal command missing it fails at DNS instead of deploying production onto the
+staging box. That default is a guard; do not replace it with the IP in the committed file, and do
+not move it into a secret — it is not sensitive, only load-bearing.
+
+*Changed 2026-09-27 — previously stated only the workstation-export path; see Change Log.*
 
 R38: Verify every secret resolves **before** deploying. An unset variable resolves to an empty
 string, `kamal config` renders clean with nothing exported, and Kamal writes `KEY=` into the
@@ -1049,6 +1070,71 @@ blocks the spec, and none should be treated as settled because it appears here:
 - Whether ghcr.io has a package retention policy on this account that would expire the image tags
   R42's rollback depends on.
 
+### Production deploy workflow (added 2026-09-27 — supersedes the manual-only decision in R3)
+
+The owner decided gathering five secrets on a workstation for every production release was the
+wrong tradeoff and asked for a button in GitHub Actions instead. R68-R76 state what that button
+must and must not do; R3, above, is amended to point here. See Change Log for the full rationale
+and PR #99 (`chore/production-deploy-workflow`) for the implementation these rules were checked
+against.
+
+R68: Production deploys run from a manually triggered GitHub Actions workflow,
+`.github/workflows/deploy-production.yml`, whose only trigger is `workflow_dispatch`. It must never
+gain a `push`, `schedule`, or `workflow_run` trigger — a human pressing **Run workflow** is what
+keeps a production deploy a deliberate act, not merely the workflow's existence.
+
+R69: The workflow accepts one optional input, `sha` — the full 40-character commit SHA to deploy,
+for a rollback. Left blank, it deploys the commit `main`'s head pointed to when the run was
+started.
+
+R70: The workflow may run only from `main`, enforced twice: the workflow itself refuses to proceed
+when `github.ref` is not `refs/heads/main`, **and** the GitHub `production` **environment**
+(Settings → Environments → production) carries a deployment branch rule restricting it to `main`.
+Neither check alone is sufficient — the in-workflow check is a line in a file that a branch could
+edit before dispatching itself, so the enforcement that cannot be bypassed by editing the workflow
+is the environment's branch rule.
+
+R71: `PRODUCTION_DATABASE_PASSWORD` is stored as a secret on the `production` **environment**, not
+as a repository secret. A job must declare `environment: production` to read it, which
+`deploy_staging` and pull-request CI do not — so no job but the production deploy job can read
+production's database password. The other five secrets (R38) remain repository-wide, unchanged,
+because staging and production already share them.
+
+R72: A **pre-flight job**, outside the deploy job's concurrency group, gates every run before it
+can occupy the queue slot a waiting staging deploy needs. In order, it verifies: all required
+secrets are non-empty (R38); the SHA to deploy, resolved per R69; that the `ci.yml` push run for
+that SHA, on `main`, concluded `success`, **including its `deploy_staging` job** — so production
+only ever promotes an image staging has already run; and that
+`ghcr.io/robknowles1/syndicate_development_2026:<sha>` exists. Only after the pre-flight job
+succeeds does the deploy job start and join the concurrency group (R75) — a doomed run (bad
+secret, untested SHA, missing image) is refused before it can make a waiting staging deploy wait
+any longer.
+
+R73: Deploy with `bin/kamal deploy --skip-push --version=<sha>` — never bare `bin/kamal deploy`
+(which rebuilds an image CI never tested) and never `bin/kamal rollback` (unreliable on this
+shared box; R42). This promotes the exact image `deploy_staging` already built and ran, never
+builds one.
+
+R74: The run fails unless `https://syndicatedevelopment.com/up` returns 200 after the deploy step
+completes.
+
+R75: Staging and production deploys share **one** concurrency group, `deploy-ovh-box`, with
+`cancel-in-progress: false`. This is required, not incidental: `Kamal::Commands::Lock#lock_dir`
+(`kamal-2.12.0/lib/kamal/commands/lock.rb`) is `lock-<service>-<destination>`, so staging and
+production hold *different* Kamal locks and nothing in Kamal itself stops them running at once —
+but every deploy ends in a prune that filters only on `label=service=`, with no destination in
+that filter (R42's same finding). A staging deploy finishing while a production deploy is
+mid-pull-or-restart can prune the image the other just fetched, or the reverse. The shared queue,
+not Kamal's own lock, is what prevents that.
+
+R76: **Residual edge case, accepted rather than solved:** GitHub keeps at most one *waiting* run
+per concurrency group, and a newer waiting run cancels an older one. A production rollback that
+queues behind a running staging deploy, followed by another merge's staging deploy arriving before
+the rollback starts, cancels the *waiting* production run — it shows cancelled in the Actions tab
+and must be started again. Nothing is left half-deployed, because a cancelled run never began. See
+E16. The alternative — separate queues for each destination — reopens the prune race R75 exists to
+close, which is worse.
+
 ---
 
 ## Edge Cases
@@ -1109,6 +1195,12 @@ origin record was orange-clouded and every visitor now shares one apparent IP (R
 E15: **The old box is needed back mid-overlap.** Disable the Redirect Rules, set the old apex to
 `A → 147.182.199.74` grey. The new domain keeps serving Rails throughout — the two are independent,
 which is the reason Phase 3 never touched the old zone's behaviour.
+
+E16: **A production rollback is queued behind a running staging deploy, and a second staging
+deploy is queued behind that.** GitHub keeps only one waiting run per concurrency group, so the
+newer staging run cancels the waiting production rollback (R76). The production run shows
+cancelled in the Actions tab and must be started again; nothing is left half-deployed, because a
+cancelled run never began.
 
 ---
 
@@ -1205,7 +1297,10 @@ across a subsequent page load.
 AC-31: `config/deploy.yml` still defaults the production host to
 `production-not-provisioned.invalid`; the real host comes from `KAMAL_PRODUCTION_HOST`.
 
-AC-32: No production deploy job exists in `.github/workflows/ci.yml`.
+AC-32: `.github/workflows/ci.yml` contains no production deploy job — `deploy_staging` is
+unchanged apart from its concurrency group's name (R75). Production's deploy job lives in the
+separate `.github/workflows/deploy-production.yml` (R68), not in `ci.yml`. *(Changed 2026-09-27 —
+see Change Log.)*
 
 ### Phase 6
 
@@ -1260,6 +1355,31 @@ AC-51: A copy of the old box's nginx docroot exists in R2 before the box is dest
 
 AC-52: `docs/deployment/ovh-server-access.md` no longer states that production is not provisioned
 via Kamal, and its DNS section describes the two-zone arrangement.
+
+### Production deploy workflow (added 2026-09-27)
+
+AC-53: `.github/workflows/deploy-production.yml`'s only trigger is `workflow_dispatch`; it contains
+no `push`, `schedule`, or `workflow_run` trigger.
+
+AC-54: The workflow refuses to run when `github.ref` is not `refs/heads/main`, and the GitHub
+`production` environment's deployment branch rule is configured to allow only `main`.
+
+AC-55: `PRODUCTION_DATABASE_PASSWORD` is configured as a secret on the `production` GitHub
+environment and does not appear among the repository's secrets.
+
+AC-56: A pre-flight job runs outside the deploy job's concurrency group and fails the run, before
+any deploy step executes, when: any required secret is empty; the resolved SHA has no successful
+`ci.yml` push run on `main`; that run's `deploy_staging` job did not succeed; or the image is
+absent from ghcr.io.
+
+AC-57: The deploy step runs `bin/kamal deploy --skip-push --version=<sha>`, and no step runs bare
+`bin/kamal deploy` or `bin/kamal rollback`.
+
+AC-58: The run fails unless `https://syndicatedevelopment.com/up` returns 200 after the deploy
+step.
+
+AC-59: `deploy_staging` (in `ci.yml`) and the production deploy job (in `deploy-production.yml`)
+declare the same concurrency group, `deploy-ovh-box`, both with `cancel-in-progress: false`.
 
 ---
 
@@ -1433,6 +1553,24 @@ When inspected
 Then it no longer contains "Production is not provisioned via Kamal yet", and its DNS section describes both zones
 Covers: R66, AC-52
 
+AT28 — AUTOMATED
+Given `.github/workflows/deploy-production.yml` and `.github/workflows/ci.yml`
+When inspected
+Then `deploy-production.yml`'s only trigger is `workflow_dispatch`, it checks `github.ref == 'refs/heads/main'` before deploying, its deploy step runs `bin/kamal deploy --skip-push --version=`, and both it and `deploy_staging` declare the concurrency group `deploy-ovh-box` with `cancel-in-progress: false`
+Covers: R68, R70, R73, R75, AC-53, AC-57, AC-59
+
+AT29 — MANUAL
+Given the `production` GitHub environment configured per R70/R71 and a merged commit whose `ci.yml` push run, including `deploy_staging`, has already succeeded
+When **Deploy production** is run once with a required secret temporarily unset, once with a made-up SHA, and once for real
+Then the pre-flight job fails each of the first two before any deploy step runs and without occupying the deploy job's concurrency-group slot, and the real run deploys, passes the `/up` check, and `PRODUCTION_DATABASE_PASSWORD` is confirmed absent from the repository's own secrets list
+Covers: R69, R71, R72, R74, AC-54, AC-55, AC-56, AC-58
+
+AT30 — MANUAL
+Given a staging deploy running, a production rollback dispatched and waiting behind it in the `deploy-ovh-box` group, and a second staging deploy triggered before the rollback starts
+When the concurrency group processes all three runs
+Then the waiting production run is cancelled, no run is left partially deployed, and re-running it completes the rollback
+Covers: R76, E16
+
 ---
 
 ## Implementation Decisions
@@ -1514,6 +1652,7 @@ before the next task begins.
 | Date | Change | Affected IDs | Rationale |
 |------|--------|-------------|-----------|
 | 2026-09-11 | Initial draft | All | Translates the owner's eight settled decisions into an executable, phase-ordered runbook. Records the ordering constraints as hard dependencies with their failure modes rather than as section order. Argues the 301's placement (R28) rather than asserting it, and grounds the grey-cloud rule in `config/environments/production.rb`'s own `trusted_proxies` comment (R25) rather than in generic Cloudflare advice. Surfaces four things verified against the installed sources that the existing configuration does not anticipate: that `ar_internal_metadata` carrying `environment=staging` disables Rails' destructive-task protection outright rather than merely mislabelling the database (R46); that Kamal's prune filters on a service label shared by both destinations, so staging deploys can prune production's rollback container and `kamal rollback` then declines (R42); that the 7.8 GB of images is `retain_containers: 5` working as designed, so a manual prune reclaims nothing and only lowering the number helps (R5); and that `ufw` does not cover Docker-published ports, so the loopback bindings remain load-bearing (R9). Records the `published = false` flags as a gated decision point rather than a SQL statement (R53, R54), and the seven things that could not be verified from the authoring environment as open items rather than as settled facts (R67). |
+| 2026-09-27 | **Reversed owner decision 4.** Production deploys no longer run only as a workstation command — they now run from a manually triggered GitHub Actions workflow, `.github/workflows/deploy-production.yml` (`workflow_dispatch` only; the workstation command remains the documented fallback). Amended the Non-Goals listing, the Environment-variables statement, R3, R37, and AC-32, which all asserted or depended on "no production deploy job anywhere in CI." Added R68-R76 and AC-53-AC-59 for the workflow's required behaviour: `workflow_dispatch` only (R68); the optional rollback-SHA input (R69); `main`-only, enforced both by the workflow's own check and by the GitHub `production` environment's deployment branch rule, since only the latter cannot be edited around from a branch (R70); `PRODUCTION_DATABASE_PASSWORD` as a `production`-environment secret rather than a repository secret, so only the production deploy job can read it (R71); a pre-flight job outside the deploy job's concurrency group that verifies secrets, resolves and validates the SHA, requires the `ci.yml` push run for that SHA to have succeeded **including `deploy_staging`**, and requires the image to exist in ghcr.io — all before the run can occupy a slot a waiting staging deploy needs (R72); deploying with `bin/kamal deploy --skip-push --version=<sha>`, never a bare deploy or `kamal rollback` (R73); a post-deploy `/up` check (R74); and one shared `deploy-ovh-box` concurrency group for staging and production, `cancel-in-progress: false` (R75). Recorded the residual edge case this design accepts rather than solves (R76, E16). Added AT28-AT30 for the workflow's static shape, its dispatched behaviour, and the queue-collision edge case. | R3, R37, R68-R76, AC-32, AC-53-AC-59, AT28-AT30, E16 | The owner found gathering five secrets on a workstation for every release the wrong tradeoff against a button in Actions, and wanted that friction gone without losing the "a human decides" property the original manual-only decision protected — production still never deploys without someone choosing that exact moment. `Kamal::Commands::Lock#lock_dir` (`kamal-2.12.0/lib/kamal/commands/lock.rb`) locks per destination, but every deploy's prune filters only on `label=service=` with no destination in that filter, so an unsynchronized staging/production pair can prune each other's images — the shared `deploy-ovh-box` queue (R75) is what this spec already relied on for staging (R42) and now extends to production. Verified against PR #99 (`chore/production-deploy-workflow`), whose workflow file and runbook diff this entry matches; that branch was, at the time of this amendment, being revised in parallel to split the pre-flight checks in R72 into a job outside the concurrency queue, which R72 already specifies as required. |
 
 ---
 
