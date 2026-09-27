@@ -4,7 +4,7 @@ How to reach the staging box, how to deploy to it, and how to recover it when a 
 leaves it half-provisioned. No secrets are recorded here; passwords and tokens are
 deliberately excluded.
 
-**Last verified:** 2026-07-28
+**Last verified:** 2026-09-27
 
 Staging and production share a single OVH box. Staging is deployed automatically by the
 `deploy_staging` job in `.github/workflows/ci.yml` on every push to `main`; production is
@@ -307,10 +307,14 @@ encoding of one rule and must be updated whenever `AdminUser::MINIMUM_PASSWORD_L
 changes. No secret value, prefix, or length is ever printed.
 
 The production workflow needs the same secrets with `PRODUCTION_DATABASE_PASSWORD` in
-place of `STAGING_DATABASE_PASSWORD`, and runs the same pre-flight. Its job declares
-`environment: production`, so it reads secrets from the **`production` GitHub
-Environment** (Settings → Environments → production) first and falls back to repository
-secrets for any name the environment does not define:
+place of `STAGING_DATABASE_PASSWORD`, and runs the same pre-flight. Both of its jobs
+(`preflight` and `deploy_production`) declare `environment: production`, so they read
+secrets from the **`production` GitHub Environment** (Settings → Environments →
+production) first and fall back to repository secrets for any name the environment does
+not define. `preflight` needs the environment too: without it, it could not see
+`PRODUCTION_DATABASE_PASSWORD` and would check staging's `ADMIN_SEED_PASSWORD` instead of
+production's. The cost is that each run records two deployments to `production`, and
+any required-reviewer rule added to the environment would ask for approval twice.
 
 | Secret | Where | Why there |
 |---|---|---|
@@ -322,6 +326,11 @@ The environment's **deployment branch rule** should allow `main` only. The workf
 refuses to run from any other ref, but that check lives in the workflow file, which a
 branch could edit; the environment rule is enforced by GitHub and withholds the
 production secrets from any other branch.
+
+**Create the `production` environment, with that branch rule, before the first run.**
+If the workflow runs while no `production` environment exists, GitHub creates one
+automatically with **no** deployment branch rule, and it stays that way until someone
+adds the rule.
 
 ---
 
@@ -354,7 +363,10 @@ Production never deploys automatically. To release what is on `main`:
 2. **Actions → Deploy production → Run workflow**. Leave *Use workflow from* on
    `Branch: main` and the SHA box empty. This works from the GitHub mobile site or app.
 
-The run, in order:
+The run has two jobs. `preflight` does every check, outside the deploy queue (see
+[Why the checks run outside the queue](#why-the-checks-run-outside-the-queue)), and passes
+the resolved SHA to `deploy_production` as a job output. `deploy_production` then joins
+the queue and deploys. In order:
 
 - refuses to start from any ref but `main`;
 - checks that all six secrets are non-empty (SPEC-017 R38);
@@ -369,7 +381,9 @@ The run, in order:
 - fails unless `https://syndicatedevelopment.com/up` returns 200.
 
 If CI for `main`'s head is still running, the run fails with a message saying so; wait
-and press the button again.
+and press the button again. If that CI run was **cancelled**, open it, choose
+**Re-run failed jobs**, and wait for `deploy_staging` to succeed before pressing the
+button again.
 
 `config/deploy.yml` still defaults the production host to the RFC 2606 placeholder
 `production-not-provisioned.invalid`. That is a guard, not an unfinished edit: an
@@ -435,6 +449,24 @@ In practice: if a staging deploy is running, a production run is waiting, and an
 merge's staging deploy then arrives, the waiting production run shows **cancelled** and
 has to be started again. Nothing is half-deployed when that happens — the cancelled run
 never began.
+
+#### Why the checks run outside the queue
+
+The one-waiting-run rule also works in the other direction: a production run joining the
+queue would cancel a staging deploy that is already waiting. Staging would silently stay
+on the older commit, and that merge's CI run would end **cancelled**.
+
+So the workflow's `preflight` job, which has no concurrency group, runs every check
+before `deploy_production` joins `deploy-ovh-box`. For the usual case, deploying `main`'s
+head, that closes the hole: a commit whose staging deploy is still waiting has not
+passed the `deploy_staging` check, so `preflight` fails and nothing joins the queue. Keep
+the checks in `preflight`; moving them into `deploy_production` would reopen it.
+
+**Residual case — rollbacks.** A run given an older, already-green SHA passes
+`preflight` whatever staging is doing. If a staging deploy is running and another is
+waiting at that moment, the rollback's `deploy_production` replaces the waiting staging
+deploy and cancels it. Before rolling back, check the CI runs on `main`; if one does get
+cancelled, open it and choose **Re-run failed jobs** once production has finished.
 
 ### First deploy on a fresh box
 
