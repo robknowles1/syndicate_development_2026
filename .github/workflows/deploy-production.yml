@@ -16,25 +16,18 @@ permissions:
   actions: read
 
 jobs:
-  deploy_production:
+  # Do not give this job a concurrency group or move its checks into deploy_production.
+  # Why: docs/deployment/ovh-server-access.md#why-the-checks-run-outside-the-queue
+  preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
 
-    environment:
-      name: production
-      url: https://syndicatedevelopment.com
+    environment: production
 
-    # Shared with deploy_staging in ci.yml on purpose: the two destinations hold
-    # DIFFERENT Kamal locks, and each deploy's prune is destination-blind, so a
-    # staging deploy running alongside this one can delete production's image.
-    # Do not rename this group, and keep cancel-in-progress false — killing a
-    # deploy mid-flight can strand the box between releases.
-    concurrency:
-      group: deploy-ovh-box
-      cancel-in-progress: false
+    outputs:
+      sha: ${{ steps.target.outputs.sha }}
 
     env:
-      KAMAL_PRODUCTION_HOST: 15.204.81.231
       IMAGE: ghcr.io/robknowles1/syndicate_development_2026
 
     steps:
@@ -143,6 +136,11 @@ jobs:
             exit 1
           fi
 
+          if [ "$conclusion" = "cancelled" ]; then
+            echo "::error::CI for ${SHA} was cancelled (${run_url}), usually because a newer run displaced its queued staging deploy. Open that run, choose 'Re-run failed jobs', wait for deploy_staging to succeed, then run this again."
+            exit 1
+          fi
+
           if [ "$conclusion" != "success" ]; then
             echo "::error::CI for ${SHA} concluded '${conclusion}' (${run_url}). Refusing to deploy an untested commit."
             exit 1
@@ -172,6 +170,25 @@ jobs:
 
           echo "${IMAGE}:${SHA} is present."
 
+  deploy_production:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    environment:
+      name: production
+      url: https://syndicatedevelopment.com
+
+    # Shared with ci.yml deploy_staging; do not rename or cancel in progress.
+    # Why: docs/deployment/ovh-server-access.md#why-staging-and-production-share-one-queue
+    concurrency:
+      group: deploy-ovh-box
+      cancel-in-progress: false
+
+    env:
+      KAMAL_PRODUCTION_HOST: 15.204.81.231
+
+    steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
@@ -197,10 +214,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
 
-      # Keep `deploy --skip-push --version=`. Dropping --skip-push rebuilds an
-      # image CI never tested; `kamal setup` is first-run provisioning only
-      # (SPEC-017 R39); `kamal rollback` fails once a staging prune has removed
-      # production's old container (R42).
+      # Keep deploy --skip-push --version=; never setup or rollback here. See SPEC-017 R39, R42.
       - name: Deploy to production with Kamal
         env:
           RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
@@ -208,7 +222,7 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
           PRODUCTION_DATABASE_PASSWORD: ${{ secrets.PRODUCTION_DATABASE_PASSWORD }}
-          SHA: ${{ steps.target.outputs.sha }}
+          SHA: ${{ needs.preflight.outputs.sha }}
         run: bin/kamal deploy --skip-push --version="$SHA"
 
       - name: Check https://syndicatedevelopment.com/up
